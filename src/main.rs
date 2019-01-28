@@ -42,7 +42,7 @@ fn run() -> cli::error::Result<()> {
 		commit: env!("VERGEN_SHA_SHORT"),
 		version: env!("CARGO_PKG_VERSION"),
 		executable_name: "supermatrix",
-		author: "Abmatrix <http://www.abmatrix.org>",
+		author: "SuperMatrix",
 		description: "A cross chain node of SUPERMatrix",
 	};
 	cli::run(::std::env::args(), Exit, version)
