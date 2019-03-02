@@ -33,7 +33,7 @@ srml-timestamp = { git = "https://github.com/paritytech/substrate", default-feat
 srml-treasury = { git = "https://github.com/paritytech/substrate", default-features = false }
 srml-sudo = { git = "https://github.com/paritytech/substrate", default-features = false }
 srml-upgrade-key = { git = "https://github.com/paritytech/substrate", default-features = false }
-node-primitives = { git = "https://github.com/paritytech/substrate", default-features = false }
+node-primitives = { path = "../primitives" , default-features = false }
 substrate-consensus-aura-primitives = { git = "https://github.com/paritytech/substrate", default-features = false }
 substrate-keyring = { git = "https://github.com/paritytech/substrate", optional = true }
 
