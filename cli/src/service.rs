@@ -18,6 +18,7 @@ use substrate_service::{
 };
 use transaction_pool::{self, txpool::{Pool as TransactionPool}};
 use inherents::InherentDataProviders;
+use vendor::{start_vendor, VendorServiceConfig};
 
 construct_simple_protocol! {
 	/// Demo protocol attachment for substrate.
@@ -55,8 +56,23 @@ construct_service_factory! {
 		Genesis = GenesisConfig,
 		Configuration = NodeConfig<Self>,
 		FullService = FullComponents<Self>
-			{ |config: FactoryFullConfiguration<Self>, executor: TaskExecutor|
-				FullComponents::<Factory>::new(config, executor) },
+			{ |config: FactoryFullConfiguration<Self>, executor: TaskExecutor| {
+                match FullComponents::<Factory>::new(config, executor.clone()) {
+                    Ok(service) => {
+                        executor.spawn(start_vendor(
+                            VendorServiceConfig { url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string() },
+                            service.network(),
+                            service.client(),
+                            service.transaction_pool(),
+                            service.keystore(),
+                            service.on_exit(),
+                        ));
+                        return Ok(service)
+                    },
+                    Err(err) => return Err(err),
+                }
+            }
+		},
 		AuthoritySetup = {
 			|mut service: Self::FullService, executor: TaskExecutor, local_key: Option<Arc<Pair>>| {
 				let (block_import, link_half) = service.config.custom.grandpa_import_setup.take()

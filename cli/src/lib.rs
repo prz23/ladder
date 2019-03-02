@@ -4,7 +4,7 @@
 #![warn(unused_extern_crates)]
 
 extern crate tokio;
-
+extern crate futures;
 extern crate substrate_cli as cli;
 extern crate substrate_primitives as primitives;
 extern crate node_runtime;
@@ -25,10 +25,13 @@ extern crate substrate_service;
 extern crate node_executor;
 extern crate substrate_keystore;
 extern crate substrate_inherents as inherents;
+extern crate sr_primitives as runtime_primitives;
+extern crate sr_io as runtime_io;
 
 #[macro_use]
 extern crate log;
 extern crate structopt;
+extern crate vendor;
 
 pub use cli::error;
 pub mod chain_spec;
@@ -106,6 +109,7 @@ pub fn run<I, T, E>(args: I, exit: E, version: cli::VersionInfo) -> error::Resul
 			Err(e) => e.exit(),
 		};
 
+    println!("#######{:?}", matches);
 	let (spec, config) = cli::parse_matches::<service::Factory, _>(
 		load_spec, &version, "substrate-node", &matches
 	)?;
@@ -155,6 +159,7 @@ fn run_until_exit<T, C, E>(
 
 	// TODO [andre]: timeout this future #1318
 	let _ = runtime.shutdown_on_idle().wait();
+
 
 	Ok(())
 }

@@ -41,6 +41,9 @@ extern crate sr_version as version;
 extern crate node_primitives;
 extern crate substrate_consensus_aura_primitives as consensus_aura;
 
+pub mod matrix;
+pub mod sigcount;
+
 use rstd::prelude::*;
 use substrate_primitives::u32_trait::{_2, _4};
 use node_primitives::{
@@ -71,8 +74,11 @@ pub use runtime_primitives::BuildStorage;
 pub use consensus::Call as ConsensusCall;
 pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
+pub use matrix::Call as MatrixCall;
+pub use sigcount::Call as SigCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use srml_support::{StorageValue, RuntimeMetadata};
+pub use system::EventRecord;
 
 /// Runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
@@ -203,6 +209,14 @@ impl grandpa::Trait for Runtime {
 	type Event = Event;
 }
 
+impl matrix::Trait for Runtime {
+	type Event = Event;
+}
+
+impl sigcount::Trait for Runtime {
+	type Event = Event;
+}
+
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, SessionKey>) where
 		Block = Block,
@@ -226,6 +240,8 @@ construct_runtime!(
 		Treasury: treasury,
 		Contract: contract::{Module, Call, Config<T>, Event<T>},
 		Sudo: sudo,
+		Matrix: matrix::{Module, Call, Storage, Event<T>},
+		Sigcount: sigcount::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -245,6 +261,13 @@ pub type UncheckedExtrinsic = generic::UncheckedMortalCompactExtrinsic<Address, 
 pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Index, Call>;
 /// Executive: handles dispatch to the various modules.
 pub type Executive = executive::Executive<Runtime, Block, system::ChainContext<Runtime>, Balances, AllModules>;
+
+decl_runtime_apis! {
+	pub trait VendorApi {
+		fn account_nonce(account: AccountId) -> Index;
+		fn authorities() -> Vec<SessionKey>;
+	}
+}
 
 impl_runtime_apis! {
 	impl client_api::Core<Block> for Runtime {
@@ -322,6 +345,16 @@ impl_runtime_apis! {
 	impl aura_api::AuraApi<Block> for Runtime {
 		fn slot_duration() -> u64 {
 			Aura::slot_duration()
+		}
+	}
+
+	impl self::VendorApi<Block> for Runtime {
+		fn account_nonce(account: AccountId) -> Index {
+			System::account_nonce(&account)
+		}
+
+		fn authorities() -> Vec<SessionKey> {
+			Consensus::authorities()
 		}
 	}
 }

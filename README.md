@@ -20,3 +20,7 @@ You can start a development chain with:
 ```
 cargo run -- --dev
 ```
+
+## UI
+* visit https://polkadot.js.org/apps/ .
+* Settings => Local Node.

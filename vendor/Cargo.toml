@@ -1,0 +1,40 @@
+[package]
+name = "vendor"
+version = "0.1.0"
+authors = ["Abmatrix <http://www.abmatrix.org>"]
+#edition = "2018"
+
+[dependencies]
+contracts = { path = "./contracts"}
+log = "0.4" 
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+web3 = "0.5.1"
+error-chain = "0.12"
+tokio = "0.1.7"
+toml = "0.4.2"
+futures = "0.1"
+tokio-timer = "0.1"
+
+ethabi = "6.0"
+ethabi-derive = "6.0"
+ethabi-contract = "6.0"
+
+tokio-core = "0.1.8"
+rustc-hex = "1.0"
+
+node-runtime = { path = "../runtime" }
+node-primitives = { path = "../primitives" }
+sr-io = { git = "https://github.com/paritytech/substrate" }
+sr-primitives = { git = "https://github.com/paritytech/substrate" }
+substrate-client = { git = "https://github.com/paritytech/substrate", default-features = false }
+substrate-network = { git = "https://github.com/paritytech/substrate" }
+substrate-keystore = { git = "https://github.com/paritytech/substrate" }
+substrate-primitives = { git = "https://github.com/paritytech/substrate" }
+substrate-transaction-pool = { git = "https://github.com/paritytech/substrate" }
+
+[dev-dependencies]
+tempdir = "0.3"
+quickcheck = "0.6.1"
+jsonrpc-core = "8.0"

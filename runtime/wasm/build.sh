@@ -11,3 +11,5 @@ for i in node_runtime
 do
 	wasm-gc target/wasm32-unknown-unknown/release/$i.wasm target/wasm32-unknown-unknown/release/$i.compact.wasm
 done
+
+read -n1 -p "Press any key to continue..."
