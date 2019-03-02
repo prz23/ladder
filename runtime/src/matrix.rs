@@ -71,8 +71,8 @@ decl_event! {
     pub enum Event<T> where 
         <T as system::Trait>::Hash
     {
-        Ingress(TransferMessage, Signatures),
-        Egress(TransferMessage, Signatures),
+        Ingress(Vec<u8>, Vec<u8>),
+        Egress(Vec<u8>, Vec<u8>),
         Has(Hash),
     } 
 }
