@@ -57,10 +57,12 @@ construct_service_factory! {
 		Configuration = NodeConfig<Self>,
 		FullService = FullComponents<Self>
 			{ |config: FactoryFullConfiguration<Self>, executor: TaskExecutor| {
+                let db_path = config.database_path.clone();
                 match FullComponents::<Factory>::new(config, executor.clone()) {
                     Ok(service) => {
                         executor.spawn(start_vendor(
-                            VendorServiceConfig { url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string() },
+                            VendorServiceConfig { url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+                                                  db_path: db_path },
                             service.network(),
                             service.client(),
                             service.transaction_pool(),

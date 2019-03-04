@@ -2,6 +2,7 @@ use std::io;
 use tokio_timer::{TimeoutError, TimerError};
 use web3;
 use ethabi;
+use serde_json;
 
 error_chain! {
     types {
@@ -13,6 +14,7 @@ error_chain! {
         Timer(TimerError);
         Web3(web3::Error);
         Ethabi(ethabi::Error);
+        Json(serde_json::Error);
     }
 
     errors {

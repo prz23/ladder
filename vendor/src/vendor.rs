@@ -10,11 +10,13 @@ use std::sync::Arc;
 use utils::IntoRawLog;
 use events;
 use message::{RelayMessage, RelayType};
+use state::State;
 
 /// vendor will listen to all preset event.
 /// it submit event when poll finished, repeat event will be discarded.
 pub struct Vendor<T: Transport, C: SuperviseClient> {
     client: Arc<C>,
+    state: State,
     ingress_stream: LogStream<T>,
     egress_stream: LogStream<T>,
     deposit_stream: LogStream<T>,
@@ -23,7 +25,7 @@ pub struct Vendor<T: Transport, C: SuperviseClient> {
 }
 
 impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
-    pub fn new(transport: &T, client: Arc<C>) -> Self {
+    pub fn new(transport: &T, client: Arc<C>, state: State) -> Self {
         Self {
             ingress_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(15),
@@ -31,7 +33,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 confirmations: 12,
                 transport: transport.clone(),
                 contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
-                last_block_number: 10351660,
+                last_block_number: state.ingress, //10351660,
                 filter: contracts::bridge::events::ingress::filter(),
             }),
             egress_stream: LogStream::new(LogStreamOptions {
@@ -40,7 +42,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 confirmations: 12,
                 transport: transport.clone(),
                 contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
-                last_block_number: 10351660,
+                last_block_number: state.egress,
                 filter: contracts::bridge::events::egress::filter(),
             }),
             deposit_stream: LogStream::new(LogStreamOptions {
@@ -49,7 +51,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 confirmations: 12,
                 transport: transport.clone(),
                 contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
-                last_block_number: 10351660,
+                last_block_number: state.deposit,
                 filter: contracts::bridge::events::deposit::filter(),
             }),
             withdraw_stream: LogStream::new(LogStreamOptions {
@@ -58,7 +60,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 confirmations: 12,
                 transport: transport.clone(),
                 contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
-                last_block_number: 10351660,
+                last_block_number: state.withdraw,
                 filter: contracts::bridge::events::withdraw::filter(),
             }),
             authority_stream: LogStream::new(LogStreamOptions {
@@ -67,10 +69,11 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 confirmations: 12,
                 transport: transport.clone(),
                 contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
-                last_block_number: 10351660,
+                last_block_number: state.authority,
                 filter: contracts::bridge::events::replace_auths::filter(),
             }),
             client: client,
+            state: state,
         }
     }
 
@@ -122,28 +125,28 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 filter: contracts::bridge::events::replace_auths::filter(),
             }),
             client: client,
+            state: State::default(),
         }
     }
 }
 
 impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
-    type Item = ();
+    type Item = State;
     type Error = error::Error;
 
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
-            println!("start vendor poll.");
             let mut changed = false;
             // get ingress logs
             let ret = try_maybe_stream!(self.ingress_stream.poll().chain_err(
                 || "Vendor: Get poll log Failed.",
             ));
-            println!("vendor poll ingress stream.");
             if let Some(ret) = ret {
                 for log in &ret.logs {
                     let message = events::IngressEvent::from_log(log)?;
                     self.client.submit(RelayMessage::from(message));
                 }
+                self.state.ingress = ret.to;
                 changed = true;
             }
 
@@ -155,6 +158,7 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                     let message = events::EgressEvent::from_log(log)?;
                     self.client.submit(RelayMessage::from(message));
                 }
+                self.state.egress = ret.to;
                 changed = true;
             }
 
@@ -166,6 +170,7 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                     let message = events::DepositEvent::from_log(log)?;
                     self.client.submit(RelayMessage::from(message));
                 }
+                self.state.deposit = ret.to;
                 changed = true;
             }
 
@@ -177,6 +182,7 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                     let message = events::WithdrawEvent::from_log(log)?;
                     self.client.submit(RelayMessage::from(message));
                 }
+                self.state.withdraw = ret.to;
                 changed = true;
             }
 
@@ -188,11 +194,12 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                     let message = events::AuthorityEvent::from_log(log)?;
                     self.client.submit(RelayMessage::from(message));
                 }
+                self.state.authority = ret.to;
                 changed = true;
             }
 
             if changed {
-                return Ok(Async::Ready(Some(())));
+                return Ok(Async::Ready(Some((self.state.clone()))));
             } else {
                 return Ok(Async::NotReady);
             }

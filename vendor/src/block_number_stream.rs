@@ -62,7 +62,6 @@ impl<T: Transport> Stream for BlockNumberStream<T> {
                     let _ = try_stream!(self.poll_interval.poll().chain_err(|| {
                         format!("BlockNumberStream polling interval failed",)
                     }));
-                    info!("BlockNumberStream polling last block number");
                     let future = web3::api::Eth::new(&self.transport).block_number();
                     let next_state = State::AwaitBlockNumber(
                         self.timer.timeout(future.from_err(), self.request_timeout),
