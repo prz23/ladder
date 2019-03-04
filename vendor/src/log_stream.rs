@@ -165,7 +165,6 @@ impl<T: Transport> Stream for LogStream<T> {
             self.state = next_state;
 
             if value_to_yield.is_some() {
-                println!("value {:?}", value_to_yield);
                 return Ok(Async::Ready(value_to_yield));
             }
         }

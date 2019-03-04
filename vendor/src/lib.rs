@@ -48,13 +48,16 @@ pub mod block_number_stream;
 pub mod vendor;
 pub mod events;
 pub mod message;
+mod state;
 mod utils;
 
 use message::{RelayMessage,RelayType};
 use tokio_core::reactor::Core;
 use std::sync::{Arc, atomic::AtomicUsize};
+use std::path::Path;
 use error::{ResultExt};
 use vendor::Vendor;
+use state::{State, StateStorage};
 use utils::StreamExt;
 use network::SyncProvider;
 use futures::{Future, Stream};
@@ -131,6 +134,7 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
 
 pub struct VendorServiceConfig {
     pub url: String,
+    pub db_path: String,
 }
 
 // /// Start the supply worker. The returned future should be run in a tokio runtime.
@@ -168,7 +172,18 @@ pub fn start_vendor<A, B, C, N>(
             MAX_PARALLEL_REQUESTS,
         )
         .chain_err(|| {format!("Cannot connect to ethereum node at {}",config.url)}).unwrap();
-        let vendor = Vendor::new(&transport, spv).for_each(|_| Ok(()));
+
+        let state_path = Path::new(&config.db_path).join("storage.json");
+        if !state_path.exists() {
+            std::fs::File::create(&state_path).expect("failed to create the storage file of state.");
+        }
+        let mut storage = StateStorage::load(state_path.as_path()).unwrap();
+        let vendor = Vendor::new(&transport, spv, storage.state.clone())
+                            .and_then(|state| {
+                                storage.save(&state)?;
+                                Ok(())
+                            })
+                            .for_each(|_| Ok(()));
         event_loop.run(vendor).unwrap();
     });
 
