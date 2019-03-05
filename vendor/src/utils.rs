@@ -1,5 +1,5 @@
 use futures::{Async, Poll, Stream, Future};
-use ethabi::{self, FunctionOutputDecoder, RawLog};
+use ethabi::RawLog;
 use web3::types::Log;
 
 pub trait IntoRawLog {

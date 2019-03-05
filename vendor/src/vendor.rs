@@ -4,12 +4,10 @@ use log_stream::{LogStream, LogStreamOptions};
 use super::error::{self, ResultExt};
 use std::time::Duration;
 use contracts;
-use ethabi::{self, FunctionOutputDecoder, RawLog};
 use SuperviseClient;
 use std::sync::Arc;
-use utils::IntoRawLog;
 use events;
-use message::{RelayMessage, RelayType};
+use message::{RelayMessage};
 use state::State;
 
 /// vendor will listen to all preset event.
@@ -199,7 +197,7 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
             }
 
             if changed {
-                return Ok(Async::Ready(Some((self.state.clone()))));
+                return Ok(Async::Ready(Some(self.state.clone())));
             } else {
                 return Ok(Async::NotReady);
             }

@@ -16,6 +16,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 extern crate contracts;
+extern crate signer;
 extern crate ethabi;
 extern crate rustc_hex;
 
@@ -51,29 +52,34 @@ pub mod message;
 mod state;
 mod utils;
 
+use std::str::FromStr;
 use message::{RelayMessage,RelayType};
 use tokio_core::reactor::Core;
 use std::sync::{Arc, atomic::AtomicUsize};
+use std::sync::mpsc::channel;
 use std::path::Path;
 use error::{ResultExt};
 use vendor::Vendor;
+use signer::{SecretKey, RawTransaction};
 use state::{State, StateStorage};
-use utils::StreamExt;
 use network::SyncProvider;
 use futures::{Future, Stream};
 use keystore::Store as Keystore;
 use runtime_primitives::codec::{Decode, Encode, Compact};
 use runtime_primitives::generic::{BlockId, Era};
 use runtime_primitives::traits::{As, Block, Header, BlockNumberToHash, ProvideRuntimeApi};
-use client::{BlockchainEvents, BlockBody, blockchain::HeaderBackend};
+use client::{BlockchainEvents, blockchain::HeaderBackend};
 use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
-use primitives::ed25519::Pair;
+use primitives::{ed25519::Pair, Ed25519AuthorityId};
 use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 use node_runtime::{
     Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, matrix::*, VendorApi
 };
-use futures::prelude::*;
 use node_primitives::{AccountId, Index};
+use web3::{
+    api::Namespace, 
+    types::{Address, Bytes}
+};
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
 
@@ -88,6 +94,7 @@ pub struct Supervisor<A, B, C, N> where
     pub pool: Arc<TransactionPool<A>>,
     pub network: Arc<N>,
     pub key: Pair,
+    pub eth_key: SecretKey,
     pub phantom: std::marker::PhantomData<B>,
     // pub queue: Vec<(RelayMessage, u8)>,
     pub nonce: Arc<AtomicUsize>, // to control nonce.
@@ -105,37 +112,48 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
 
-        let nonce = self.client.runtime_api().account_nonce(&at, local_id.into()).unwrap();
-        let function =  match message.ty {
-                RelayType::Ingress => Call::Matrix(MatrixCall::ingress(message.raw, vec![1])),
-                RelayType::Egress => Call::Matrix(MatrixCall::egress(message.raw, vec![1])),
-                RelayType::Deposit => Call::Matrix(MatrixCall::deposit(message.raw, vec![1])),
-                RelayType::Withdraw => Call::Matrix(MatrixCall::withdraw(message.raw, vec![1])),
-                RelayType::SetAuthorities => Call::Matrix(MatrixCall::reset_authorities(message.raw, vec![1])),
-            };
-        let payload = (
-            Compact::<Index>::from(nonce),  // index/nonce
-            function, //function
-            Era::immortal(),  
-            self.client.genesis_hash(),
-        );
-        let signature = self.key.sign(&payload.encode());
-        let extrinsic = UncheckedExtrinsic::new_signed(
-            payload.0.into(),
-            payload.1,
-            local_id.into(),
-            signature.into(),
-            payload.2
-        );
-        let xt: ExtrinsicFor<A> = Decode::decode(&mut &extrinsic.encode()[..]).unwrap();
-        println!("@submit transaction {:?}",self.pool.submit_one(&at, xt));
+        let auths = self.client.runtime_api().authorities(&at).unwrap();
+        if auths.contains(&Ed25519AuthorityId(self.key.public().0)) {
+            let nonce = self.client.runtime_api().account_nonce(&at, local_id.into()).unwrap();
+            let signature = signer::sign_message(&self.eth_key, &message.raw).into();
+
+            let function =  match message.ty {
+                    RelayType::Ingress => Call::Matrix(MatrixCall::ingress(message.raw, signature)),
+                    RelayType::Egress => Call::Matrix(MatrixCall::egress(message.raw, signature)),
+                    RelayType::Deposit => Call::Matrix(MatrixCall::deposit(message.raw, signature)),
+                    RelayType::Withdraw => Call::Matrix(MatrixCall::withdraw(message.raw, signature)),
+                    RelayType::SetAuthorities => Call::Matrix(MatrixCall::reset_authorities(message.raw, signature)),
+                };
+
+            let payload = (
+                Compact::<Index>::from(nonce),  // index/nonce
+                function, //function
+                Era::immortal(),  
+                self.client.genesis_hash(),
+            );
+            
+            let signature = self.key.sign(&payload.encode());
+            let extrinsic = UncheckedExtrinsic::new_signed(
+                payload.0.into(),
+                payload.1,
+                local_id.into(),
+                signature.into(),
+                payload.2
+            );
+
+            let xt: ExtrinsicFor<A> = Decode::decode(&mut &extrinsic.encode()[..]).unwrap();
+            println!("@submit transaction {:?}",self.pool.submit_one(&at, xt));
+        }
     }
 }
 
+#[derive(Clone)]
 pub struct VendorServiceConfig {
     pub url: String,
     pub db_path: String,
+    pub eth_key: String,
 }
+
 
 // /// Start the supply worker. The returned future should be run in a tokio runtime.
 pub fn start_vendor<A, B, C, N>(
@@ -154,26 +172,29 @@ pub fn start_vendor<A, B, C, N>(
 {
     let key = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
     info!("ss58 account: {:?}, ", key.public().to_ss58check());
-
+    let eth_key = SecretKey::from_str(&config.eth_key).unwrap();
     let spv = Arc::new(Supervisor {
         client: client.clone(),
         pool: pool.clone(),
         network: network.clone(),
         key: key,
+        eth_key: eth_key.clone(),
         nonce: Arc::new(AtomicUsize::new(0)),
         phantom: std::marker::PhantomData,
     });
+
+    let l_config = config.clone();
     //new a thread to listen 
     std::thread::spawn(move ||{
         let mut event_loop = Core::new().unwrap();
         let transport = web3::transports::Http::with_event_loop(
-            &config.url,
-            &event_loop.handle(),
-            MAX_PARALLEL_REQUESTS,
-        )
-        .chain_err(|| {format!("Cannot connect to ethereum node at {}",config.url)}).unwrap();
+                &l_config.url,
+                &event_loop.handle(),
+                MAX_PARALLEL_REQUESTS,
+            )
+            .chain_err(|| {format!("Cannot connect to ethereum node at {}", l_config.url)}).unwrap();
 
-        let state_path = Path::new(&config.db_path).join("storage.json");
+        let state_path = Path::new(&l_config.db_path).join("storage.json");
         if !state_path.exists() {
             std::fs::File::create(&state_path).expect("failed to create the storage file of state.");
         }
@@ -187,7 +208,55 @@ pub fn start_vendor<A, B, C, N>(
         event_loop.run(vendor).unwrap();
     });
 
-    // // how to fetch real key?
+
+    let (sender, receiver) = channel();
+    // A thread that send transaction to ETH
+    std::thread::spawn(move || {
+        let mut event_loop = Core::new().unwrap();
+        let transport = web3::transports::Http::with_event_loop(
+                &config.url,
+                &event_loop.handle(),
+                MAX_PARALLEL_REQUESTS,
+            )
+            .chain_err(|| {format!("Cannot connect to ethereum node at {}",config.url)}).unwrap();
+
+        // get nonce
+        let contract_address:Address = "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into();
+        let authority_address: Address = "0x74241db5f3ebaeecf9506e4ae988186093341604".into();
+        let nonce_future  = web3::api::Eth::new(&transport).transaction_count(authority_address, None);
+        let mut nonce = event_loop.run(nonce_future).unwrap();
+        info!("eth nonce: {}", nonce);
+        loop {
+            let event = receiver.recv().unwrap();
+            let data = match event {
+                RawEvent::Ingress(message, signatures) => {
+                    info!("ingress message: {:?}, signatures: {:?}", message, signatures);
+                    let payload = contracts::bridge::functions::release::encode_input(message, signatures);
+                    Some(payload)
+                },
+                _ => {
+                    None
+                }
+            };
+            if let Some(payload) = data {
+                let transaction = RawTransaction {
+                                nonce: nonce.into(),
+                                to: Some(contract_address),
+                                value: 0.into(),
+                                data: payload,
+                                gas_price: 2000000000.into(),
+                                gas: 41000.into(),
+                            };
+                let data = signer::sign_transaction(&eth_key, &transaction);
+                let future = web3::api::Eth::new(&transport).send_raw_transaction(Bytes::from(data));
+                let hash = event_loop.run(future).unwrap();
+                info!("send to eth transaction hash: {:?}", hash);
+                nonce += 1.into();
+            }
+        }
+    });
+
+    // how to fetch real key?
     let events_key = StorageKey(runtime_io::twox_128(b"System Events").to_vec());
     let storage_stream = client.storage_changes_notification_stream(Some(&[events_key])).unwrap()
     .map(|(block, changes)| StorageChangeSet { block, changes: changes.iter().cloned().collect()})
@@ -205,14 +274,8 @@ pub fn start_vendor<A, B, C, N>(
             .map(|r| r.event)
             .collect();
         events.iter().for_each(|event| {
-            if let Event::sigcount(e) = event {
-                match e {
-                    //RawEvent::Ingress(hash, msg) => println!("@@@@@@@@ Ingress: hash{:?}, msg{:?}", hash, msg),
-                    // RawEvent::Txisok(transcation) => println!("XXXXXXXXXXX Txisok: hash{:?}",transcation),
-                    // RawEvent::TranscationVerified(transcation,vec) => println!("XXXXXXXXXXX Txisok: hash{:?}",transcation) ,
-                    // other events.
-                    _ => println!("@@@@@@@ other: {:?}", e),
-                }
+            if let Event::matrix(e) = event {
+                sender.send(e.clone()).unwrap();
             }
         });
         Ok(())
@@ -221,31 +284,5 @@ pub fn start_vendor<A, B, C, N>(
     storage_stream
             .map(|_|())
             .select(on_exit)
-            .then(|_| {
-                println!("@@@@@@@@@exit");
-            Ok(())})
+            .then(|_| {Ok(())})
 }
-
-/*
-/// main logical of vendor.
-fn origin() {
-    let web3 = Web3::new();
-    /// save last 100 logs
-    let logs_dump = LogsDump::new();
-    let number = FixedNumber::load(path)?;
-    loop {
-        let _ await interval?;
-        let block_number = await get_block_number(&web3)?;
-        number.wal(block_number);
-        if (number.changed) {
-            let logs = await get_logs(&web3, abi)?;
-            let logs = check(logs);
-            let logs = logs_dump.dump(logs);
-            let signed_logs = logs.map(switch).map(sign);
-            if client.submit(signed_logs)? {
-                number.flash()?;
-            }
-        }
-    }
-}
-*/
