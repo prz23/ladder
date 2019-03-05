@@ -249,7 +249,7 @@ impl AuthorityEvent {
         index += 4;
 
         let mut last: Vec<Address> = Vec::with_capacity(last_len as usize);
-        for i in (0..last_len) {
+        for _ in (0..last_len) {
             let address: Address = bytes[index..(index + 20)].into();
             index += 20;
             last.push(address);

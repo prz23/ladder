@@ -8,7 +8,7 @@ use tokio_timer::{Timeout, Timer};
 use web3;
 use web3::api::Namespace;
 use web3::helpers::CallFuture;
-use web3::types::{Address, Filter, FilterBuilder, Log, H256};
+use web3::types::{Address, FilterBuilder, Log, H256};
 use web3::Transport;
 
 fn ethabi_topic_to_web3(topic: &ethabi::Topic<ethabi::Hash>) -> Option<Vec<H256>> {

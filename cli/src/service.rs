@@ -62,7 +62,8 @@ construct_service_factory! {
                     Ok(service) => {
                         executor.spawn(start_vendor(
                             VendorServiceConfig { url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
-                                                  db_path: db_path },
+                                                  db_path: db_path,
+                                                  eth_key: "154ec1e37ec3fcad3af521e56e0c749ca65d295ef9e78e942cb0a2d4863bc6fc".to_string() },
                             service.network(),
                             service.client(),
                             service.transaction_pool(),
