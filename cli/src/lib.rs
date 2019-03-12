@@ -32,6 +32,7 @@ extern crate sr_io as runtime_io;
 extern crate log;
 extern crate structopt;
 extern crate vendor;
+extern crate signer;
 
 pub use cli::error;
 pub mod chain_spec;

@@ -72,7 +72,7 @@ impl<T: Transport> Stream for BlockNumberStream<T> {
                     let last_block = try_ready!(future.poll().chain_err(
                         || "BlockNumberStream: fetching of last block number failed",
                     )).as_u64();
-                    info!(
+                    debug!(
                         "BlockNumberStream: fetched last block number {}",
                         last_block
                     );
@@ -83,7 +83,7 @@ impl<T: Transport> Stream for BlockNumberStream<T> {
                         self.last_checked_block = last_confirmed_block;
                         (State::AwaitInterval, Some(last_confirmed_block))
                     } else {
-                        info!(
+                        debug!(
                             "BlockNumberStream: no blocks confirmed since we last checked. waiting some more"
                         );
                         (State::AwaitInterval, None)

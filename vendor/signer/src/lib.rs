@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate secp256k1;
 extern crate tiny_keccak;
 #[macro_use]
@@ -7,14 +9,15 @@ extern crate rlp;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-
-#[cfg(test)]
 extern crate rustc_hex;
+
+mod keypair;
 
 use web3::{types::{U256, H160}};
 use rlp::{RlpStream};
 
 pub use secp256k1::{Secp256k1, Message, SecretKey, PublicKey, All};
+pub use keypair::{KeyPair, Keyring, PrivKey, PubKey};
 
 lazy_static! {
     pub static ref SECP256K1: Secp256k1<All> = Secp256k1::new();

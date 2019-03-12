@@ -55,12 +55,12 @@ mod utils;
 use std::str::FromStr;
 use message::{RelayMessage,RelayType};
 use tokio_core::reactor::Core;
-use std::sync::{Arc, atomic::AtomicUsize};
-use std::sync::mpsc::channel;
-use std::path::Path;
+use std::sync::{Arc, atomic::AtomicUsize, Mutex};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::path::{Path, PathBuf};
 use error::{ResultExt};
 use vendor::Vendor;
-use signer::{SecretKey, RawTransaction};
+use signer::{SecretKey, RawTransaction, KeyPair, PrivKey};
 use state::{State, StateStorage};
 use network::SyncProvider;
 use futures::{Future, Stream};
@@ -73,13 +73,14 @@ use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
 use primitives::{ed25519::Pair, Ed25519AuthorityId};
 use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 use node_runtime::{
-    Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, matrix::*, VendorApi
+    Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, matrix::*, VendorApi,
 };
-use node_primitives::{AccountId, Index};
+use node_primitives::{Hash, AccountId, Index, BlockNumber};
 use web3::{
     api::Namespace, 
-    types::{Address, Bytes}
+    types::{Address, Bytes, H256},
 };
+use std::marker::{Send, Sync};
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
 
@@ -87,8 +88,14 @@ pub trait SuperviseClient{
     fn submit(&self, message: RelayMessage);
 }
 
+pub struct PacketNonce<B> where B: Block{
+    pub nonce: Index, // to control nonce.
+    pub last_block: BlockId<B>,
+}
+
 pub struct Supervisor<A, B, C, N> where
-    A: txpool::ChainApi
+    A: txpool::ChainApi,
+    B: Block
 {
     pub client: Arc<C>,
     pub pool: Arc<TransactionPool<A>>,
@@ -97,7 +104,31 @@ pub struct Supervisor<A, B, C, N> where
     pub eth_key: SecretKey,
     pub phantom: std::marker::PhantomData<B>,
     // pub queue: Vec<(RelayMessage, u8)>,
-    pub nonce: Arc<AtomicUsize>, // to control nonce.
+    pub packet_nonce: Arc<Mutex<PacketNonce<B>>>,
+}
+
+impl<A, B, C, N> Supervisor<A, B, C, N> where
+    A: txpool::ChainApi<Block = B>,
+    B: Block,
+    C: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi,
+    N: SyncProvider<B>,
+    C::Api: VendorApi<B>
+{
+    /// get nonce with atomic
+    fn get_nonce(&self) -> Index {
+        let mut p_nonce = self.packet_nonce.lock().unwrap();
+        let local_id: AccountId = self.key.public().0.into();
+        let info = self.client.info().unwrap();
+        let at = BlockId::Hash(info.best_hash);
+        if p_nonce.last_block == at {
+            p_nonce.nonce = p_nonce.nonce + 1;
+        } else {
+            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, local_id.into()).unwrap();
+            p_nonce.last_block = at;
+        }
+
+        p_nonce.nonce
+    }
 }
 
 impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
@@ -111,10 +142,9 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
         let local_id: AccountId = self.key.public().0.into();
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
-
         let auths = self.client.runtime_api().authorities(&at).unwrap();
         if auths.contains(&Ed25519AuthorityId(self.key.public().0)) {
-            let nonce = self.client.runtime_api().account_nonce(&at, local_id.into()).unwrap();
+            let nonce = self.get_nonce();
             let signature = signer::sign_message(&self.eth_key, &message.raw).into();
 
             let function =  match message.ty {
@@ -142,6 +172,7 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
             );
 
             let xt: ExtrinsicFor<A> = Decode::decode(&mut &extrinsic.encode()[..]).unwrap();
+            println!("extrinsic {:?}", xt);
             println!("@submit transaction {:?}",self.pool.submit_one(&at, xt));
         }
     }
@@ -149,13 +180,138 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
 
 #[derive(Clone)]
 pub struct VendorServiceConfig {
-    pub url: String,
+    pub kovan_url: String,
+    pub ropsten_url: String,
+    pub kovan_address: String,
+    pub ropsten_address: String,
     pub db_path: String,
     pub eth_key: String,
 }
 
+pub struct SideListener<V> {
+    pub url: String,
+    pub contract_address: Address,
+    pub db_file: PathBuf,
+    pub spv: Arc<V>,
+}
 
-// /// Start the supply worker. The returned future should be run in a tokio runtime.
+fn print_err(err: error::Error) {
+    let message = err
+        .iter()
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("\n\nCaused by:\n  ");
+    error!("{}", message);
+}
+
+fn is_err_time_out(err: &error::Error) -> bool {
+    err.iter().any(|e| e.to_string() == "Request timed out")
+}
+
+impl<V> SideListener<V> where 
+    V: SuperviseClient + Send + Sync + 'static
+{
+    fn start(self) {
+        // TODO hook the event of http disconnect to keep run.
+        std::thread::spawn(move ||{
+            let mut event_loop = Core::new().unwrap();
+            loop {
+                let transport = web3::transports::Http::with_event_loop(
+                        &self.url,
+                        &event_loop.handle(),
+                        MAX_PARALLEL_REQUESTS,
+                    )
+                    .chain_err(|| {format!("Cannot connect to ethereum node at {}", self.url)}).unwrap();
+
+                if !self.db_file.exists() {
+                    std::fs::File::create(&self.db_file).expect("failed to create the storage file of state.");
+                }
+                let mut storage = StateStorage::load(self.db_file.as_path()).unwrap();
+                let vendor = Vendor::new(&transport, self.spv.clone(), storage.state.clone(), self.contract_address)
+                                    .and_then(|state| {
+                                        storage.save(&state)?;
+                                        Ok(())
+                                    })
+                                    .for_each(|_| Ok(()));
+                match event_loop.run(vendor) {
+                    Ok(s) => {
+                        info!("{:?}", s);
+                        break;
+                    }
+                    Err(err) => {
+                        if is_err_time_out(&err) {
+                            error!("\nreqeust time out sleep 5s and try again.\n");
+                            std::thread::sleep_ms(5000);
+                        } else {
+                            print_err(err);
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+struct SideSender {
+    name: String,
+    url: String,
+    contract_address: Address,
+    pair: KeyPair,
+}
+
+impl SideSender {
+    fn start(self) -> Sender<RawEvent<Hash>> {
+        let (sender, receiver) = channel();
+        std::thread::spawn(move || {
+            let mut event_loop = Core::new().unwrap();
+            let transport = web3::transports::Http::with_event_loop(
+                    &self.url,
+                    &event_loop.handle(),
+                    MAX_PARALLEL_REQUESTS,
+                )
+                .chain_err(|| {format!("Cannot connect to ethereum node at {}", self.url)}).unwrap();
+
+            // get nonce
+            let authority_address: Address = self.pair.address();
+            let nonce_future  = web3::api::Eth::new(&transport).transaction_count(authority_address, None);
+            let mut nonce = event_loop.run(nonce_future).unwrap();
+            info!("eth nonce: {}", nonce);
+            loop {
+                let event = receiver.recv().unwrap();
+                let data = match event {
+                    RawEvent::Ingress(message, signatures) => {
+                        info!("ingress message: {:?}, signatures: {:?}", message, signatures);
+                        let payload = contracts::bridge::functions::release::encode_input(message, signatures);
+                        Some(payload)
+                    },
+                    _ => {
+                        None
+                    }
+                };
+                if let Some(payload) = data {
+                    let transaction = RawTransaction {
+                                    nonce: nonce.into(),
+                                    to: Some(self.contract_address),
+                                    value: 0.into(),
+                                    data: payload,
+                                    gas_price: 2000000000.into(),
+                                    gas: 41000.into(),
+                                };
+                    let sec: &SecretKey = unsafe { std::mem::transmute(self.pair.privkey()) };
+                    let data = signer::sign_transaction(&sec, &transaction);
+                    let future = web3::api::Eth::new(&transport).send_raw_transaction(Bytes::from(data));
+                    let hash = event_loop.run(future).unwrap();
+                    info!("send to eth transaction hash: {:?}", hash);
+                    nonce += 1.into();
+                }
+            }
+        });
+
+        sender
+    }
+}
+
+/// Start the supply worker. The returned future should be run in a tokio runtime.
 pub fn start_vendor<A, B, C, N>(
     config: VendorServiceConfig,
     network: Arc<N>,
@@ -171,91 +327,62 @@ pub fn start_vendor<A, B, C, N>(
     C::Api: VendorApi<B>
 {
     let key = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
-    info!("ss58 account: {:?}, ", key.public().to_ss58check());
+    let kovan_address = Address::from_str(&config.kovan_address).unwrap();
+    let ropsten_address = Address::from_str(&config.ropsten_address).unwrap();
     let eth_key = SecretKey::from_str(&config.eth_key).unwrap();
+    let eth_pair = KeyPair::from_privkey(PrivKey::from_slice(&eth_key[..]));
+    info!("ss58 account: {:?}, eth account: {}", key.public().to_ss58check(), eth_pair);
+
+    let info = client.info().unwrap();
+    let at = BlockId::Hash(info.best_hash);
+    let packet_nonce = PacketNonce {
+            nonce: client.runtime_api().account_nonce(&at, key.public().0.into()).unwrap(),
+            last_block: at,
+        };
+
     let spv = Arc::new(Supervisor {
         client: client.clone(),
         pool: pool.clone(),
         network: network.clone(),
         key: key,
         eth_key: eth_key.clone(),
-        nonce: Arc::new(AtomicUsize::new(0)),
+        packet_nonce: Arc::new(Mutex::new(packet_nonce)),
         phantom: std::marker::PhantomData,
     });
+    
+    //new a thread to listen kovan network
+    SideListener {
+        url: config.kovan_url.clone(), 
+        db_file: Path::new(&config.db_path).join("kovan_storage.json"),
+        contract_address: kovan_address,
+        spv: spv.clone(),
+    }.start();
 
-    let l_config = config.clone();
-    //new a thread to listen 
-    std::thread::spawn(move ||{
-        let mut event_loop = Core::new().unwrap();
-        let transport = web3::transports::Http::with_event_loop(
-                &l_config.url,
-                &event_loop.handle(),
-                MAX_PARALLEL_REQUESTS,
-            )
-            .chain_err(|| {format!("Cannot connect to ethereum node at {}", l_config.url)}).unwrap();
+    //new a thread to listen ropsten network
+    SideListener {
+        url: config.ropsten_url.clone(),
+        db_file:  Path::new(&config.db_path).join("ropsten_storage.json"),
+        contract_address: ropsten_address,
+        spv: spv.clone(),
+    }.start();
 
-        let state_path = Path::new(&l_config.db_path).join("storage.json");
-        if !state_path.exists() {
-            std::fs::File::create(&state_path).expect("failed to create the storage file of state.");
-        }
-        let mut storage = StateStorage::load(state_path.as_path()).unwrap();
-        let vendor = Vendor::new(&transport, spv, storage.state.clone())
-                            .and_then(|state| {
-                                storage.save(&state)?;
-                                Ok(())
-                            })
-                            .for_each(|_| Ok(()));
-        event_loop.run(vendor).unwrap();
-    });
-
-
-    let (sender, receiver) = channel();
     // A thread that send transaction to ETH
-    std::thread::spawn(move || {
-        let mut event_loop = Core::new().unwrap();
-        let transport = web3::transports::Http::with_event_loop(
-                &config.url,
-                &event_loop.handle(),
-                MAX_PARALLEL_REQUESTS,
-            )
-            .chain_err(|| {format!("Cannot connect to ethereum node at {}",config.url)}).unwrap();
+    let kovan_sender = SideSender {
+        name: "ETH_Kovan".to_string(),
+        url: config.kovan_url.clone(),
+        contract_address: kovan_address,
+        pair: eth_pair.clone(),
+    }.start();
+    
+    let ropsten_sender = SideSender {
+        name: "ETH_Ropsten".to_string(),
+        url: config.ropsten_url.clone(),
+        contract_address: ropsten_address,
+        pair: eth_pair.clone(),
+    }.start();
 
-        // get nonce
-        let contract_address:Address = "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into();
-        let authority_address: Address = "0x74241db5f3ebaeecf9506e4ae988186093341604".into();
-        let nonce_future  = web3::api::Eth::new(&transport).transaction_count(authority_address, None);
-        let mut nonce = event_loop.run(nonce_future).unwrap();
-        info!("eth nonce: {}", nonce);
-        loop {
-            let event = receiver.recv().unwrap();
-            let data = match event {
-                RawEvent::Ingress(message, signatures) => {
-                    info!("ingress message: {:?}, signatures: {:?}", message, signatures);
-                    let payload = contracts::bridge::functions::release::encode_input(message, signatures);
-                    Some(payload)
-                },
-                _ => {
-                    None
-                }
-            };
-            if let Some(payload) = data {
-                let transaction = RawTransaction {
-                                nonce: nonce.into(),
-                                to: Some(contract_address),
-                                value: 0.into(),
-                                data: payload,
-                                gas_price: 2000000000.into(),
-                                gas: 41000.into(),
-                            };
-                let data = signer::sign_transaction(&eth_key, &transaction);
-                let future = web3::api::Eth::new(&transport).send_raw_transaction(Bytes::from(data));
-                let hash = event_loop.run(future).unwrap();
-                info!("send to eth transaction hash: {:?}", hash);
-                nonce += 1.into();
-            }
-        }
-    });
-
+    let eth_kovan_tag = H256::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+    let eth_ropsten_tag = H256::from_str("0000000000000000000000000000000000000000000000000000000000000002").unwrap();
     // how to fetch real key?
     let events_key = StorageKey(runtime_io::twox_128(b"System Events").to_vec());
     let storage_stream = client.storage_changes_notification_stream(Some(&[events_key])).unwrap()
@@ -275,7 +402,23 @@ pub fn start_vendor<A, B, C, N>(
             .collect();
         events.iter().for_each(|event| {
             if let Event::matrix(e) = event {
-                sender.send(e.clone()).unwrap();
+                match e {
+                    RawEvent::Ingress(message, signatures) => {
+                        println!("raw event ingress: {:?}, {:?}", message, signatures);
+                        events::IngressEvent::from_bytes(message).map(|ie| {
+                            if ie.tag == eth_kovan_tag {
+                                kovan_sender.send(e.clone()).unwrap();
+                            } else if ie.tag == eth_ropsten_tag {
+                                ropsten_sender.send(e.clone()).unwrap();
+                            } else {
+                                warn!("unknown event tag of ingress: {:?}", ie.tag);
+                            }
+                        }).map_err(|err| {
+                            warn!("unexpected format of ingress, message {:?}", message);
+                        });
+                    },
+                    _ => {}
+                };
             }
         });
         Ok(())

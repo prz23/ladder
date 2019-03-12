@@ -19,6 +19,7 @@ use substrate_service::{
 use transaction_pool::{self, txpool::{Pool as TransactionPool}};
 use inherents::InherentDataProviders;
 use vendor::{start_vendor, VendorServiceConfig};
+use signer::Keyring;
 
 construct_simple_protocol! {
 	/// Demo protocol attachment for substrate.
@@ -58,12 +59,18 @@ construct_service_factory! {
 		FullService = FullComponents<Self>
 			{ |config: FactoryFullConfiguration<Self>, executor: TaskExecutor| {
                 let db_path = config.database_path.clone();
+                let keyring = config.keys.first().map_or(Keyring::default(), |key| Keyring::from(key.as_bytes()));
+                info!("eth signer key: {}", keyring.to_hex());
                 match FullComponents::<Factory>::new(config, executor.clone()) {
                     Ok(service) => {
                         executor.spawn(start_vendor(
-                            VendorServiceConfig { url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+                            VendorServiceConfig { kovan_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+                                                  ropsten_url: "https://ropsten.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+                                                  kovan_address: "690aB411ca08bB0631C49513e10b29691561bB08".to_string(),
+                                                  ropsten_address: "631b6b933Bc56Ebd93e4402aA5583650Fcf74Cc7".to_string(),
                                                   db_path: db_path,
-                                                  eth_key: "154ec1e37ec3fcad3af521e56e0c749ca65d295ef9e78e942cb0a2d4863bc6fc".to_string() },
+                                                  eth_key: keyring.to_hex(), // sign message
+                                                },
                             service.network(),
                             service.client(),
                             service.transaction_pool(),

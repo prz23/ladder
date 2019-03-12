@@ -31,6 +31,7 @@ substrate-keystore = { git = "https://github.com/paritytech/substrate" }
 vendor = { path = "../vendor" }
 node-runtime = { path = "../runtime" }
 node-primitives = { path = "../primitives" }
+signer = { path = "../vendor/signer" }
 
 [dev-dependencies]
 substrate-service-test = { git = "https://github.com/paritytech/substrate" }
