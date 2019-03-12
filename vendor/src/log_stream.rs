@@ -116,7 +116,7 @@ impl<T: Transport> Stream for LogStream<T> {
                     let last_block = try_stream!(self.block_number_stream.poll().chain_err(
                         || "LogStream: fetching of last confirmed block number failed",
                     ));
-                    info!("LogStream: fetched confirmed block number {}", last_block);
+                    debug!("LogStream: fetched confirmed block number {}", last_block);
 
                     let from = self.last_checked_block + 1;
                     let filter = self.filter_builder
@@ -126,7 +126,7 @@ impl<T: Transport> Stream for LogStream<T> {
                         .build();
                     let future = web3::api::Eth::new(&self.transport).logs(filter);
 
-                    info!(
+                    debug!(
                         "LogStream: fetching logs in blocks {} to {}",
                         from,
                         last_block

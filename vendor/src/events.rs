@@ -4,7 +4,7 @@ use web3::types::{Address, H256, U256, Log};
 use utils::IntoRawLog;
 use std::str::FromStr;
 
-pub const ETH_COIN: &str = "0x0000000000000000000000000000000000000001";
+pub const ETH_COIN: &str = "0000000000000000000000000000000000000000000000000000000000000001";
 pub const MESSAGE_LENGTH: usize = 116;
 pub const BANKER_LENGTH: usize = 116;
 pub const AUTHORITY_MINIMUM_LENGTH: usize = 72;

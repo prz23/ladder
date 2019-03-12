@@ -1,5 +1,5 @@
 use futures::{Async, Poll, Stream};
-use web3::Transport;
+use web3::{Transport, types::Address};
 use log_stream::{LogStream, LogStreamOptions};
 use super::error::{self, ResultExt};
 use std::time::Duration;
@@ -23,50 +23,50 @@ pub struct Vendor<T: Transport, C: SuperviseClient> {
 }
 
 impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
-    pub fn new(transport: &T, client: Arc<C>, state: State) -> Self {
+    pub fn new(transport: &T, client: Arc<C>, state: State, contract_address: Address) -> Self {
         Self {
             ingress_stream: LogStream::new(LogStreamOptions {
-                request_timeout: Duration::from_secs(15),
+                request_timeout: Duration::from_secs(30),
                 poll_interval: Duration::from_secs(10),
-                confirmations: 12,
+                confirmations: 1,
                 transport: transport.clone(),
-                contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
+                contract_address: contract_address,
                 last_block_number: state.ingress, //10351660,
                 filter: contracts::bridge::events::ingress::filter(),
             }),
             egress_stream: LogStream::new(LogStreamOptions {
-                request_timeout: Duration::from_secs(15),
+                request_timeout: Duration::from_secs(30),
                 poll_interval: Duration::from_secs(10),
-                confirmations: 12,
+                confirmations: 1,
                 transport: transport.clone(),
-                contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
+                contract_address: contract_address,
                 last_block_number: state.egress,
                 filter: contracts::bridge::events::egress::filter(),
             }),
             deposit_stream: LogStream::new(LogStreamOptions {
-                request_timeout: Duration::from_secs(15),
+                request_timeout: Duration::from_secs(30),
                 poll_interval: Duration::from_secs(10),
-                confirmations: 12,
+                confirmations: 1,
                 transport: transport.clone(),
-                contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
+                contract_address: contract_address,
                 last_block_number: state.deposit,
                 filter: contracts::bridge::events::deposit::filter(),
             }),
             withdraw_stream: LogStream::new(LogStreamOptions {
-                request_timeout: Duration::from_secs(15),
+                request_timeout: Duration::from_secs(30),
                 poll_interval: Duration::from_secs(10),
-                confirmations: 12,
+                confirmations: 1,
                 transport: transport.clone(),
-                contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
+                contract_address: contract_address,
                 last_block_number: state.withdraw,
                 filter: contracts::bridge::events::withdraw::filter(),
             }),
             authority_stream: LogStream::new(LogStreamOptions {
-                request_timeout: Duration::from_secs(15),
+                request_timeout: Duration::from_secs(30),
                 poll_interval: Duration::from_secs(10),
-                confirmations: 12,
+                confirmations: 1,
                 transport: transport.clone(),
-                contract_address: "0xf1df5972b7e394201d4ffadd797faa4a3c8be0ea".into(),
+                contract_address: contract_address,
                 last_block_number: state.authority,
                 filter: contracts::bridge::events::replace_auths::filter(),
             }),
