@@ -4,6 +4,7 @@
 #![warn(unused_extern_crates)]
 
 extern crate tokio;
+extern crate tokio_timer;
 extern crate futures;
 extern crate substrate_cli as cli;
 extern crate substrate_primitives as primitives;

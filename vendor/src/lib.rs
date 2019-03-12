@@ -73,9 +73,9 @@ use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
 use primitives::{ed25519::Pair, Ed25519AuthorityId};
 use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 use node_runtime::{
-    Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, matrix::*, VendorApi,
+    Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, BankCall, matrix::*, VendorApi,
 };
-use node_primitives::{Hash, AccountId, Index, BlockNumber};
+use node_primitives::{Balance, Hash, AccountId, Index, BlockNumber};
 use web3::{
     api::Namespace, 
     types::{Address, Bytes, H256},
@@ -150,8 +150,8 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
             let function =  match message.ty {
                     RelayType::Ingress => Call::Matrix(MatrixCall::ingress(message.raw, signature)),
                     RelayType::Egress => Call::Matrix(MatrixCall::egress(message.raw, signature)),
-                    RelayType::Deposit => Call::Matrix(MatrixCall::deposit(message.raw, signature)),
-                    RelayType::Withdraw => Call::Matrix(MatrixCall::withdraw(message.raw, signature)),
+                    RelayType::Deposit => Call::Bank(BankCall::deposit(message.raw, signature)),
+                    RelayType::Withdraw => Call::Bank(BankCall::withdraw(message.raw, signature)),
                     RelayType::SetAuthorities => Call::Matrix(MatrixCall::reset_authorities(message.raw, signature)),
                 };
 
@@ -260,7 +260,7 @@ struct SideSender {
 }
 
 impl SideSender {
-    fn start(self) -> Sender<RawEvent<Hash>> {
+    fn start(self) -> Sender<RawEvent<Balance, AccountId, Hash, BlockNumber>> {
         let (sender, receiver) = channel();
         std::thread::spawn(move || {
             let mut event_loop = Core::new().unwrap();

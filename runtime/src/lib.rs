@@ -43,6 +43,7 @@ extern crate substrate_consensus_aura_primitives as consensus_aura;
 
 pub mod matrix;
 pub mod sigcount;
+pub mod bank;
 
 use rstd::prelude::*;
 use substrate_primitives::u32_trait::{_2, _4};
@@ -76,6 +77,7 @@ pub use timestamp::Call as TimestampCall;
 pub use balances::Call as BalancesCall;
 pub use matrix::Call as MatrixCall;
 pub use sigcount::Call as SigCall;
+pub use bank::Call as BankCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use srml_support::{StorageValue, RuntimeMetadata};
 pub use system::EventRecord;
@@ -210,6 +212,10 @@ impl grandpa::Trait for Runtime {
 }
 
 impl matrix::Trait for Runtime {
+    type Event = Event;
+}
+
+impl bank::Trait for Runtime {
 	type Event = Event;
 }
 
@@ -240,8 +246,9 @@ construct_runtime!(
 		Treasury: treasury,
 		Contract: contract::{Module, Call, Config<T>, Event<T>},
 		Sudo: sudo,
-		Matrix: matrix::{Module, Call, Storage, Event<T>},
-		Sigcount: sigcount::{Module, Call, Storage, Event<T>},
+        Matrix: matrix::{Module, Call, Storage, Event<T>},
+        Sigcount: sigcount::{Module, Call, Storage, Event<T>},
+        Bank: bank::{Module, Call, Storage, Event<T>},
 	}
 );
 

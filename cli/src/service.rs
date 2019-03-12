@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 use std::time::Duration;
-
+use tokio_timer;
 use client;
 use consensus::{import_queue, start_aura, AuraImportQueue, SlotDuration, NothingExtra};
 use grandpa;
@@ -42,6 +42,156 @@ impl<F> Default for NodeConfig<F> where F: substrate_service::ServiceFactory {
 			inherent_data_providers: InherentDataProviders::new(),
 		}
 	}
+}
+
+mod vendor {
+    use std::sync::Arc;
+    use futures::{future, Future, Stream};
+    use network::SyncProvider;
+    use client::{BlockchainEvents, BlockBody, blockchain::HeaderBackend};
+    use substrate_keystore::Store as Keystore;
+    use runtime_primitives::traits::{As, Block, Header, BlockNumberToHash};
+    use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
+
+    use futures::prelude::*;
+    use tokio_timer::{Timer, Interval};
+
+    use node_runtime::{EventRecord, UncheckedExtrinsic, Call, Event, sigcount::*, SigCall,MatrixCall};
+    use runtime_io;
+    use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
+    use runtime_primitives::generic::{BlockId, Era};
+    use runtime_primitives::codec::{Decode, Encode, Compact};
+    use node_primitives::{AccountId, Index};
+    struct Mock{
+        poll_interval: Interval,
+    }
+
+    impl Stream for Mock {
+        type Item = ();
+        type Error = ();
+        fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
+            loop {
+                let _ = match self.poll_interval.poll() {
+                    Err(err) => return Err(()),
+                    Ok(Async::NotReady) => return Ok(Async::NotReady),
+                    Ok(Async::Ready(None)) => return Ok(Async::Ready(None)),
+                    Ok(Async::Ready(Some(value))) => value,
+                };
+                println!("############");
+                // do you things
+                return Ok(Async::Ready(Some(())));
+            }
+        }
+    }
+
+    pub fn start_vendor<A, B, C, N>(
+        network: Arc<N>,
+        client: Arc<C>,
+        pool: Arc<TransactionPool<A>>,
+        keystore: &Keystore,
+        on_exit: impl Future<Item=(),Error=()> + Clone,
+    ) -> impl Future<Item=(),Error=()> where
+        A: txpool::ChainApi<Block = B>,
+        B: Block,
+        C: BlockchainEvents<B> + BlockBody<B> + HeaderBackend<B> + BlockNumberToHash,
+        N: SyncProvider<B>
+    {
+        let mock = Mock { poll_interval: Interval::new_interval(std::time::Duration::from_secs(2))};
+        let mock_stream = mock
+                        .for_each(|_| Ok(()));
+
+        let key = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
+        let local_id: AccountId = key.public().0.into();
+        println!("ROS account: {:?}", key.public().to_ss58check());
+        let timer_stream = Interval::new_interval(std::time::Duration::from_secs(10));
+        let fork_client = client.clone();
+        let send_stream = timer_stream.for_each(move |_| {
+                // get nonce
+                // let mut next_index = {
+                //     let local_id = self.local_key.public().0;
+                //     let cur_index = self.transaction_pool.cull_and_get_pending(&BlockId::hash(self.parent_hash), |pending| pending
+                //         .filter(|tx| tx.verified.sender == local_id)
+                //         .last()
+                //         .map(|tx| Ok(tx.verified.index()))
+                //         .unwrap_or_else(|| fork_client.account_nonce(&self.parent_id, local_id))
+                //         .map_err(Error::from)
+                //     );
+
+                //     match cur_index {
+                //         Ok(cur_index) => cur_index + 1,
+                //         Err(e) => {
+                //             warn!(target: "consensus", "Error computing next transaction index: {:?}", e);
+                //             0
+                //         }
+                //     }
+                // };
+
+                let block = fork_client.info().unwrap().best_number;
+                let payload = (
+                    Compact::<Index>::from(0),  // index/nonce
+                    Call::Matrix(MatrixCall::ingress(vec![0, 1, 3, 4, 5, 6, 7],vec![1,0])), //function
+                    Compact::<Index>::from(0),  // index/nonce
+                    Call::Matrix(MatrixCall::ingress(vec![0, 1, 3, 4, 5, 6, 7], vec![0, 1, 3, 4, 5, 6, 7])), //function
+                    Era::immortal(),  
+                    fork_client.genesis_hash(),
+                );
+                let signature = key.sign(&payload.encode());
+                let extrinsic = UncheckedExtrinsic::new_signed(
+                    payload.0.into(),
+                    payload.1,
+                    local_id.into(),
+                    signature.into(),
+                    payload.4
+                );
+                let xt: ExtrinsicFor<A> = Decode::decode(&mut &extrinsic.encode()[..]).unwrap();
+                //println!("check: {:?}", extrinsic.check());
+                println!("@@@@@@@@@@@result: {:?}", pool.submit_one(&BlockId::number(block), xt));
+                Ok(())
+        }).map_err(|_| ());
+
+        // how to fetch real key?
+        let events_key = StorageKey(runtime_io::twox_128(b"System Events").to_vec());
+        let storage_stream = client.storage_changes_notification_stream(Some(&[events_key])).unwrap()
+        .map(|(block, changes)| StorageChangeSet { block, changes: changes.iter().cloned().collect()})
+        .for_each(move |change_set| {
+            println!("@@@@@@@@@@@@@@@@@@");
+            let records: Vec<Vec<EventRecord<Event>>> = change_set.changes
+                .iter()
+                .filter_map(|(_, mbdata)| if let Some(StorageData(data)) = mbdata {
+                    Decode::decode(&mut &data[..])
+                } else { None })
+                .collect();
+            let events: Vec<Event> = records
+                .concat()
+                .iter()
+                .cloned()
+                .map(|r| r.event)
+                .collect();
+            println!("@@@@@@@@@@@@changes: {:?}", events);
+            events.iter().for_each(|event| {
+                if let Event::sigcount(e) = event {
+                    match e {
+                        //RawEvent::Ingress(hash, msg) => println!("@@@@@@@@ Ingress: hash{:?}, msg{:?}", hash, msg),
+                        RawEvent::Txisok(transcation) => println!("XXXXXXXXXXX Txisok: hash{:?}",transcation),
+                        RawEvent::TranscationVerified(transcation,vec) => println!("XXXXXXXXXXX Txisok: hash{:?}",transcation) ,
+                        // other events.
+                        _ => println!("@@@@@@@ other: {:?}", e),
+                    }
+                }
+            });
+            Ok(())
+        });
+
+        storage_stream
+        .join(mock_stream)                      
+        .join(send_stream)
+        .map(|_| ())
+        .select(on_exit)
+        .then(|_| {
+            println!("##############on exit");
+            Ok(())
+        })
+    }
 }
 
 construct_service_factory! {

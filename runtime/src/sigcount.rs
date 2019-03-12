@@ -1,22 +1,10 @@
 extern crate srml_session as session;
 
+
 use rstd::prelude::Vec;
-use runtime_primitives::traits::*;
+//use runtime_primitives::traits::*;
 use srml_support::{StorageValue, StorageMap, dispatch::Result};
 use {balances, system::{self, ensure_signed}};
-
-
-use session::*;
-
-#[derive(Encode, Decode, Default, Clone, PartialEq)]
-pub struct Kitty<Hash, Balance> {
-    id: Hash,
-    dna: Hash,
-    price: Balance,
-    gen: u64,
-}
-
-
 
 pub trait Trait: balances::Trait + session::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -29,7 +17,7 @@ decl_event!(
         <T as system::Trait>::Hash
     {
         Created(AccountId, Hash),
-        SetMin(u64),
+        SetMinRequreSignatures(u64),
         Txisok(Hash),
         // 交易 = vec<id，签名>
         TranscationVerified(Hash,Vec<(AccountId,Hash)>),
@@ -38,31 +26,25 @@ decl_event!(
 
 decl_storage! {
     trait Store for Module<T: Trait> as KittyStorage {
-      /*  Kitties get(kitty): map T::Hash => Kitty<T::Hash, T::Balance>;
-        KittyOwner get(owner_of): map T::Hash => Option<T::AccountId>;
 
-        AllKittiesArray get(kitty_by_index): map u64 => T::Hash;
-        AllKittiesCount get(all_kitties_count): u64;
-        AllKittiesIndex: map T::Hash => u64;
+        /// 记录每个交易的签名的数量
+        /// Record the number of signatures per transaction got
+        NumberOfSignedContract get(num_of_signed): map T::Hash => u64;
 
-        OwnedKittiesArray get(kitty_of_owner_by_index): map (T::AccountId, u64) => T::Hash;
-        OwnedKittiesCount get(owned_kitty_count): map T::AccountId => u64;
-        OwnedKittiesIndex: map T::Hash => u64;
-         */
-        //记录每个交易的签名的数量
-        NumOfSignedContract get(num_of_signed): map T::Hash => u64;
-        //需要这些数量的签名，才发送这个交易通过的事件
+        /// 需要这些数量的签名，才发送这个交易通过的事件
+        /// These amount of signatures are needed to send the event that the transaction verified.
         MinNumOfSignature get(min_signature): u64;
-        //某个交易 Hash => (accountid,sign)
+
+        //record transaction   Hash => (accountid,sign)
         IdSignTxList  get(all_list) : map T::Hash => (T::AccountId,T::Hash);
+        IdSignTxListB  get(all_list_b) : map T::Hash => Vec<(T::AccountId,T::Hash)>;
+        IdSignTxListC  get(all_list_c) : map T::Hash => Vec<T::AccountId>;
 
-        IdSignTxListB  get(all_listB) : map T::Hash => Vec<(T::AccountId,T::Hash)>;
-
-        IdSignTxListC  get(all_listC) : map T::Hash => Vec<T::AccountId>;
-        //已经发送过的交易记录  防止重复发送事件
+        /// 已经发送过的交易记录  防止重复发送事件
+        /// Transaction records that have been sent prevent duplication of events
         AlreadySentTx get(already_sent) : map T::Hash => u64;
         
-        Nonce: u64;
+       // Nonce: u64;
     }
 }
 
@@ -71,14 +53,8 @@ decl_module! {
 
         fn deposit_event<T>() = default;
 
-        pub fn ingress(origin, message: Vec<u8>) -> Result {
-            let sender = ensure_signed(origin)?;
-            let hash = T::Hashing::hash_of(&message);
-            
-            Ok(())
-        }
-
-        //设置最小要求签名数量
+        /// 设置最小要求签名数量
+        /// Set the minimum required number of signatures
         pub  fn set_min_num(origin,new_num: u64) -> Result{
             let _sender = ensure_signed(origin)?;
             let newmin = new_num;
@@ -86,12 +62,12 @@ decl_module! {
                 return Err("too small,should bigger than 5");
             }
             <MinNumOfSignature<T>>::put(newmin) ;
-            Self::deposit_event(RawEvent::SetMin(newmin));
+            Self::deposit_event(RawEvent::SetMinRequreSignatures(newmin));
             Ok(())
         }
 
-        //签名并判断如果当前签名数量足够就发送一个事件
-        //TODO:还需要判断是否是同一个人不断签名
+        /// 签名并判断如果当前签名数量足够就发送一个事件
+        /// Sign and determine if the current number of signatures is sufficient to send an event
         pub  fn sign_and_check(origin,transcation : T::Hash,sign : T::Hash) -> Result{
             let sender = ensure_signed(origin)?;
             //判断是否是合法验证者集合中的人
@@ -99,14 +75,14 @@ decl_module! {
             ensure!(!validators.contains(&sender),"not validator");
 
             //查看该交易是否存在，没得话添加上去
-            if !<NumOfSignedContract<T>>::exists(transcation) {
-                <NumOfSignedContract<T>>::insert(&transcation,0);
+            if !<NumberOfSignedContract<T>>::exists(transcation) {
+                <NumberOfSignedContract<T>>::insert(&transcation,0);
                 <AlreadySentTx<T>>::insert(&transcation,0);
             }
 
             //查看这个签名的是否重复发送交易 重复发送就滚粗
-            let mut RepeatVec = Self::all_listC(transcation);
-            ensure!(RepeatVec.contains(&sender),"repeat!");
+            let mut repeat_vec = Self::all_list_c(transcation);
+            ensure!(repeat_vec.contains(&sender),"repeat!");
 
             //查看交易是否已被发送
             if 1 == Self::already_sent(transcation){
@@ -117,31 +93,30 @@ decl_module! {
             <IdSignTxList<T>>::insert(transcation.clone(),(sender.clone(),sign.clone()));
 
             //增加一条记录 ->  交易 = vec of 验证者 签名
-            let mut StoredVec = Self::all_listB(transcation);
-            StoredVec.push((sender.clone(),sign.clone()));
-            <IdSignTxListB<T>>::insert(transcation.clone(),StoredVec.clone());
-            RepeatVec.push(sender.clone());
-            <IdSignTxListC<T>>::insert(transcation.clone(),RepeatVec.clone());
+            let mut stored_vec = Self::all_list_b(transcation);
+            stored_vec.push((sender.clone(),sign.clone()));
+            <IdSignTxListB<T>>::insert(transcation.clone(),stored_vec.clone());
+            repeat_vec.push(sender.clone());
+            <IdSignTxListC<T>>::insert(transcation.clone(),repeat_vec.clone());
 
             //其他验证？
             Self::_verify(transcation)?;
 
             let numofsigned = Self::num_of_signed(&transcation);
-
             let newnumofsigned = numofsigned.checked_add(1)
             .ok_or("Overflow adding a new sign to Tx")?;
 
-            <NumOfSignedContract<T>>::insert(&transcation,newnumofsigned);
-
+            <NumberOfSignedContract<T>>::insert(&transcation,newnumofsigned);
             if newnumofsigned <= Self::min_signature() {
                 return Err("not enough signatusign_and_checkre");
             }
 
-            //记录已经发送过的交易  同时发送事件Event
+
+            // Record the transaction and sending event
             <AlreadySentTx<T>>::insert(&transcation,1);
             Self::deposit_event(RawEvent::Txisok(transcation));
             
-            Self::deposit_event(RawEvent::TranscationVerified(transcation,StoredVec));
+            Self::deposit_event(RawEvent::TranscationVerified(transcation,stored_vec));
             Ok(())
         }
 
@@ -149,10 +124,7 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-   
-
-    fn _verify(tx : T::Hash) -> Result{
-
+    fn _verify(_tx : T::Hash) -> Result{
         //TODO:verify signature or others
         Ok(())
     }
