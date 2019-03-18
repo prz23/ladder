@@ -11,10 +11,10 @@ use rstd::prelude::Vec;
 use runtime_primitives::traits::*;
 use srml_support::{StorageValue, StorageMap, dispatch::Result};
 use system::{self, ensure_signed};
+use sigcount;
 
 
-
-pub trait Trait: balances::Trait + session::Trait{
+pub trait Trait: balances::Trait + session::Trait + sigcount::Trait{
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
@@ -22,28 +22,23 @@ pub trait Trait: balances::Trait + session::Trait{
 decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 
-         fn deposit_event<T>() = default;
+        fn deposit_event<T>() = default;
 
         /// deposit
         //offset 0:32  who         ::   AccountID
         //offset 32:48 bytes        ::   money
         //origin, hash 32: T::Hash, tag 32: T::Hash, id 20: T::AccountId, amount 32: T::Balance, signature: Vec<u8>
         //(origin, message: Vec, signature: Vec)
-        pub fn deposit(origin, message: Vec<u8>, _signature: Vec<u8>) -> Result {
+        pub fn deposit(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let _sender = ensure_signed(origin)?;
             // 解析message --> hash  tag  id  amount
-            let mut messagedrain = message.clone();
-            let _hash:Vec<_> = messagedrain.drain(0..32).collect();
-            let id:Vec<_> = messagedrain.drain(32..64).collect();
-            let who: T::AccountId = Decode::decode(&mut &id.encode()[..]).unwrap();
-            let amount_vec:Vec<u8> = messagedrain.drain(32..64).collect();
-            let mut amount: u64 = 0;
-            let mut i = 0;
-            amount_vec.iter().for_each(|x|{
-                let exp = (*x as u64)^i;
-                amount = amount+exp;
-                i = i+1;
-            });
+            let (tx_hash,who,amount,signature_hash) = Self::split_message(message,signature);
+            //check the validity and number of signatures
+            if Self::check_signature(who.clone(),tx_hash,signature_hash).is_ok(){
+                runtime_io::print("deposit -> account balance");
+            } else{
+                return Err("not enough signature or bad signature");
+            }
 
             // ensure no repeat desposit
             ensure!(Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already depositing.");
@@ -67,6 +62,8 @@ decl_module! {
             ensure!(Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already depositing.");
             // ensure no repeat
             ensure!(Self::intentions_desposit_vec().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already in queue.");
+
+
             // update the list of intentions to desposit
             <IntentionsDespositVec<T>>::put({
                 let mut v =  Self::intentions_desposit_vec();
@@ -82,14 +79,16 @@ decl_module! {
 
         /// withdraw
         /// origin, message: Vec<u8>, signature: Vec<u8>
-         pub fn withdraw(_origin, message: Vec<u8>, _signature: Vec<u8>) -> Result {
+         pub fn withdraw(_origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
+
             // 解析message --> hash  tag  id  amount
-            let mut messagedrain = message.clone();
-            let _hash:Vec<_> = messagedrain.drain(0..32).collect();
-
-            let id:Vec<_> = messagedrain.drain(32..64).collect();
-            let who: T::AccountId = Decode::decode(&mut &id.encode()[..]).unwrap();
-
+            let (tx_hash,who,_amount,signature_hash) = Self::split_message(message,signature);
+            //check the validity and number of signatures
+            if Self::check_signature(who.clone(),tx_hash,signature_hash).is_ok(){
+                runtime_io::print("deposit -> account balance");
+            } else{
+                return Err("not enough signature or bad signature");
+            }
 
             // ensure no repeat
             ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
@@ -223,6 +222,31 @@ decl_event! {
 
 impl<T: Trait> Module<T>
 {
+    fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash) {
+        // 解析message --> hash  tag  id  amount
+        let mut messagedrain = message.clone();
+
+        let hash:Vec<_> = messagedrain.drain(0..32).collect();
+        let tx_hash: T::Hash = Decode::decode(&mut &hash.encode()[..]).unwrap();
+
+        let signature_hash =  Decode::decode(&mut &signature.encode()[..]).unwrap();
+
+        let id:Vec<_> = messagedrain.drain(32..64).collect();
+        let who: T::AccountId = Decode::decode(&mut &id.encode()[..]).unwrap();
+        let amount_vec:Vec<u8> = messagedrain.drain(32..40).collect();
+        let mut amount: u64 = 0;
+        let mut i = 0;
+        amount_vec.iter().for_each(|x|{
+            let exp = (*x as u64)^i;
+            amount = amount+exp;
+            i = i+1;
+        });
+
+        //ensure the signature is valid
+        //ensure!(Self::check_secp512(&hash[..],&signature[..]),"not valid signature");
+       
+        return (tx_hash,who,amount,signature_hash);
+    }
 
     /// Hook to be called after transaction processing.  间隔一段时间才触发 rotate_session
     pub fn check_rotate_session(block_number: T::BlockNumber) {
@@ -347,7 +371,6 @@ impl<T: Trait> Module<T>
 
         let xx1 = balance_value[0];  let xx2 = balance_value[1];  let xx3 = balance_value[2];
         let yy1 = balance_factor[0];  let yy2 = balance_factor[1];  let yy3 = balance_factor[2]; let yy4 = balance_factor[3];
-
         
         let mut final_ba = 0;
         if money <= xx1 {
@@ -361,5 +384,17 @@ impl<T: Trait> Module<T>
         }
 
         <DespositingBalance<T>>::get(who)*T::Balance::sa((final_se * final_ba)as u64)
+    }
+
+    fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash) -> Result {
+        //ensure enough signature
+        <sigcount::Module<T>>::check_signature(who,tx,signature)
+    }
+
+    fn check_secp512(tx: &[u8; 65], signature: &[u8; 32]) -> bool {
+        runtime_io::print("asd");
+        //TODO: if runtime_io::secp256k1_ecdsa_recover(signature,tx).is_ok(){ true} else { false }
+        //TODO:
+        true
     }
 }
