@@ -1,49 +1,25 @@
-//! Substrate Node CLI
+//! Substrate Node Template CLI library.
 
 #![warn(missing_docs)]
+#![warn(unused_extern_crates)]
 
-extern crate node_cli as cli;
-extern crate ctrlc;
-extern crate futures;
+mod chain_spec;
+mod service;
+mod cli;
 
-#[macro_use]
-extern crate error_chain;
-
-use cli::VersionInfo;
-use futures::sync::oneshot;
-use futures::{future, Future};
-
-use std::cell::RefCell;
-
-// handles ctrl-c
-struct Exit;
-impl cli::IntoExit for Exit {
-	type Exit = future::MapErr<oneshot::Receiver<()>, fn(oneshot::Canceled) -> ()>;
-	fn into_exit(self) -> Self::Exit {
-		// can't use signal directly here because CtrlC takes only `Fn`.
-		let (exit_send, exit) = oneshot::channel();
-
-		let exit_send_cell = RefCell::new(Some(exit_send));
-		ctrlc::set_handler(move || {
-			if let Some(exit_send) = exit_send_cell.try_borrow_mut().expect("signal handler not reentrant; qed").take() {
-				exit_send.send(()).expect("Error sending exit notification");
-			}
-		}).expect("Error setting Ctrl-C handler");
-
-		exit.map_err(drop)
-	}
-}
-
-quick_main!(run);
+pub use cli::{VersionInfo, IntoExit, error};
 
 fn run() -> cli::error::Result<()> {
-	let version = VersionInfo {
-		name: "SUPERMatrix Node",
-		commit: env!("VERGEN_SHA_SHORT"),
-		version: env!("CARGO_PKG_VERSION"),
-		executable_name: "supermatrix",
-		author: "SuperMatrix",
-		description: "A cross chain node of SUPERMatrix",
-	};
-	cli::run(::std::env::args(), Exit, version)
+    let version = VersionInfo {
+        name: "ABMatrix Node",
+        commit: env!("VERGEN_SHA_SHORT"),
+        version: env!("CARGO_PKG_VERSION"),
+        executable_name: "abmatrix",
+        author: "ABMatrix",
+        description: "A cross chain node of ABMatrix",
+        support_url: "https://github.com/paritytech/substrate/issues/new",
+    };
+	cli::run(::std::env::args(), cli::Exit, version)
 }
+
+error_chain::quick_main!(run);

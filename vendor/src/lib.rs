@@ -21,8 +21,6 @@ extern crate ethabi;
 extern crate rustc_hex;
 
 extern crate node_runtime;
-extern crate node_primitives;
-extern crate sr_io as runtime_io;
 extern crate sr_primitives as runtime_primitives;
 extern crate substrate_client as client;
 extern crate substrate_network as network;
@@ -56,26 +54,26 @@ use std::str::FromStr;
 use message::{RelayMessage,RelayType};
 use tokio_core::reactor::Core;
 use std::sync::{Arc, atomic::AtomicUsize, Mutex};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{channel, Sender};
 use std::path::{Path, PathBuf};
 use error::{ResultExt};
 use vendor::Vendor;
 use signer::{SecretKey, RawTransaction, KeyPair, PrivKey};
-use state::{State, StateStorage};
+use state::{StateStorage};
 use network::SyncProvider;
 use futures::{Future, Stream};
 use keystore::Store as Keystore;
 use runtime_primitives::codec::{Decode, Encode, Compact};
 use runtime_primitives::generic::{BlockId, Era};
-use runtime_primitives::traits::{As, Block, Header, BlockNumberToHash, ProvideRuntimeApi};
-use client::{BlockchainEvents, blockchain::HeaderBackend};
+use runtime_primitives::traits::{Block, BlockNumberToHash, ProvideRuntimeApi};
+use client::{runtime_api::Core as CoreApi, BlockchainEvents, blockchain::HeaderBackend};
 use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
-use primitives::{ed25519::Pair, Ed25519AuthorityId};
+use primitives::{Pair as TraitPait, ed25519::{Pair, Public as Ed25519AuthorityId}};
 use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 use node_runtime::{
-    Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, BankCall, matrix::*, VendorApi,
+    Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, BankCall, matrix::*, VendorApi
 };
-use node_primitives::{Balance, Hash, AccountId, Index, BlockNumber};
+use node_runtime::{Balance, Hash, AccountId, Index, BlockNumber, AuthorityId};
 use web3::{
     api::Namespace, 
     types::{Address, Bytes, H256},
@@ -117,13 +115,12 @@ impl<A, B, C, N> Supervisor<A, B, C, N> where
     /// get nonce with atomic
     fn get_nonce(&self) -> Index {
         let mut p_nonce = self.packet_nonce.lock().unwrap();
-        let local_id: AccountId = self.key.public().0.into();
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
         if p_nonce.last_block == at {
             p_nonce.nonce = p_nonce.nonce + 1;
         } else {
-            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, local_id.into()).unwrap();
+            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, self.key.public()).unwrap();
             p_nonce.last_block = at;
         }
 
@@ -136,14 +133,15 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
     B: Block,
     C: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi,
     N: SyncProvider<B>,
-    C::Api: VendorApi<B>
+    C::Api: VendorApi<B> + CoreApi<B>
 {
     fn submit(&self, message: RelayMessage) {
-        let local_id: AccountId = self.key.public().0.into();
+        let local_id: AccountId = self.key.public();
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
-        let auths = self.client.runtime_api().authorities(&at).unwrap();
-        if auths.contains(&Ed25519AuthorityId(self.key.public().0)) {
+        // let auths = self.client.runtime_api().authorities(&at).unwrap();
+        // if auths.contains(&AuthorityId::from(self.key.public().0)) {
+        if self.client.runtime_api().is_authority(&at, &self.key.public()).unwrap() {
             let nonce = self.get_nonce();
             let signature = signer::sign_message(&self.eth_key, &message.raw).into();
 
@@ -336,7 +334,7 @@ pub fn start_vendor<A, B, C, N>(
     let info = client.info().unwrap();
     let at = BlockId::Hash(info.best_hash);
     let packet_nonce = PacketNonce {
-            nonce: client.runtime_api().account_nonce(&at, key.public().0.into()).unwrap(),
+            nonce: client.runtime_api().account_nonce(&at, key.public()).unwrap(),
             last_block: at,
         };
 
@@ -384,7 +382,7 @@ pub fn start_vendor<A, B, C, N>(
     let eth_kovan_tag = H256::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
     let eth_ropsten_tag = H256::from_str("0000000000000000000000000000000000000000000000000000000000000002").unwrap();
     // how to fetch real key?
-    let events_key = StorageKey(runtime_io::twox_128(b"System Events").to_vec());
+    let events_key = StorageKey(primitives::twox_128(b"System Events").to_vec());
     let storage_stream = client.storage_changes_notification_stream(Some(&[events_key])).unwrap()
     .map(|(block, changes)| StorageChangeSet { block, changes: changes.iter().cloned().collect()})
     .for_each(move |change_set| {

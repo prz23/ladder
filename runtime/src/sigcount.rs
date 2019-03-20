@@ -1,10 +1,10 @@
-extern crate srml_session as session;
+// extern crate srml_session as session;
 
-
+use session;
 use rstd::prelude::Vec;
 //use runtime_primitives::traits::*;
-use srml_support::{StorageValue, StorageMap, dispatch::Result};
 use {balances, system::{self, ensure_signed}};
+use support::{decl_module, decl_storage, decl_event, StorageValue, StorageMap, dispatch::Result, ensure};
 
 pub trait Trait: balances::Trait + session::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;

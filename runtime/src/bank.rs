@@ -1,17 +1,16 @@
-extern crate srml_session as session;
-extern crate srml_balances as balances;
-extern crate sr_io as runtime_io;
-extern crate substrate_primitives as primitives;
-
-use codec::{Decode, Encode};
-
-
 use session::*;
+use balances;
+use sr_io as runtime_io;
+// use primitives;
 use rstd::prelude::Vec;
 use runtime_primitives::traits::*;
-use srml_support::{StorageValue, StorageMap, dispatch::Result};
 use system::{self, ensure_signed};
-use sigcount;
+use super::sigcount;
+use support::{
+    traits::Currency,
+    codec::{Decode, Encode}, 
+    decl_module, decl_storage, decl_event, StorageValue, StorageMap, dispatch::Result, ensure
+};
 
 
 pub trait Trait: balances::Trait + session::Trait + sigcount::Trait{

@@ -1,18 +1,19 @@
-extern crate srml_session as session;
-extern crate srml_balances as balances;
-extern crate sr_io as runtime_io;
-extern crate substrate_primitives as primitives;
+// extern crate srml_session as session;
+// extern crate srml_balances as balances;
+// extern crate sr_io as runtime_io;
+// extern crate substrate_primitives as primitives;
 
 
-
+use session;
+use balances;
 use rstd::prelude::Vec;
 use runtime_primitives::traits::*;
-use srml_support::{ StorageMap, dispatch::Result};
 use { system::{self, ensure_signed}};
+use support::{
+    decl_module, decl_storage, decl_event, StorageValue, StorageMap, dispatch::Result, ensure
+};
 
-
-
-pub trait Trait: balances::Trait + session::Trait{
+pub trait Trait: balances::Trait + session::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }

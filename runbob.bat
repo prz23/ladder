@@ -1,6 +1,6 @@
 :: windows bat
 set PROJECT_PATH=%cd%
-set EXE_PATH=%PROJECT_PATH%\target\debug\supermatrix.exe
+set EXE_PATH=%PROJECT_PATH%\target\debug\abmatrix.exe
 set BATH_PATH=%PROJECT_PATH%\target\bob
 
 ::set $env:RUST_LOG='info'
