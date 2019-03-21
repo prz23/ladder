@@ -54,7 +54,7 @@ pub fn run<I, T, E>(args: I, exit: E, version: VersionInfo) -> error::Result<()>
 	T: Into<std::ffi::OsString> + Clone,
 	E: IntoExit,
 {
-	substrate_cli::parse_and_execute::<service::Factory, NoCustom, NoCustom, _, _, _, _, _>(
+	parse_and_execute::<service::Factory, NoCustom, NoCustom, _, _, _, _, _>(
 		load_spec, &version, "abmatrix-node", args, exit,
 		|exit, _custom_args, config| {
 			info!("{}", version.name);

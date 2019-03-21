@@ -134,20 +134,20 @@ construct_service_factory! {
 	}
 }
 
+/*
 #[cfg(test)]
-mod vendor {
+mod vendor_template {
     use std::sync::Arc;
-    use futures::{future, Future, Stream};
+    use futures::{Future, Stream};
     use network::SyncProvider;
-    use client::{BlockchainEvents, BlockBody, blockchain::HeaderBackend};
+    use client::{BlockchainEvents, BlockBody, blockchain::HeaderBackend, BlockNumberToHash};
     use substrate_keystore::Store as Keystore;
-    use runtime_primitives::traits::{As, Block, Header, BlockNumberToHash};
     use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 
     use futures::prelude::*;
     use tokio_timer::{Timer, Interval};
 
-    use node_runtime::{EventRecord, UncheckedExtrinsic, Call, Event, sigcount::*, SigCall,MatrixCall};
+    use node_runtime::{EventRecord, UncheckedExtrinsic, Call, Event, sigcount::*,MatrixCall};
     use runtime_io;
     use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
     use runtime_primitives::generic::{BlockId, Era};
@@ -284,3 +284,4 @@ mod vendor {
         })
     }
 }
+*/

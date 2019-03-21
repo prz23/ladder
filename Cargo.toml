@@ -34,5 +34,11 @@ vendor = { path = "./vendor" }
 node-runtime = { path = "./runtime" }
 signer = { path = "./vendor/signer" }
 
+[workspace]
+members = [
+    "runtime",
+    "vendor",
+]
+
 [build-dependencies]
 vergen = "2"

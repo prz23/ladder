@@ -26,7 +26,7 @@ use client::{
 use runtime_primitives::{ApplyResult, generic, create_runtime_str};
 use runtime_primitives::transaction_validity::TransactionValidity;
 use runtime_primitives::traits::{ 
-	self, AuthorityIdFor, BlakeTwo256, Block as BlockT, DigestFor,
+	self, BlakeTwo256, Block as BlockT, DigestFor,
     Verify, NumberFor, StaticLookup,
 };
 use version::RuntimeVersion;
