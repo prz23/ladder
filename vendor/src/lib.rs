@@ -53,7 +53,7 @@ mod utils;
 use std::str::FromStr;
 use message::{RelayMessage,RelayType};
 use tokio_core::reactor::Core;
-use std::sync::{Arc, atomic::AtomicUsize, Mutex};
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Sender};
 use std::path::{Path, PathBuf};
 use error::{ResultExt};
@@ -68,12 +68,12 @@ use runtime_primitives::generic::{BlockId, Era};
 use runtime_primitives::traits::{Block, BlockNumberToHash, ProvideRuntimeApi};
 use client::{runtime_api::Core as CoreApi, BlockchainEvents, blockchain::HeaderBackend};
 use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
-use primitives::{Pair as TraitPait, ed25519::{Pair, Public as Ed25519AuthorityId}};
+use primitives::{Pair as TraitPait, ed25519::Pair};
 use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 use node_runtime::{
     Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, BankCall, matrix::*, VendorApi
 };
-use node_runtime::{Balance, Hash, AccountId, Index, BlockNumber, AuthorityId};
+use node_runtime::{Balance, Hash, AccountId, Index, BlockNumber};
 use web3::{
     api::Namespace, 
     types::{Address, Bytes, H256},

@@ -10,7 +10,7 @@ use rstd::prelude::Vec;
 use runtime_primitives::traits::*;
 use { system::{self, ensure_signed}};
 use support::{
-    decl_module, decl_storage, decl_event, StorageValue, StorageMap, dispatch::Result, ensure
+    decl_module, decl_storage, decl_event, StorageMap, dispatch::Result, ensure
 };
 
 pub trait Trait: balances::Trait + session::Trait {
