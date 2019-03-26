@@ -339,9 +339,19 @@ impl<T: Trait> Module<T>
         runtime_io::print("发钱发钱发钱发钱发钱发钱发钱发钱发钱发钱");
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),<DespositingBalance<T>>::get(v));
-            let _ = <balances::Module<T>>::reward(v, reward);
+            //let _ = <balances::Module<T>>::reward(v, reward);
         });
     }
+
+    // this is origin logic of reward
+    // 	fn reward(who: &T::AccountId, value: Self::Balance) -> result::Result<(), &'static str> {
+	// 	if Self::total_balance(who).is_zero() {
+	// 		return Err("beneficiary account must pre-exist");
+	// 	}
+	// 	Self::set_free_balance(who, Self::free_balance(who) + value);
+	// 	Self::increase_total_stake_by(value);
+	// 	Ok(())
+	// }
 
     // RewardSessionValue  get(reward_session_value): Vec<u64>
     // RewardSessionFactor  get(reward_session_factor): Vec<u64>
