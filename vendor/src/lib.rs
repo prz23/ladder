@@ -68,12 +68,12 @@ use runtime_primitives::generic::{BlockId, Era};
 use runtime_primitives::traits::{Block, BlockNumberToHash, ProvideRuntimeApi};
 use client::{runtime_api::Core as CoreApi, BlockchainEvents, blockchain::HeaderBackend};
 use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
-use primitives::{Pair as TraitPait, ed25519::Pair};
+use primitives::{ed25519::Pair as TraitPait, ed25519::Pair};
 use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 use node_runtime::{
     Call, UncheckedExtrinsic, EventRecord, Event,MatrixCall, BankCall, matrix::*, VendorApi
 };
-use node_runtime::{Balance, Hash, AccountId, Index, BlockNumber};
+use node_runtime::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
 use web3::{
     api::Namespace, 
     types::{Address, Bytes, H256},
@@ -120,7 +120,7 @@ impl<A, B, C, N> Supervisor<A, B, C, N> where
         if p_nonce.last_block == at {
             p_nonce.nonce = p_nonce.nonce + 1;
         } else {
-            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, self.key.public()).unwrap();
+            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, self.key.public().0.into()).unwrap();
             p_nonce.last_block = at;
         }
 
@@ -136,12 +136,12 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
     C::Api: VendorApi<B> + CoreApi<B>
 {
     fn submit(&self, message: RelayMessage) {
-        let local_id: AccountId = self.key.public();
+        let local_id: AccountId = self.key.public().0.into();
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
         // let auths = self.client.runtime_api().authorities(&at).unwrap();
         // if auths.contains(&AuthorityId::from(self.key.public().0)) {
-        if self.client.runtime_api().is_authority(&at, &self.key.public()).unwrap() {
+        if self.client.runtime_api().is_authority(&at, &self.key.public().0.into()).unwrap() {
             let nonce = self.get_nonce();
             let signature = signer::sign_message(&self.eth_key, &message.raw).into();
 
@@ -334,7 +334,7 @@ pub fn start_vendor<A, B, C, N>(
     let info = client.info().unwrap();
     let at = BlockId::Hash(info.best_hash);
     let packet_nonce = PacketNonce {
-            nonce: client.runtime_api().account_nonce(&at, key.public()).unwrap(),
+            nonce: client.runtime_api().account_nonce(&at, key.public().0.into()).unwrap(),
             last_block: at,
         };
 
