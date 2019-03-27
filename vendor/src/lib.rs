@@ -177,6 +177,12 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
 }
 
 #[derive(Clone)]
+pub struct RunStrategy {
+    pub listener: bool,
+    pub sender: bool,
+}
+
+#[derive(Clone)]
 pub struct VendorServiceConfig {
     pub kovan_url: String,
     pub ropsten_url: String,
@@ -184,6 +190,7 @@ pub struct VendorServiceConfig {
     pub ropsten_address: String,
     pub db_path: String,
     pub eth_key: String,
+    pub strategy: RunStrategy,
 }
 
 pub struct SideListener<V> {
@@ -191,6 +198,7 @@ pub struct SideListener<V> {
     pub contract_address: Address,
     pub db_file: PathBuf,
     pub spv: Arc<V>,
+    pub enable: bool,
 }
 
 fn print_err(err: error::Error) {
@@ -210,6 +218,8 @@ impl<V> SideListener<V> where
     V: SuperviseClient + Send + Sync + 'static
 {
     fn start(self) {
+        // return directly.
+        if !self.enable {return;}
         // TODO hook the event of http disconnect to keep run.
         std::thread::spawn(move ||{
             let mut event_loop = Core::new().unwrap();
@@ -255,6 +265,7 @@ struct SideSender {
     url: String,
     contract_address: Address,
     pair: KeyPair,
+    enable: bool,
 }
 
 impl SideSender {
@@ -276,6 +287,9 @@ impl SideSender {
             info!("eth nonce: {}", nonce);
             loop {
                 let event = receiver.recv().unwrap();
+
+                if !self.enable {continue;}
+
                 let data = match event {
                     RawEvent::Ingress(message, signatures) => {
                         info!("ingress message: {:?}, signatures: {:?}", message, signatures);
@@ -354,6 +368,7 @@ pub fn start_vendor<A, B, C, N>(
         db_file: Path::new(&config.db_path).join("kovan_storage.json"),
         contract_address: kovan_address,
         spv: spv.clone(),
+        enable: config.strategy.listener,
     }.start();
 
     //new a thread to listen ropsten network
@@ -362,6 +377,7 @@ pub fn start_vendor<A, B, C, N>(
         db_file:  Path::new(&config.db_path).join("ropsten_storage.json"),
         contract_address: ropsten_address,
         spv: spv.clone(),
+        enable: config.strategy.listener,
     }.start();
 
     // A thread that send transaction to ETH
@@ -370,6 +386,7 @@ pub fn start_vendor<A, B, C, N>(
         url: config.kovan_url.clone(),
         contract_address: kovan_address,
         pair: eth_pair.clone(),
+        enable: config.strategy.sender,
     }.start();
     
     let ropsten_sender = SideSender {
@@ -377,6 +394,7 @@ pub fn start_vendor<A, B, C, N>(
         url: config.ropsten_url.clone(),
         contract_address: ropsten_address,
         pair: eth_pair.clone(),
+        enable: config.strategy.sender,
     }.start();
 
     let eth_kovan_tag = H256::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();

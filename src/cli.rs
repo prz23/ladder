@@ -3,10 +3,11 @@ use std::cell::RefCell;
 use tokio::runtime::Runtime;
 use futures::{future, Future, sync::oneshot};
 pub use substrate_cli::{VersionInfo, IntoExit, error};
-use substrate_cli::{informant, parse_and_execute, NoCustom};
+use substrate_cli::{informant, parse_and_execute};
 use substrate_service::{ServiceFactory, Roles as ServiceRoles};
 use chain_spec;
 use service;
+use params::{VendorCmd};
 
 fn load_spec(id: &str) -> Result<Option<chain_spec::ChainSpec>, String> {
     Ok(match chain_spec::ChainOpt::from(id) {
@@ -21,15 +22,16 @@ pub fn run<I, T, E>(args: I, exit: E, version: VersionInfo) -> error::Result<()>
     T: Into<std::ffi::OsString> + Clone,
     E: IntoExit,
 {
-    parse_and_execute::<service::Factory, NoCustom, NoCustom, _, _, _, _, _>(
+    parse_and_execute::<service::Factory, VendorCmd, VendorCmd, _, _, _, _, _>(
         load_spec, &version, "abmatrix-node", args, exit,
-         |exit, _custom_args, config| {
+         |exit, custom_args, mut config| {
             info!("{}", version.name);
             info!("  version {}", config.full_version());
             info!("  by {}, 2018, 2019", version.author);
             info!("Chain specification: {}", config.chain_spec.name());
             info!("Node name: {}", config.name);
             info!("Roles: {:?}", config.roles);
+            config.custom.custom_args = custom_args;
             let runtime = Runtime::new().map_err(|e| format!("{:?}", e))?;
             let executor = runtime.executor();
             match config.roles {

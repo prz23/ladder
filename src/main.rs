@@ -1,6 +1,7 @@
 #![warn(missing_docs)]
 #![warn(unused_extern_crates)]
 
+extern crate structopt;
 extern crate tokio;
 extern crate futures;
 extern crate serde_json;
@@ -29,6 +30,7 @@ extern crate signer;
 mod chain_spec;
 mod service;
 mod cli;
+mod params;
 
 pub use substrate_cli::{VersionInfo, IntoExit, error};
 
