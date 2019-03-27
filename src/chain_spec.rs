@@ -161,8 +161,7 @@ pub fn development_config() -> ChainSpec {
         "dev",
         development_config_genesis,
         vec![],
-        // TODO, remove it when substrate upgrade to latest version. test that hasn't this problem.
-        Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
+        None,
         None,
         None,
         None,
@@ -187,6 +186,7 @@ pub fn local_testnet_config() -> ChainSpec {
         "abmatrix_testnet",
         local_testnet_genesis,
         vec![],
+        // TODO, remove it when substrate upgrade to latest version. test that hasn't this problem.
         Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
         None,
         None,
