@@ -116,7 +116,7 @@ pub fn testnet_genesis(
         }),
         staking: Some(StakingConfig {
             current_era: 0,
-            minimum_validator_count: 2,
+            minimum_validator_count: 1,
             validator_count: 4,
             sessions_per_era: 60,
             bonding_duration: 60 * MINUTES,
@@ -161,7 +161,8 @@ pub fn development_config() -> ChainSpec {
         "dev",
         development_config_genesis,
         vec![],
-        None,
+        // TODO, remove it when substrate upgrade to latest version. test that hasn't this problem.
+        Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
         None,
         None,
         None,
@@ -182,11 +183,11 @@ fn local_testnet_genesis() -> GenesisConfig {
 /// Local testnet config (multivalidator Alice + Bob)
 pub fn local_testnet_config() -> ChainSpec {
     ChainSpec::from_genesis(
-        "Local Testnet",
-        "local_testnet",
+        "Abmatrix Testnet",
+        "abmatrix_testnet",
         local_testnet_genesis,
         vec![],
-        None,
+        Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
         None,
         None,
         None,
