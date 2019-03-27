@@ -17,6 +17,7 @@ use grandpa;
 use client;
 use vendor::{start_vendor, VendorServiceConfig};
 use signer::Keyring;
+use params::{VendorCmd};
 
 pub use substrate_executor::NativeExecutor;
 /// Abmatrix runtime native executor instance.
@@ -30,6 +31,7 @@ native_executor_instance!(
 pub struct NodeConfig<F: substrate_service::ServiceFactory> {
     inherent_data_providers: InherentDataProviders,
     pub grandpa_import_setup: Option<(Arc<grandpa::BlockImportForService<F>>, grandpa::LinkHalfForService<F>)>,
+    pub custom_args: VendorCmd,
 }
 
 impl<F> Default for NodeConfig<F> where F: substrate_service::ServiceFactory {
@@ -37,6 +39,7 @@ impl<F> Default for NodeConfig<F> where F: substrate_service::ServiceFactory {
         NodeConfig {
             grandpa_import_setup: None,
             inherent_data_providers: InherentDataProviders::new(),
+            custom_args: VendorCmd::default(),
         }
     }
 }
@@ -62,6 +65,7 @@ construct_service_factory! {
             |config: FactoryFullConfiguration<Self>, executor: TaskExecutor| {
                 let db_path = config.database_path.clone();
                 let keyring = config.keys.first().map_or(Keyring::default(), |key| Keyring::from(key.as_bytes()));
+                let run_args = config.custom.custom_args.clone();
                 info!("eth signer key: {}", keyring.to_hex());
                 match FullComponents::<Factory>::new(config, executor.clone()) {
                     Ok(service) => {
@@ -72,6 +76,7 @@ construct_service_factory! {
                                                   ropsten_address: "631b6b933Bc56Ebd93e4402aA5583650Fcf74Cc7".to_string(),
                                                   db_path: db_path,
                                                   eth_key: keyring.to_hex(), // sign message
+                                                  strategy: run_args.into(),
                                                 },
                             service.network(),
                             service.client(),
