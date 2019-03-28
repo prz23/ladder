@@ -24,6 +24,8 @@ pub enum ChainOpt {
     Development,
     /// Whatever the current runtime is, with simple Alice/Bob auths.
     LocalTestnet,
+    /// Abmatrix public testnet.
+    AbmatrixTestnet,
 }
 
 impl ChainOpt {
@@ -32,6 +34,7 @@ impl ChainOpt {
         Ok(match self {
             ChainOpt::Development => development_config(),
             ChainOpt::LocalTestnet => local_testnet_config(),
+            ChainOpt::AbmatrixTestnet => abmatrix_testnet_config(),
         })
     }
 
@@ -39,6 +42,7 @@ impl ChainOpt {
         match s {
             "dev" => Some(ChainOpt::Development),
             "local" => Some(ChainOpt::LocalTestnet),
+            "" | "abmatrixtest" => Some(ChainOpt::AbmatrixTestnet),
             _ => None,
         }
     }
@@ -181,6 +185,40 @@ fn local_testnet_genesis() -> GenesisConfig {
 
 /// Local testnet config (multivalidator Alice + Bob)
 pub fn local_testnet_config() -> ChainSpec {
+    ChainSpec::from_genesis(
+        "Local Testnet",
+        "local_testnet",
+        local_testnet_genesis,
+        vec![],
+        // TODO, remove it when substrate upgrade to latest version. test that hasn't this problem.
+        Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
+        None,
+        None,
+        None,
+    )
+}
+
+fn abmatrix_testnet_genesis() -> GenesisConfig {
+    let alice_stash   = ed25519::Public::from_ss58check("5GoKvZWG5ZPYL1WUovuHW3zJBWBP5eT8CbqjdRY4Q6iMaDtZ").unwrap().0;
+    let alice_control = ed25519::Public::from_ss58check("5GoKvZWG5ZPYL1WUovuHW3zJBWBP5eT8CbqjdRY4Q6iMaDtZ").unwrap().0;
+    let bob_stash   = ed25519::Public::from_ss58check("5Gw3s7q4QLkSWwknsiPtjujPv3XM4Trxi5d4PgKMMk3gfGTE").unwrap().0;
+    let bob_control = ed25519::Public::from_ss58check("5Gw3s7q4QLkSWwknsiPtjujPv3XM4Trxi5d4PgKMMk3gfGTE").unwrap().0;
+    let eve_stash   = ed25519::Public::from_ss58check("5CNLHq4doqBbrrxLCxAakEgaEvef5tjSrN7QqJwcWzNd7W7k").unwrap().0;
+    let eve_control = ed25519::Public::from_ss58check("5CNLHq4doqBbrrxLCxAakEgaEvef5tjSrN7QqJwcWzNd7W7k").unwrap().0;
+
+    testnet_genesis(
+        vec![
+            (alice_stash.into(), alice_control.into(), alice_control.into()),
+            (bob_stash.into(), bob_control.into(), bob_control.into()),
+            (eve_stash.into(), eve_control.into(), eve_control.into()),
+        ],
+        alice_control.into(),
+        Some(vec![alice_control.into(), bob_control.into(), eve_control.into()]),
+    )
+}
+
+/// abmatrix testnet config
+pub fn abmatrix_testnet_config() -> ChainSpec {
     ChainSpec::from_genesis(
         "Abmatrix Testnet",
         "abmatrix_testnet",
