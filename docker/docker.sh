@@ -9,6 +9,7 @@ if [ $? -ne 0 ]; then
 
     # run new container
     docker run -itd \
+        --net=host \
         --volume ${HOME}/.local:/root/.local  \
         --volume `pwd`:/chain  \
         --name ${CONTAINER_NAME} \
