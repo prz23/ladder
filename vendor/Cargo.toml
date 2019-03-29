@@ -32,6 +32,10 @@ substrate-network = { git = "https://github.com/paritytech/substrate" }
 substrate-keystore = { git = "https://github.com/paritytech/substrate" }
 substrate-primitives = { git = "https://github.com/paritytech/substrate" }
 substrate-transaction-pool = { git = "https://github.com/paritytech/substrate" }
+srml-session = { git = "https://github.com/paritytech/substrate" }
+
+curl = { version = "*"}
+rustc-serialize = { version = "*"}
 
 # runtime_io = { package = "sr-io", git = "https://github.com/paritytech/substrate" }
 # runtime_primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate" }

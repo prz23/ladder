@@ -8,6 +8,7 @@ pub const ETH_COIN: &str = "0000000000000000000000000000000000000000000000000000
 pub const MESSAGE_LENGTH: usize = 116;
 pub const BANKER_LENGTH: usize = 116;
 pub const AUTHORITY_MINIMUM_LENGTH: usize = 72;
+pub const ORACLE_LENTH: usize = 116;     // 8 8
 
 #[derive(Debug)]
 pub struct IngressEvent {
@@ -199,6 +200,8 @@ pub fn u32_to_array(data: u32) -> [u8; 4] {
     bytes
 }
 
+
+
 #[derive(Debug)]
 pub struct AuthorityEvent {
     pub coin: H256,
@@ -297,6 +300,31 @@ impl AuthorityEvent {
         result[index..(index + 32)].copy_from_slice(&self.tx_hash.0[..]);
         return result;
     }
+}
+
+#[derive(Debug)]
+pub struct ExchangeRateEvent {
+    pub pair: u64,                //组合类型 1-ETHUSD  2-BITUSD  ……
+    pub time: u64,                //该汇率的时间
+    pub rate: u64,
+    pub tx_hash: H256,
+}
+
+
+impl ExchangeRateEvent{
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut result = vec![0u8; 24];
+        result[0..8].copy_from_slice(&u64_to_array(self.rate));
+        result[8..16].copy_from_slice(&u64_to_array(self.time));
+        result[16..24].copy_from_slice(&u64_to_array(self.pair));
+
+        result[24..56].copy_from_slice(&self.tx_hash.0[..]);
+        return result;
+    }
+}
+pub fn u64_to_array(data: u64) -> [u8; 8] {
+    let bytes: [u8; 8] = unsafe { std::mem::transmute(data.to_le()) };
+    bytes
 }
 
 #[cfg(test)]

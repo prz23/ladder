@@ -37,6 +37,7 @@ extern crate substrate_consensus_aura_primitives as consensus_aura;
 pub mod bank;
 pub mod matrix;
 pub mod sigcount;
+pub mod exchangerate;
 
 use rstd::prelude::*;
 #[cfg(feature = "std")]
@@ -63,6 +64,7 @@ pub use timestamp::Call as TimestampCall;
 pub use matrix::Call as MatrixCall;
 pub use sigcount::Call as SigCall;
 pub use bank::Call as BankCall;
+pub use exchangerate::Call as ExrCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use support::StorageValue;
 pub use timestamp::BlockPeriod;
@@ -260,6 +262,11 @@ impl sigcount::Trait for Runtime {
 	type Event = Event;
 }
 
+impl exchangerate::Trait for Runtime {
+	type Event = Event;
+}
+
+
 construct_runtime!(
     pub enum Runtime with Log(InternalLog: DigestItem<Hash, SessionKey>) where
         Block = Block,
@@ -279,9 +286,10 @@ construct_runtime!(
         Fees: fees::{Module, Storage, Config<T>, Event<T>},
         Sudo: sudo,
         Matrix: matrix::{Module, Call, Storage, Event<T>},
-		Sigcount: sigcount::{Module, Call, Storage, Event<T>},
-		Bank: bank::{Module, Call, Storage, Event<T>},
-    }
+        Sigcount: sigcount::{Module, Call, Storage, Event<T>},
+        Bank: bank::{Module, Call, Storage, Event<T>,Config<T>},
+        Exchangerate: exchangerate::{Module, Call, Storage, Event<T>},
+	}
 );
 
 /// The type used as a helper for interpreting the sender of transactions.
@@ -305,10 +313,21 @@ decl_runtime_apis! {
 	pub trait VendorApi {
 		fn account_nonce(account: AccountId) -> Nonce;
 		fn is_authority(id: &SessionKey) -> bool;
+		fn check_validator(account: AccountId) -> bool;
+	    fn record_data(account: AccountId, exchangerate: u64, time: u64);
+	}
+
+	pub trait ExchangeRateApi {
+	    fn check_validator(account: AccountId) -> bool;
+	    fn record_data(account: AccountId, exchangerate: u64, time: u64);
 	}
 }
 
+
 // Implement our runtime API endpoints. This is just a bunch of proxying.
+
+
+
 impl_runtime_apis! {
     impl runtime_api::Core<Block> for Runtime {
         fn version() -> RuntimeVersion {
@@ -409,5 +428,27 @@ impl_runtime_apis! {
 		fn is_authority(id: &SessionKey) -> bool {
 			Consensus::authorities().contains(id)
 		}
+
+			    /// check the accountid has the access to update the exchange rate data or not
+	    fn check_validator(account: AccountId) -> bool {
+	       Exchangerate::check_validator(account)
+	       //Ok(())
+	    }
+	    fn record_data(account: AccountId, exchangerate: u64, time: u64){
+           Exchangerate::check_signature(account,exchangerate,time);
+	    }
+	    
+	}
+
+
+	impl self::ExchangeRateApi<Block> for Runtime {
+	    /// check the accountid has the access to update the exchange rate data or not 
+	    fn check_validator(account: AccountId) -> bool {
+	       Exchangerate::check_validator(account)
+	       //Ok(())
+	    }
+	    fn record_data(account: AccountId, exchangerate: u64, time: u64){
+           Exchangerate::check_signature(account,exchangerate,time);
+	    }
 	}
 }
