@@ -1,7 +1,7 @@
 use primitives::{Ed25519AuthorityId as AuthorityId, ed25519};
 use node_runtime::{
     GenesisConfig, ConsensusConfig, SessionConfig, StakingConfig, TimestampConfig,
-    IndicesConfig, BalancesConfig, FeesConfig, GrandpaConfig, SudoConfig,
+    IndicesConfig, BalancesConfig, FeesConfig, GrandpaConfig, SudoConfig,BankConfig,
     AccountId, Perbill
 };
 use substrate_service::{self, Properties};
@@ -145,6 +145,15 @@ pub fn testnet_genesis(
             transaction_base_fee: 1 * GLUSHKOV,
             transaction_byte_fee: 50 * COASE,
         }),
+        bank: Some(BankConfig{
+            enable_record: true,
+            session_length: 10,
+            reward_session_value: vec![1000,5000,10000,50000,500000],
+            reward_session_factor: vec![1,2,3,4,5],
+            reward_balance_value: vec![1000,5000,10000,50000,500000],
+            reward_balance_factor: vec![1,2,3,4,5],
+            total_despositing_balance: 0,
+        })
     }
 }
 
