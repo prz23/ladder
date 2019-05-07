@@ -8,8 +8,13 @@ use tokio_timer::{Timeout, Timer};
 use web3;
 use web3::api::Namespace;
 use web3::helpers::CallFuture;
-use web3::types::{Address, FilterBuilder, Log, H256};
+use web3::types::{Address, FilterBuilder, Log, H256, Filter};
 use web3::Transport;
+
+pub fn abos_logs<T: Transport>(transport: &T, filter: Filter) -> CallFuture<Vec<Log>, T::Out> {
+    let filter = web3::helpers::serialize(&filter);
+    CallFuture::new(transport.execute("getLogs", vec![filter]))
+}
 
 fn ethabi_topic_to_web3(topic: &ethabi::Topic<ethabi::Hash>) -> Option<Vec<H256>> {
     match topic {
@@ -41,6 +46,7 @@ pub struct LogStreamOptions<T> {
     pub transport: T,
     pub contract_address: Address,
     pub last_block_number: u64,
+    pub chain: ChainAlias,
 }
 
 /// Contains all logs matching `LogStream` filter in inclusive block range `[from, to]`.
@@ -64,6 +70,13 @@ enum State<T: Transport> {
     },
 }
 
+/// Alias of Chain to diff.
+#[derive(Copy, Clone)]
+pub enum ChainAlias {
+    ETH,
+    ABOS,
+}
+
 pub struct LogStream<T: Transport> {
     block_number_stream: BlockNumberStream<T>,
     request_timeout: Duration,
@@ -73,6 +86,7 @@ pub struct LogStream<T: Transport> {
     state: State<T>,
     filter_builder: FilterBuilder,
     topic: Vec<H256>,
+    chain: ChainAlias,
 }
 
 impl<T: Transport> LogStream<T> {
@@ -101,6 +115,7 @@ impl<T: Transport> LogStream<T> {
             state: State::AwaitBlockNumber,
             filter_builder,
             topic,
+            chain: options.chain,
         }
     }
 }
@@ -124,8 +139,10 @@ impl<T: Transport> Stream for LogStream<T> {
                         .from_block(from.into())
                         .to_block(last_block.into())
                         .build();
-                    let future = web3::api::Eth::new(&self.transport).logs(filter);
-
+                    let future = match self.chain {
+                        ChainAlias::ETH => web3::api::Eth::new(&self.transport).logs(filter),
+                        ChainAlias::ABOS => abos_logs(&self.transport, filter),
+                    };
                     debug!(
                         "LogStream: fetching logs in blocks {} to {}",
                         from,

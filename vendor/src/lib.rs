@@ -82,9 +82,10 @@ use node_runtime::{
 use node_runtime::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
 use web3::{
     api::Namespace, 
-    types::{Address, Bytes, H256},
+    types::{Address, Bytes, H256, U256},
 };
 use std::marker::{Send, Sync};
+use log_stream::ChainAlias;
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
 
@@ -206,6 +207,7 @@ pub struct SideListener<V> {
     pub db_file: PathBuf,
     pub spv: Arc<V>,
     pub enable: bool,
+    pub chain: ChainAlias,
 }
 
 fn print_err(err: error::Error) {
@@ -242,7 +244,7 @@ impl<V> SideListener<V> where
                     std::fs::File::create(&self.db_file).expect("failed to create the storage file of state.");
                 }
                 let mut storage = StateStorage::load(self.db_file.as_path()).unwrap();
-                let vendor = Vendor::new(&transport, self.spv.clone(), storage.state.clone(), self.contract_address)
+                let vendor = Vendor::new(&transport, self.spv.clone(), storage.state.clone(), self.contract_address, self.chain)
                                     .and_then(|state| {
                                         storage.save(&state)?;
                                         Ok(())
@@ -383,15 +385,48 @@ impl <A,B,Q> Exchange <A,B,Q> where
 }
 
 ///////////////////////////////////////////////
-struct SideSender {
+
+struct SignContext {
+    nonce: U256,
+    contract_address: Address,
+    payload: Vec<u8>,
+}
+
+trait SenderProxy{
+    fn sign(&self, context: SignContext) -> Vec<u8>;
+    // fn send(event_loop: &mut Core, transport: &Transport) -> Result<()>;
+}
+
+struct EthProxy {
+    pair: KeyPair,
+}
+
+impl SenderProxy for EthProxy {
+    fn sign(&self, context: SignContext) -> Vec<u8> {
+        let transaction = RawTransaction {
+                                    nonce: context.nonce.into(),
+                                    to: Some(context.contract_address),
+                                    value: 0.into(),
+                                    data: context.payload,
+                                    gas_price: 2000000000.into(),
+                                    gas: 41000.into(),
+                                };
+        let sec: &SecretKey = unsafe { std::mem::transmute(self.pair.privkey()) };
+        let data = signer::sign_transaction(&sec, &transaction);
+        data
+    }
+}
+
+struct SideSender<P>{
     name: String,
     url: String,
     contract_address: Address,
     pair: KeyPair,
     enable: bool,
+    proxy: Arc<P>,
 }
 
-impl SideSender {
+impl<P> SideSender<P> where P: SenderProxy + Send + Sync + 'static {
     fn start(self) -> Sender<RawEvent<Balance, AccountId, Hash, BlockNumber>> {
         let (sender, receiver) = channel();
         std::thread::spawn(move || {
@@ -424,16 +459,12 @@ impl SideSender {
                     }
                 };
                 if let Some(payload) = data {
-                    let transaction = RawTransaction {
-                                    nonce: nonce.into(),
-                                    to: Some(self.contract_address),
-                                    value: 0.into(),
-                                    data: payload,
-                                    gas_price: 2000000000.into(),
-                                    gas: 41000.into(),
-                                };
-                    let sec: &SecretKey = unsafe { std::mem::transmute(self.pair.privkey()) };
-                    let data = signer::sign_transaction(&sec, &transaction);
+                    let context = SignContext {
+                        nonce: nonce,
+                        contract_address: self.contract_address,
+                        payload: payload,
+                    };
+                    let data = self.proxy.sign(context);
                     let future = web3::api::Eth::new(&transport).send_raw_transaction(Bytes::from(data));
                     let hash = event_loop.run(future).unwrap();
                     info!("send to eth transaction hash: {:?}", hash);
@@ -497,6 +528,7 @@ pub fn start_vendor<A, B, C, N>(
         contract_address: kovan_address,
         spv: spv.clone(),
         enable: config.strategy.listener,
+        chain: ChainAlias::ETH,
     }.start();
 
     //new a thread to listen ropsten network
@@ -506,6 +538,7 @@ pub fn start_vendor<A, B, C, N>(
         contract_address: ropsten_address,
         spv: spv.clone(),
         enable: config.strategy.listener,
+        chain: ChainAlias::ETH,
     }.start();
 
     // A thread that send transaction to ETH
@@ -515,6 +548,7 @@ pub fn start_vendor<A, B, C, N>(
         contract_address: kovan_address,
         pair: eth_pair.clone(),
         enable: config.strategy.sender,
+        proxy: Arc::new(EthProxy{ pair: eth_pair.clone() }),
     }.start();
     
     let ropsten_sender = SideSender {
@@ -523,6 +557,7 @@ pub fn start_vendor<A, B, C, N>(
         contract_address: ropsten_address,
         pair: eth_pair.clone(),
         enable: config.strategy.sender,
+        proxy: Arc::new(EthProxy{ pair: eth_pair.clone() }),
     }.start();
 
     // exchange
