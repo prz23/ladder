@@ -1,4 +1,4 @@
-Substrate Node for SUPERMatrix network
+Substrate Node for Ladder network
 
 ## Hacking
 
