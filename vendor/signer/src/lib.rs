@@ -152,6 +152,11 @@ pub fn sign_transaction(secret_key: &SecretKey, raw: &RawTransaction) -> Vec<u8>
     tx.out()
 }
 
+pub fn sign_transaction2(priv_key: &PrivKey, raw: &RawTransaction) -> Vec<u8> {
+    let secret_key: &SecretKey = unsafe { std::mem::transmute(priv_key) };
+    sign_transaction(secret_key, raw)
+}
+
 impl Transaction {
     /// Signs the transaction by PrivKey.
     pub fn sign(&self, sk: PrivKey) -> SignedTransaction {
@@ -250,45 +255,50 @@ mod tests {
     use super::*;
     use std::str::FromStr;
     use rustc_hex::ToHex;
+    use web3::helpers;
+    use web3::types::Bytes;
 
-    // #[test]
-    // fn sign_message_test() {
-    //     let nonce = vec![0x30];
-    //     let priv_key = SecretKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
-    //     let out = sign_message(&priv_key, &nonce);
-    //     println!("signture: {}", out.to_hex());
-    //     assert_eq!(out.len(), 65);
-    //     let signture = "e3e044fd77db535d8e2ab9d064b8a7d99a0cd99a7af307607e21610ebed5a9aa4acd9c190c8f8d8cb8b074dde0a539a37c9f802d95a44997febd0acff5d6f56d01".to_owned();
-    //     assert_eq!(out.to_hex(), signture);
-    // }
+    #[test]
+    fn sign_message_test() {
+        let nonce = vec![0x30];
+        let secret_key = SecretKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
+        let out = sign_message(&secret_key, &nonce);
+        println!("signture: {}", out.to_hex());
+        assert_eq!(out.len(), 65);
+        let signture = "e3e044fd77db535d8e2ab9d064b8a7d99a0cd99a7af307607e21610ebed5a9aa4acd9c190c8f8d8cb8b074dde0a539a37c9f802d95a44997febd0acff5d6f56d01".to_owned();
+        assert_eq!(out.to_hex(), signture);
+    }
 
-    // #[test]
-    // fn eth_sign_empty_test() {
-    //     let priv_key = SecretKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
-    //     let trans = RawTransaction {
-    //         nonce: 7.into(),
-    //         to: Some(H160::from_str("4b5Ae4567aD5D9FB92Bc9aFd6A657e6fA13a2523").unwrap()),
-    //         value: 0.into(),
-    //         data: vec![],
-    //         gas_price: 20.into(),
-    //         gas: 21000.into(),
-    //     };
-    //     let signed = sign_transaction(&priv_key, &trans);
-    //     let target = String::from("f85f0614825208944b5ae4567ad5d9fb92bc9afd6a657e6fa13a252380801ca06832fa6a99f05ec7418e2bb94ecc6e1bbacb4bb2df3fbe563fabcb8faac9507fa068890efb97f4dcc26fb646f841dbfc680337b47e6f41c1cd3bd23edadaf42b60");
-    //     println!("signed:{}\ntarget:{}", signed.to_hex(), target);
-    // }
+    #[test]
+    fn eth_sign_empty_test() {
+        let secret_key = SecretKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
+        let trans = RawTransaction {
+            nonce: 7.into(),
+            to: Some(H160::from_str("4b5Ae4567aD5D9FB92Bc9aFd6A657e6fA13a2523").unwrap()),
+            value: 0.into(),
+            data: vec![],
+            gas_price: 20.into(),
+            gas: 21000.into(),
+        };
+        let priv_key = PrivKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
+        let signed = sign_transaction2(&priv_key, &trans);
+        let target = String::from("f85f0614825208944b5ae4567ad5d9fb92bc9afd6a657e6fa13a252380801ca06832fa6a99f05ec7418e2bb94ecc6e1bbacb4bb2df3fbe563fabcb8faac9507fa068890efb97f4dcc26fb646f841dbfc680337b47e6f41c1cd3bd23edadaf42b60");
+        assert_eq!(signed.to_hex(), target);
+        println!("signed:{}\ntarget:{}", signed.to_hex(), target);
+    }
 
-    // #[test]
-    // fn signed_contract_test(){
-    //     let tar = "0x0a36120331323318c0843d20c0c4072a03608050322000000000000000000000000000000000000000000000000000000000000000003801124157c1eded88c25788cd62e1e894d4afe919a5f81fc7d2f053ebef253535eecc646ce95b9eb45fe0f5775421db2db3f8c5634983c0ab640f701bccd0fee499a59801".to_string();
-    //     let code = "608050".to_string();
-    //     let to = "".to_owned();
-    //     let nonce = "123".to_owned();
-    //     let priv_key = PrivKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
-    //     let mut signed = generate_signed_tx(&priv_key, code, to, 123456, 1000000, 0, nonce);
-    //     // let signed = helpers::serialize(&Bytes::from(signed.take_transaction_with_sig().write_to_bytes().unwrap()));
-    //     // assert_eq!(tar, signed);
-    // }
+
+    #[test]
+    fn signed_contract_test(){
+        let tar = "0x0a36120331323318c0843d20c0c4072a03608050322000000000000000000000000000000000000000000000000000000000000000003801124157c1eded88c25788cd62e1e894d4afe919a5f81fc7d2f053ebef253535eecc646ce95b9eb45fe0f5775421db2db3f8c5634983c0ab640f701bccd0fee499a59801".to_string();
+        let code = "608050".to_string();
+        let to = "".to_owned();
+        let nonce = "123".to_owned();
+        let priv_key = PrivKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
+        let mut signed = generate_signed_tx(&priv_key, code, to, 123456, 1000000, 0, nonce);
+        // let signed = helpers::serialize(&Bytes::from(signed.take_transaction_with_sig().write_to_bytes().unwrap()));
+        // assert_eq!(tar, signed);
+    }
 
     #[test]
     fn signed_tx_test(){
@@ -299,8 +309,9 @@ mod tests {
         let priv_key = PrivKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
         let mut signed = generate_signed_tx(&priv_key, code, to, 123456, 1000000, 0, nonce);
         let d = signed.take_transaction_with_sig().write_to_bytes().unwrap();
-        println!("{:?}", d.to_hex());
-        // let signed = helpers::serialize(&Bytes::from(signed.take_transaction_with_sig().write_to_bytes().unwrap()));
+        println!("transaction with sign: {:?}", d.to_hex());
+        let signed = helpers::serialize(&Bytes::from(d));
+        println!("signed {:?}", signed);
         // assert_eq!(tar, signed);
     }
 }

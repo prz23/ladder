@@ -119,7 +119,7 @@ mod tests {
         let pair = KeyPair::from_privkey(keyring.to_key());
         assert_eq!(pair.address(), Address::from_str("59dc5d8803b482ddbf361ebaccbacc413925ab28").unwrap());
 
-        let Keyring = Keyring::from(b"Alice");
+        let keyring = Keyring::from(b"Alice");
         let pair = KeyPair::from_privkey(keyring.to_key());
         println!("Alice pair: {}", pair);
     }

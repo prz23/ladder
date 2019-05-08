@@ -385,6 +385,7 @@ impl <A,B,Q> Exchange <A,B,Q> where
 }
 
 ///////////////////////////////////////////////
+type SignData = Vec<u8>;
 
 struct SignContext {
     nonce: U256,
@@ -414,6 +415,16 @@ impl SenderProxy for EthProxy {
         let sec: &SecretKey = unsafe { std::mem::transmute(self.pair.privkey()) };
         let data = signer::sign_transaction(&sec, &transaction);
         data
+    }
+}
+
+struct AbosProxy {
+    pair: KeyPair,
+}
+
+impl SenderProxy for AbosProxy {
+    fn sign(&self, context: SignContext) -> Vec<u8> {
+        
     }
 }
 
