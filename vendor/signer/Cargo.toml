@@ -14,5 +14,6 @@ web3 = { git = "https://github.com/ABMatrix/rust-web3.git", branch = "abos" }
 serde = "1.0"
 serde_derive = "1.0"
 rustc-hex = "1.0"
+protobuf = { version = "2.0.4", features = ["with-bytes"]}
 
 [dev-dependencies]
