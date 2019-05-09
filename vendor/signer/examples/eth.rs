@@ -1,16 +1,10 @@
 extern crate signer;
 extern crate web3;
 extern crate tokio_core;
-extern crate serde_json;
-extern crate uuid;
 
 use web3::futures::Future;
-use web3::types::{Bytes, H256};
+use signer::{PrivKey, KeyPair, EthTransaction, H256, U256, Bytes};
 use std::str::FromStr;
-use signer::{PrivKey, KeyPair, RawTransaction, SecretKey};
-use uuid::Uuid;
-
-const MAX_PARALLEL_REQUESTS: usize = 64;
 
 fn main() {
     let mut event_loop = tokio_core::reactor::Core::new().unwrap();
@@ -18,7 +12,7 @@ fn main() {
         web3::transports::Http::with_event_loop(
             "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89",
             &event_loop.handle(),
-            MAX_PARALLEL_REQUESTS,
+            64,
         ).unwrap(),
     ).eth();
 
@@ -27,7 +21,7 @@ fn main() {
     }).unwrap();
     let height: u64 = event_loop.run(eth.block_number()).unwrap().into();
     let nonce = event_loop.run(eth.transaction_count(key_pair.address(), None)).unwrap();
-    let transaction = RawTransaction {
+    let transaction = EthTransaction {
                                     nonce: nonce.into(),
                                     to: Some(key_pair.address()),
                                     value: 0.into(),
@@ -35,11 +29,10 @@ fn main() {
                                     gas_price: 2000000000.into(),
                                     gas: 41000.into(),
                                 };
-    let sec: &SecretKey = unsafe { std::mem::transmute(key_pair.privkey()) };
-    let data = signer::sign_transaction(&sec, &transaction);
+    let data = signer::Eth::sign_transaction(key_pair.privkey(), &transaction);
 
     let bytes = Bytes::from(data);
-    let send_raw_transaction = web3.send_raw_transaction(bytes)
+    let send_raw_transaction = eth.send_raw_transaction(bytes)
         .map(|hash| {
             println!("transaction hash: {:?}", hash);
             hash

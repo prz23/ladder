@@ -102,7 +102,6 @@ mod tests {
 
     #[test]
     fn eth_sign_empty_test() {
-        let secret_key = SecretKey::from_str("5f0258a4778057a8a7d97809bd209055b2fbafa654ce7d31ec7191066b9225e6").unwrap();
         let trans = EthTransaction {
             nonce: 7.into(),
             to: Some(H160::from_str("4b5Ae4567aD5D9FB92Bc9aFd6A657e6fA13a2523").unwrap()),

@@ -16,6 +16,7 @@ fn main() {
         ).unwrap(),
     ).abos();
 
+    // get meta data.
     let meta_data = event_loop.run(abos.meta_data(None)).unwrap();
     println!("metadata: {:?}", meta_data);
     let height: u64 = event_loop.run(abos.block_number()).unwrap().into();
@@ -36,6 +37,7 @@ fn main() {
         .map(|hash| {hash.hash});
     let hash = event_loop.run(send_raw_transaction).unwrap();
     let hash = H256::from_slice(hash.as_ref());
+    
     loop {
         let receipt = event_loop.run(abos.transaction_receipt(hash)).unwrap();
         println!("receipt {:?}", receipt);
