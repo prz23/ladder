@@ -23,11 +23,3 @@ message UnverifiedTransaction {
     bytes signature = 2;
     Crypto crypto = 3;
 }
-
-message SignedTransaction {
-    UnverifiedTransaction transaction_with_sig = 1;
-    // SignedTransaction hash
-    bytes tx_hash = 2;
-    // public key
-    bytes signer = 3;
-}

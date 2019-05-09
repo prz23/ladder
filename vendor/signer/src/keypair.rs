@@ -1,8 +1,10 @@
-use super::{SECP256K1, Hasher};
+use rustc_hex::ToHex;
 use secp256k1::{SecretKey, PublicKey};
 use std::fmt;
-use web3::{types::{H256, H512, Address}};
-use rustc_hex::ToHex;
+use crate::types::{H256, H512, Address};
+use crate::hasher::Hasher;
+use super::SECP256K1;
+
 
 pub type PrivKey = H256;
 pub type PubKey = H512;
@@ -35,7 +37,7 @@ impl Keyring {
     }
 }
 
-/// key pair
+/// key pair struct
 #[derive(Clone)]
 pub struct KeyPair {
     privkey: PrivKey,
@@ -51,7 +53,7 @@ impl fmt::Display for KeyPair {
 }
 
 impl KeyPair {
-    /// Create a pair from secret key
+    /// Create a pair from private key
     pub fn from_privkey(privkey: PrivKey) -> Self {
         let secp = &SECP256K1;
         let secret_key = SecretKey::from_slice(&privkey).expect("32 bytes, within curve order");
@@ -110,7 +112,7 @@ mod tests {
     }
 
     #[test]
-    fn test_Keyring() {
+    fn test_keyring() {
         let privkey = PrivKey::from(
             H256::from_str("de0a3ae1674c881e96659ba568d06c6807876c41d13f63444111d57d4754a866")
                 .unwrap(),
