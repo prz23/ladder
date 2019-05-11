@@ -1,4 +1,4 @@
-use error::{self, ResultExt};
+use crate::error;
 use futures::future::FromErr;
 use futures::{Async, Future, Poll, Stream};
 use std::time::Duration;
