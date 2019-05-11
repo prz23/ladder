@@ -1,5 +1,7 @@
-use block_number_stream::{BlockNumberStream, BlockNumberStreamOptions};
+use crate::block_number_stream::{BlockNumberStream, BlockNumberStreamOptions};
 use error::{self, ResultExt};
+//use crate::error::ResultExt;
+//use crate::error;
 use ethabi;
 use futures::future::FromErr;
 use futures::{Async, Future, Poll, Stream};
