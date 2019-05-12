@@ -1,3 +1,5 @@
+A simple signer for ethereum and Abos.
+
 # Feature
 
 ## interfaces

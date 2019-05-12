@@ -63,7 +63,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::path::{Path, PathBuf};
 use error::{ResultExt};
 use vendor::Vendor;
-use signer::{SecretKey, RawTransaction, KeyPair, PrivKey};
+use signer::{EthTransaction, AbosTransaction, KeyPair, PrivKey};
 use state::{StateStorage};
 use network::SyncProvider;
 use futures::{Future, Stream};
@@ -81,6 +81,7 @@ use node_runtime::{
 };
 use node_runtime::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
 use web3::{
+    Transport,
     api::Namespace, 
     types::{Address, Bytes, H256, U256},
 };
@@ -106,7 +107,7 @@ pub struct Supervisor<A, B, C, N> where
     pub pool: Arc<TransactionPool<A>>,
     pub network: Arc<N>,
     pub key: Pair,
-    pub eth_key: SecretKey,
+    pub eth_key: PrivKey,
     pub phantom: std::marker::PhantomData<B>,
     // pub queue: Vec<(RelayMessage, u8)>,
     pub packet_nonce: Arc<Mutex<PacketNonce<B>>>,
@@ -150,7 +151,7 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
         // if auths.contains(&AuthorityId::from(self.key.public().0)) {
         if self.client.runtime_api().is_authority(&at, &self.key.public().0.into()).unwrap() {
             let nonce = self.get_nonce();
-            let signature = signer::sign_message(&self.eth_key, &message.raw).into();
+            let signature = signer::Eth::sign_message(&self.eth_key, &message.raw).into();
 
             let function =  match message.ty {
                     RelayType::Ingress => Call::Matrix(MatrixCall::ingress(message.raw, signature)),
@@ -388,43 +389,78 @@ impl <A,B,Q> Exchange <A,B,Q> where
 type SignData = Vec<u8>;
 
 struct SignContext {
+    height: u64,
     nonce: U256,
     contract_address: Address,
-    payload: Vec<u8>,
 }
 
 trait SenderProxy{
-    fn sign(&self, context: SignContext) -> Vec<u8>;
-    // fn send(event_loop: &mut Core, transport: &Transport) -> Result<()>;
+    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport);
+    fn send(&mut self, event_loop: &mut Core, transport: &impl Transport, payload: Vec<u8>);
 }
 
 struct EthProxy {
     pair: KeyPair,
+    context: SignContext,
 }
 
 impl SenderProxy for EthProxy {
-    fn sign(&self, context: SignContext) -> Vec<u8> {
-        let transaction = RawTransaction {
-                                    nonce: context.nonce.into(),
-                                    to: Some(context.contract_address),
-                                    value: 0.into(),
-                                    data: context.payload,
-                                    gas_price: 2000000000.into(),
-                                    gas: 41000.into(),
-                                };
-        let sec: &SecretKey = unsafe { std::mem::transmute(self.pair.privkey()) };
-        let data = signer::sign_transaction(&sec, &transaction);
-        data
+    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport) {
+        let authority_address: Address = self.pair.address();
+        let nonce = event_loop.run(web3::api::Eth::new(&transport).transaction_count(authority_address, None)).unwrap();
+        info!("eth nonce: {}", nonce);
+        self.context.nonce = nonce;
+    }
+
+    fn send(&mut self, event_loop: &mut Core, transport: &impl Transport, payload: Vec<u8>) {
+        let transaction = EthTransaction {
+            nonce: self.context.nonce.into(),
+            to: Some(self.context.contract_address),
+            value: 0.into(),
+            data: payload,
+            gas_price: 2000000000.into(),
+            gas: 41000.into(),
+        };
+        let data = signer::Eth::sign_transaction(self.pair.privkey(), &transaction);
+
+        let future = web3::api::Eth::new(&transport).send_raw_transaction(Bytes::from(data));
+        let hash = event_loop.run(future).unwrap();
+        info!("send to eth transaction hash: {:?}", hash);
+        self.context.nonce += 1.into();
     }
 }
 
 struct AbosProxy {
     pair: KeyPair,
+    context: SignContext,
 }
 
 impl SenderProxy for AbosProxy {
-    fn sign(&self, context: SignContext) -> Vec<u8> {
-        
+    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport) {
+        let authority_address: Address = self.pair.address();
+        let nonce = event_loop.run(web3::api::Abos::new(&transport).transaction_count(authority_address, None)).unwrap();
+        info!("abos nonce: {}", nonce);
+        self.context.nonce = nonce;
+    }
+
+    fn send(&mut self, event_loop: &mut Core, transport: &impl Transport, payload: Vec<u8>) {
+        let height: u64 = event_loop.run(web3::api::Abos::new(&transport).block_number()).unwrap().into();
+        let transaction = AbosTransaction {
+            to: Some(self.context.contract_address),
+            nonce: self.context.nonce.to_string(),
+            quota: 210000,
+            valid_until_block: height + 88,
+            data: payload,
+            value: U256::from(0),
+            chain_id: U256::from(1),
+            version: 1,
+        };
+        let data = signer::Abos::sign_transaction(self.pair.privkey(), &transaction);
+
+        let future = web3::api::Abos::new(&transport).send_raw_transaction(Bytes::from(data));
+        let hash = event_loop.run(future).unwrap();
+        info!("send to eth transaction hash: {:?}", hash);
+        self.context.nonce += 1.into();
     }
 }
 
@@ -434,11 +470,11 @@ struct SideSender<P>{
     contract_address: Address,
     pair: KeyPair,
     enable: bool,
-    proxy: Arc<P>,
+    proxy: P,
 }
 
 impl<P> SideSender<P> where P: SenderProxy + Send + Sync + 'static {
-    fn start(self) -> Sender<RawEvent<Balance, AccountId, Hash, BlockNumber>> {
+    fn start(mut self) -> Sender<RawEvent<Balance, AccountId, Hash, BlockNumber>> {
         let (sender, receiver) = channel();
         std::thread::spawn(move || {
             let mut event_loop = Core::new().unwrap();
@@ -449,37 +485,20 @@ impl<P> SideSender<P> where P: SenderProxy + Send + Sync + 'static {
                 )
                 .chain_err(|| {format!("Cannot connect to ethereum node at {}", self.url)}).unwrap();
 
-            // get nonce
-            let authority_address: Address = self.pair.address();
-            let nonce_future  = web3::api::Eth::new(&transport).transaction_count(authority_address, None);
-            let mut nonce = event_loop.run(nonce_future).unwrap();
-            info!("eth nonce: {}", nonce);
+            // initialize proxy.
+            self.proxy.initialize(&mut event_loop, &transport);
             loop {
                 let event = receiver.recv().unwrap();
 
                 if !self.enable {continue;}
 
-                let data = match event {
+                match event {
                     RawEvent::Ingress(message, signatures) => {
                         info!("ingress message: {:?}, signatures: {:?}", message, signatures);
                         let payload = contracts::bridge::functions::release::encode_input(message, signatures);
-                        Some(payload)
+                        self.proxy.send(&mut event_loop, &transport, payload);
                     },
-                    _ => {
-                        None
-                    }
-                };
-                if let Some(payload) = data {
-                    let context = SignContext {
-                        nonce: nonce,
-                        contract_address: self.contract_address,
-                        payload: payload,
-                    };
-                    let data = self.proxy.sign(context);
-                    let future = web3::api::Eth::new(&transport).send_raw_transaction(Bytes::from(data));
-                    let hash = event_loop.run(future).unwrap();
-                    info!("send to eth transaction hash: {:?}", hash);
-                    nonce += 1.into();
+                    _ => { warn!("SideSender: unknown event!") }
                 }
             }
         });
@@ -507,8 +526,8 @@ pub fn start_vendor<A, B, C, N>(
     let key2 = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
     let kovan_address = Address::from_str(&config.kovan_address).unwrap();
     let ropsten_address = Address::from_str(&config.ropsten_address).unwrap();
-    let eth_key = SecretKey::from_str(&config.eth_key).unwrap();
-    let eth_pair = KeyPair::from_privkey(PrivKey::from_slice(&eth_key[..]));
+    let eth_key = PrivKey::from_str(&config.eth_key).unwrap();
+    let eth_pair = KeyPair::from_privkey(eth_key);
     info!("ss58 account: {:?}, eth account: {}", key.public().to_ss58check(), eth_pair);
 
     let info = client.info().unwrap();
@@ -559,7 +578,11 @@ pub fn start_vendor<A, B, C, N>(
         contract_address: kovan_address,
         pair: eth_pair.clone(),
         enable: config.strategy.sender,
-        proxy: Arc::new(EthProxy{ pair: eth_pair.clone() }),
+        proxy: EthProxy{ pair: eth_pair.clone(), context: SignContext {
+            height: 0,
+            nonce: U256::from(0),
+            contract_address: kovan_address,
+        }},
     }.start();
     
     let ropsten_sender = SideSender {
@@ -568,7 +591,11 @@ pub fn start_vendor<A, B, C, N>(
         contract_address: ropsten_address,
         pair: eth_pair.clone(),
         enable: config.strategy.sender,
-        proxy: Arc::new(EthProxy{ pair: eth_pair.clone() }),
+        proxy: EthProxy{ pair: eth_pair.clone(), context: SignContext {
+            height: 0,
+            nonce: U256::from(0),
+            contract_address: ropsten_address,
+        }},
     }.start();
 
     // exchange
