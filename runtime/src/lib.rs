@@ -388,8 +388,8 @@ impl_runtime_apis! {
 	}
 
 	impl self::VendorApi<Block> for Runtime {
-		fn account_nonce(account: AccountId) -> Nonce {
-			System::account_nonce(&account)
+		fn account_nonce(account: &AccountId) -> Nonce {
+			System::account_nonce(account)
 		}
 
 		fn is_authority(id: &SessionKey) -> bool {
@@ -397,10 +397,10 @@ impl_runtime_apis! {
 		}
 
 		/// check the accountid has the access to update the exchange rate data or not
-	    fn check_validator(account: AccountId) -> bool {
+	    fn check_validator(account: &AccountId) -> bool {
 	       Exchange::check_validator(account)
 	    }
-	    fn record_data(account: AccountId, exchangerate: u64, time: u64){
+	    fn record_data(account: &AccountId, exchangerate: u64, time: u64){
            //Exchangerate::check_signature(account,exchangerate,time);
 	    }
 	}
@@ -410,9 +410,9 @@ pub type Nonce = u64;
 
 decl_runtime_apis! {
 	pub trait VendorApi {
-		fn account_nonce(account: AccountId) -> Nonce;
+		fn account_nonce(account: &AccountId) -> Nonce;
 		fn is_authority(id: &SessionKey) -> bool;
-		fn check_validator(account: AccountId) -> bool;
-	    fn record_data(account: AccountId, exchangerate: u64, time: u64);
+		fn check_validator(account: &AccountId) -> bool;
+	    fn record_data(account: &AccountId, exchangerate: u64, time: u64);
 	}
 }

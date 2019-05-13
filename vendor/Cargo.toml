@@ -38,14 +38,6 @@ node-primitives = { path = "../primitives"}
 curl = { version = "*"}
 rustc-serialize = { version = "*"}
 
-# runtime_io = { package = "sr-io", git = "https://github.com/paritytech/substrate" }
-# runtime_primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate" }
-# client = { package = "substrate-client", git = "https://github.com/paritytech/substrate", default-features = false }
-# network = { package = "substrate-network", git = "https://github.com/paritytech/substrate" }
-# keystore = { package = "substrate-keystore", git = "https://github.com/paritytech/substrate" }
-# primitives = { package = "substrate-primitives", git = "https://github.com/paritytech/substrate" }
-# transaction_pool = { package = "substrate-transaction-pool", git = "https://github.com/paritytech/substrate" }
-
 [dev-dependencies]
 tempdir = "0.3"
 quickcheck = "0.6.1"

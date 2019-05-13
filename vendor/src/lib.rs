@@ -135,7 +135,7 @@ impl<A, B, C, N> Supervisor<A, B, C, N> where
         if p_nonce.last_block == at {
             p_nonce.nonce = p_nonce.nonce + 1;
         } else {
-            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, self.key.public().0.unchecked_into()).unwrap();
+            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, &self.key.public().0.unchecked_into()).unwrap();
             p_nonce.last_block = at;
         }
 
@@ -322,7 +322,7 @@ impl <A,B,Q,V> ExchangeTrait for Exchange<A,B,Q,V> where
     fn check_validators(&self) -> bool {
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
-        let accountid = self.accountid;
+        let accountid = &self.accountid;
         self.client.runtime_api().check_validator(&at,accountid).unwrap()
         //self.client.runtime_api().is_authority(&at, &self.key.public().0.into()).unwrap();
         //Ok(1)
@@ -549,11 +549,11 @@ pub fn start_vendor<A, B, C, N>(
     let info = client.info().unwrap();
     let at = BlockId::Hash(info.best_hash);
     let packet_nonce = PacketNonce {
-            nonce: client.runtime_api().account_nonce(&at, key.public().0.unchecked_into()).unwrap(),
+            nonce: client.runtime_api().account_nonce(&at, &key.public().0.unchecked_into()).unwrap(),
             last_block: at,
         };
     let packet_nonce2 = PacketNonce {
-        nonce: client.runtime_api().account_nonce(&at, key.public().0.unchecked_into()).unwrap(),
+        nonce: client.runtime_api().account_nonce(&at, &key.public().0.unchecked_into()).unwrap(),
         last_block: at,
     };
 

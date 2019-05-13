@@ -8,6 +8,7 @@ use web3::api::Namespace;
 use web3::helpers::CallFuture;
 use web3::types::U256;
 use web3::Transport;
+use error::ResultExt;
 
 /// Block Number Stream state.
 enum State<T: Transport> {

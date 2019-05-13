@@ -97,10 +97,10 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    pub fn check_validator(accountid: T::AccountId) -> bool{
+    pub fn check_validator(accountid: &T::AccountId) -> bool{
         //判断是否是合法验证者集合中的人
         let validators = <session::Module<T>>::validators();
-        if !validators.contains(&accountid){
+        if !validators.contains(accountid){
             return false;
         }
         true
