@@ -22,6 +22,7 @@
 pub use cli::error;
 pub mod chain_spec;
 mod service;
+mod params;
 
 use tokio::prelude::Future;
 use tokio::runtime::{Builder as RuntimeBuilder, Runtime};

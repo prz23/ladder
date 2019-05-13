@@ -40,6 +40,9 @@ use network::construct_simple_protocol;
 use substrate_service::construct_service_factory;
 use log::info;
 use substrate_service::TelemetryOnConnect;
+use vendor::{start_vendor, VendorServiceConfig};
+use signer::Keyring;
+use crate::params::{VendorCmd};
 
 construct_simple_protocol! {
 	/// Demo protocol attachment for substrate.
@@ -52,6 +55,7 @@ pub struct NodeConfig<F: substrate_service::ServiceFactory> {
 	// FIXME #1134 rather than putting this on the config, let's have an actual intermediate setup state
 	pub grandpa_import_setup: Option<(Arc<grandpa::BlockImportForService<F>>, grandpa::LinkHalfForService<F>)>,
 	inherent_data_providers: InherentDataProviders,
+	pub custom_args: VendorCmd,
 }
 
 impl<F> Default for NodeConfig<F> where F: substrate_service::ServiceFactory {
@@ -59,6 +63,7 @@ impl<F> Default for NodeConfig<F> where F: substrate_service::ServiceFactory {
 		NodeConfig {
 			grandpa_import_setup: None,
 			inherent_data_providers: InherentDataProviders::new(),
+			custom_args: VendorCmd::default(),
 		}
 	}
 }
@@ -75,9 +80,35 @@ construct_service_factory! {
 			{ |config, client| Ok(TransactionPool::new(config, transaction_pool::ChainApi::new(client))) },
 		Genesis = GenesisConfig,
 		Configuration = NodeConfig<Self>,
-		FullService = FullComponents<Self>
-			{ |config: FactoryFullConfiguration<Self>, executor: TaskExecutor|
-				FullComponents::<Factory>::new(config, executor) },
+		FullService = FullComponents<Self> {
+					|config: FactoryFullConfiguration<Self>, executor: TaskExecutor| {
+						let db_path = config.database_path.clone();
+						let keyring = config.keys.first().map_or(Keyring::default(), |key| Keyring::from(key.as_bytes()));
+						let run_args = config.custom.custom_args.clone();
+						info!("eth signer key: {}", keyring.to_hex());
+						match FullComponents::<Factory>::new(config, executor.clone()) {
+							Ok(service) => {
+								executor.spawn(start_vendor(
+									VendorServiceConfig { kovan_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+														ropsten_url: "https://ropsten.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+														kovan_address: "690aB411ca08bB0631C49513e10b29691561bB08".to_string(),
+														ropsten_address: "631b6b933Bc56Ebd93e4402aA5583650Fcf74Cc7".to_string(),
+														db_path: db_path,
+														eth_key: keyring.to_hex(), // sign message
+														strategy: run_args.into(),
+														},
+									service.network(),
+									service.client(),
+									service.transaction_pool(),
+									service.keystore(),
+									service.on_exit(),
+								));
+								return Ok(service)
+							},
+							Err(err) => return Err(err),
+						}
+					}
+				},
 		AuthoritySetup = {
 			|mut service: Self::FullService, executor: TaskExecutor, local_key: Option<Arc<ed25519::Pair>>| {
 				let (block_import, link_half) = service.config.custom.grandpa_import_setup.take()

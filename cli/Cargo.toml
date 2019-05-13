@@ -30,6 +30,9 @@ sr-primitives = { git = "https://github.com/paritytech/substrate" }
 node-executor = { path = "../executor" }
 substrate-keystore = { git = "https://github.com/paritytech/substrate" }
 substrate-telemetry = { package = "substrate-telemetry", git = "https://github.com/paritytech/substrate" }
+vendor = { path = "../vendor" }
+signer = { path = "../vendor/signer" }
+structopt = "0.2"
 
 [dev-dependencies]
 service-test = { package = "substrate-service-test", git = "https://github.com/paritytech/substrate" }
