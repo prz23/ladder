@@ -1,6 +1,6 @@
 use futures::{Async, Poll, Stream};
 use web3::{Transport, types::Address};
-use log_stream::{LogStream, LogStreamOptions};
+use log_stream::{LogStream, LogStreamOptions, ChainAlias};
 use super::error::{self, ResultExt};
 use std::time::Duration;
 use contracts;
@@ -23,7 +23,7 @@ pub struct Vendor<T: Transport, C: SuperviseClient> {
 }
 
 impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
-    pub fn new(transport: &T, client: Arc<C>, state: State, contract_address: Address) -> Self {
+    pub fn new(transport: &T, client: Arc<C>, state: State, contract_address: Address, chain: ChainAlias) -> Self {
         Self {
             ingress_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(30),
@@ -33,6 +33,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: contract_address,
                 last_block_number: state.ingress, //10351660,
                 filter: contracts::bridge::events::ingress::filter(),
+                chain,
             }),
             egress_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(30),
@@ -42,6 +43,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: contract_address,
                 last_block_number: state.egress,
                 filter: contracts::bridge::events::egress::filter(),
+                chain,
             }),
             deposit_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(30),
@@ -51,6 +53,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: contract_address,
                 last_block_number: state.deposit,
                 filter: contracts::bridge::events::deposit::filter(),
+                chain,
             }),
             withdraw_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(30),
@@ -60,6 +63,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: contract_address,
                 last_block_number: state.withdraw,
                 filter: contracts::bridge::events::withdraw::filter(),
+                chain,
             }),
             authority_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(30),
@@ -69,6 +73,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: contract_address,
                 last_block_number: state.authority,
                 filter: contracts::bridge::events::replace_auths::filter(),
+                chain,
             }),
             client: client,
             state: state,
@@ -85,6 +90,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: "0000000000000000000000000000000000000001".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::ingress::filter(),
+                chain: ChainAlias::ETH,
             }),
             egress_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(1),
@@ -94,6 +100,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: "0000000000000000000000000000000000000002".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::egress::filter(),
+                chain: ChainAlias::ETH,
             }),
             deposit_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(1),
@@ -103,6 +110,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: "0000000000000000000000000000000000000002".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::deposit::filter(),
+                chain: ChainAlias::ETH,
             }),
             withdraw_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(1),
@@ -112,6 +120,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: "0000000000000000000000000000000000000002".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::withdraw::filter(),
+                chain: ChainAlias::ETH,
             }),
             authority_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(1),
@@ -121,6 +130,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 contract_address: "0000000000000000000000000000000000000002".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::replace_auths::filter(),
+                chain: ChainAlias::ETH,
             }),
             client: client,
             state: State::default(),
