@@ -1,5 +1,5 @@
 use web3::types::H256;
-use events::*;
+use crate::events::*;
 
 #[derive(Debug)]
 pub enum RelayType{
