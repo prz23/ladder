@@ -248,6 +248,7 @@ pub fn testnet_genesis(
 			get_account_id_from_seed("Dave//stash"),
 			get_account_id_from_seed("Eve//stash"),
 			get_account_id_from_seed("Ferdie//stash"),
+			hex!("0bdb300d3f861c5f9dad27b4f2d37b613ab59c689f469cbb19b5844b75e02985").unchecked_into(),
 		]
 	});
 
