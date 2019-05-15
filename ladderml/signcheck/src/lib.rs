@@ -1,14 +1,27 @@
-// extern crate srml_session as session;
+#![cfg_attr(not(feature = "std"), no_std)]
 
-extern crate sr_io as runtime_io;
-use rstd::prelude::Vec;
-//use runtime_primitives::traits::*;
-use {balances, system::{self, ensure_signed}};
-use support::{decl_module, decl_storage, decl_event, StorageValue, StorageMap, dispatch::Result, ensure};
+#[cfg(feature = "std")]
+use serde_derive::{Serialize, Deserialize};
+
+use sr_primitives::traits::{Verify, Zero, CheckedAdd, CheckedSub, Hash};
+use support::{decl_module, decl_storage, decl_event, StorageValue,
+			  StorageMap, dispatch::Result, Parameter,ensure};
+
+use system::ensure_signed;
+
+use rstd::prelude::*;
+use rstd::marker::PhantomData;
+
+#[cfg(feature = "std")]
+pub use std::fmt;
+
+// use Encode, Decode
+use parity_codec::{Encode, Decode};
+use rstd::ops::Div;
 
 
-pub trait Trait: balances::Trait + session::Trait {
-    type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
+pub trait Trait: system::Trait {
+	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 decl_event!(
@@ -47,7 +60,7 @@ decl_storage! {
         /// 已经发送过的交易记录  防止重复发送事件
         /// Transaction records that have been sent prevent duplication of events
         AlreadySentTx get(already_sent) : map T::Hash => u64;
-        
+
        // Nonce: u64;
     }
 }
@@ -121,7 +134,7 @@ decl_module! {
             // Record the transaction and sending event
             <AlreadySentTx<T>>::insert(&transcation,1);
             Self::deposit_event(RawEvent::Txisok(transcation));
-            
+
             Self::deposit_event(RawEvent::TranscationVerified(transcation,stored_vec));
             Ok(())
         }
@@ -130,67 +143,67 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    fn _verify(_tx : T::Hash) -> Result{
-        //TODO:verify signature or others
-        Ok(())
-    }
+	fn _verify(_tx: T::Hash) -> Result {
+		//TODO:verify signature or others
+		Ok(())
+	}
 
-    /// 签名并判断如果当前签名数量足够就发送一个事件
+	/// 签名并判断如果当前签名数量足够就发送一个事件
        /// Sign and determine if the current number of signatures is sufficient to send an event
-    pub  fn check_signature(who: T::AccountId, transcation: T::Hash, sign: T::Hash, message: T::Hash) -> Result{
-        //TODO： 判断这个信息发送的人是否是validator     不在这里 已经前置了
-        let sender = who;
+	pub fn check_signature(who: T::AccountId, transcation: T::Hash, sign: T::Hash, message: T::Hash) -> Result {
+		//TODO： 判断这个信息发送的人是否是validator     不在这里 已经前置了
+		let sender = who;
 
-        //查看该交易是否已经存在，没得话添加上去
-        if !<NumberOfSignedContract<T>>::exists(transcation) {
-            <NumberOfSignedContract<T>>::insert(&transcation,0);
-            <AlreadySentTx<T>>::insert(&transcation,0);
-        }
+		//查看该交易是否已经存在，没得话添加上去
+		if !<NumberOfSignedContract<T>>::exists(transcation) {
+			<NumberOfSignedContract<T>>::insert(&transcation, 0);
+			<AlreadySentTx<T>>::insert(&transcation, 0);
+		}
 
-        /// 防止签名重复
-        // 防止一个交易的相同签名的是否重复发送
-        let mut repeat_vec = Self::repeat_prevent(transcation);
-        ensure!(!repeat_vec.contains(&sign),"This signature is repeat!");
-        // ensure!(!repeat_vec.iter().find(|&t| t == &sign).is_none(), "Cannot deposit if already in queue.");
-        // 把某个交易hash的一个签名hash保存，以验证后来的是否重复
-        repeat_vec.push(sign.clone());
-        <RepeatPrevent<T>>::insert(transcation.clone(),repeat_vec.clone());
+		/// 防止签名重复
+		// 防止一个交易的相同签名的是否重复发送
+		let mut repeat_vec = Self::repeat_prevent(transcation);
+		ensure!(!repeat_vec.contains(&sign),"This signature is repeat!");
+		// ensure!(!repeat_vec.iter().find(|&t| t == &sign).is_none(), "Cannot deposit if already in queue.");
+		// 把某个交易hash的一个签名hash保存，以验证后来的是否重复
+		repeat_vec.push(sign.clone());
+		<RepeatPrevent<T>>::insert(transcation.clone(), repeat_vec.clone());
 
-        // 防止一个交易被重复发送，已发送过的会有记录
-        if 1 == Self::already_sent(transcation){
-            return Err("This Transcation already been sent!");
-        }
+		// 防止一个交易被重复发送，已发送过的会有记录
+		if 1 == Self::already_sent(transcation) {
+			return Err("This Transcation already been sent!");
+		}
 
-  /*
-        //增加一条记录 ->  交易 验证者 签名
-        <IdSignTxList<T>>::insert(transcation.clone(),(sender.clone(),sign.clone()));
-   */
+		/*
+              //增加一条记录 ->  交易 验证者 签名
+              <IdSignTxList<T>>::insert(transcation.clone(),(sender.clone(),sign.clone()));
+         */
 
-        //增加一条记录  包含  交易hash => vec (验证者,签名hash)
-        let mut stored_vec = Self::record(transcation);
-        stored_vec.push((sender.clone(),sign.clone()));
-        <Record<T>>::insert(transcation.clone(),stored_vec.clone());
+		//增加一条记录  包含  交易hash => vec (验证者,签名hash)
+		let mut stored_vec = Self::record(transcation);
+		stored_vec.push((sender.clone(), sign.clone()));
+		<Record<T>>::insert(transcation.clone(), stored_vec.clone());
 
+		//TODO:其他验证
+		Self::_verify(transcation)?;
 
-        //TODO:其他验证
-        Self::_verify(transcation)?;
+		// 判断签名数量是否达到指定要求
+		let numofsigned = Self::num_of_signed(&transcation);
+		let newnumofsigned = numofsigned.checked_add(1)
+			.ok_or("Overflow adding a new sign to Tx")?;
 
-        // 判断签名数量是否达到指定要求
-        let numofsigned = Self::num_of_signed(&transcation);
-        let newnumofsigned = numofsigned.checked_add(1)
-            .ok_or("Overflow adding a new sign to Tx")?;
+		<NumberOfSignedContract<T>>::insert(&transcation, newnumofsigned);
+		if newnumofsigned <= Self::min_signature() {
+			return Err("Not enough signature!");
+		}
 
-        <NumberOfSignedContract<T>>::insert(&transcation,newnumofsigned);
-        if newnumofsigned <= Self::min_signature() {
-            return Err("Not enough signature!");
-        }
+		// 记录已发送的交易防止重复发送 Record the transaction and sending event
+		<AlreadySentTx<T>>::insert(&transcation, 1);
 
-        // 记录已发送的交易防止重复发送 Record the transaction and sending event
-        <AlreadySentTx<T>>::insert(&transcation,1);
-
-        // 抛出事件
-        Self::deposit_event(RawEvent::Txisok(transcation));
-        Self::deposit_event(RawEvent::TranscationVerified(transcation,stored_vec));
-        Ok(())
-    }
+		// 抛出事件
+		Self::deposit_event(RawEvent::Txisok(transcation));
+		Self::deposit_event(RawEvent::TranscationVerified(transcation, stored_vec));
+		Ok(())
+	}
 }
+

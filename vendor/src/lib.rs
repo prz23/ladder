@@ -28,6 +28,8 @@ extern crate substrate_keystore as keystore;
 extern crate substrate_primitives as primitives;
 extern crate substrate_transaction_pool as transaction_pool;
 
+extern crate node_primitives;
+
 extern crate rustc_serialize;
 use rustc_serialize::json;
 
@@ -73,13 +75,17 @@ use runtime_primitives::generic::{BlockId, Era};
 use runtime_primitives::traits::{Block, BlockNumberToHash, ProvideRuntimeApi};
 use client::{runtime_api::Core as CoreApi, BlockchainEvents, blockchain::HeaderBackend};
 use primitives::storage::{StorageKey, StorageData, StorageChangeSet};
-use primitives::{ed25519::Pair as TraitPait, ed25519::Pair};
+use primitives::{ ed25519::Pair, ed25519::Public, Pair as TraitPair, crypto::Ss58Codec,
+    sr25519::Public as srPubilc, sr25519::Pair as srPair, crypto::*};
 use transaction_pool::txpool::{self, Pool as TransactionPool, ExtrinsicFor};
 use node_runtime::{
-    Call, UncheckedExtrinsic, EventRecord, Event, MatrixCall, BankCall, matrix::*, ExrCall,
-    VendorApi,exchangerate,ExchangeRateApi
+    Call, UncheckedExtrinsic, EventRecord, Event, MatrixCall, BankCall, matrix::*, ExchangeCall,
+    VendorApi/*,exchangerate */
 };
-use node_runtime::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
+
+use node_primitives::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
+//use node_runtime::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
+
 use web3::{
     Transport,
     api::Namespace, 
@@ -89,6 +95,7 @@ use std::marker::{Send, Sync};
 use log_stream::ChainAlias;
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
+
 
 pub trait SuperviseClient{
     fn submit(&self, message: RelayMessage);
@@ -128,7 +135,7 @@ impl<A, B, C, N> Supervisor<A, B, C, N> where
         if p_nonce.last_block == at {
             p_nonce.nonce = p_nonce.nonce + 1;
         } else {
-            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, self.key.public().0.into()).unwrap();
+            p_nonce.nonce = self.client.runtime_api().account_nonce(&at, &self.key.public().0.unchecked_into()).unwrap();
             p_nonce.last_block = at;
         }
 
@@ -144,12 +151,12 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
     C::Api: VendorApi<B> + CoreApi<B>
 {
     fn submit(&self, message: RelayMessage) {
-        let local_id: AccountId = self.key.public().0.into();
+        let local_id: AccountId = self.key.public().0.unchecked_into();
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
         // let auths = self.client.runtime_api().authorities(&at).unwrap();
         // if auths.contains(&AuthorityId::from(self.key.public().0)) {
-        if self.client.runtime_api().is_authority(&at, &self.key.public().0.into()).unwrap() {
+        if self.client.runtime_api().is_authority(&at, &self.key.public().0.unchecked_into()).unwrap() {
             let nonce = self.get_nonce();
             let signature = signer::Eth::sign_message(&self.eth_key, &message.raw).into();
 
@@ -159,7 +166,7 @@ impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N> where
                     RelayType::Deposit => Call::Bank(BankCall::deposit(message.raw, signature)),
                     RelayType::Withdraw => Call::Bank(BankCall::withdraw(message.raw, signature)),
                     RelayType::SetAuthorities => Call::Matrix(MatrixCall::reset_authorities(message.raw, signature)),
-                    RelayType::ExchangeRate => Call::Exchangerate(ExrCall::check_exchange(message.raw,signature)),
+                    RelayType::ExchangeRate => Call::Exchange(ExchangeCall::check_exchange(message.raw,signature)),
             };
 
             let payload = (
@@ -302,45 +309,49 @@ fn parse_exchange_rate(content : String) -> (f64,u64) {
 }
  // let local_id: AccountId = self.key.public().0.into();
  pub trait ExchangeTrait{
-     fn check_validators(&self) -> Result<u32,u32>;
+     fn check_validators(&self) ->bool;
  }
 
-impl <A,B,Q> ExchangeTrait for Exchange<A,B,Q> where
+impl <A,B,Q,V> ExchangeTrait for Exchange<A,B,Q,V> where
     A: txpool::ChainApi<Block = B>+ 'static,
     B: Block,
     Q: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi + 'static,
     Q::Api: VendorApi<B>,
+    V: SuperviseClient + Send + Sync + 'static,
 {
-    fn check_validators(&self) -> Result<u32,u32> {
+    fn check_validators(&self) -> bool {
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
-        let accountid = self.accountid;
-        self.client.runtime_api().check_validator(&at,accountid).unwrap();
-        Ok(1)
+        let accountid = &self.accountid;
+        self.client.runtime_api().check_validator(&at,accountid).unwrap()
+        //self.client.runtime_api().is_authority(&at, &self.key.public().0.into()).unwrap();
+        //Ok(1)
     }
 }
 
-pub struct Exchange <A,B,C> where
+pub struct Exchange <A,B,C,V> where
     A: txpool::ChainApi,
-    B: Block
-
+    B: Block,
+    V: SuperviseClient + Send + Sync + 'static,
 {
     pub client: Arc<C>,
     pub pool: Arc<TransactionPool<A>>,
     pub accountid : AccountId,
     //pub phantom: std::marker::PhantomData<B>,
     pub packet_nonce: Arc<Mutex<PacketNonce<B>>>,
+    pub spv: Arc<V>,
 }
 
 use std::thread; // 线程
 use std::time::Duration; // 时间差
 
 /// oracle 获取ETHUSD等等的汇率
-impl <A,B,Q> Exchange <A,B,Q> where
+impl <A,B,Q,V> Exchange <A,B,Q,V> where
     A: txpool::ChainApi<Block = B>+ 'static,
     B: Block,
     Q: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi + 'static,
     Q::Api: VendorApi<B>,
+    V: SuperviseClient + Send + Sync + 'static,
 {
     fn start(self)  {
        // let (sender, receiver) = channel();
@@ -359,26 +370,32 @@ impl <A,B,Q> Exchange <A,B,Q> where
                 easy.url("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny").unwrap();
 
                 //let event = receiver.recv().unwrap();
-                // Judging whether the validators is legitimate
-                if  self.check_validators().is_ok(){
+                // 只有validator才有权限去进行oracle获取并上传汇率
+                if  self.check_validators(){
                     // perform the http get method and fetch the responsed
-                    easy.perform().unwrap();
-
+                    if easy.perform().is_err(){ continue; }
+                    // 调用http——get查询是否成功
                     if  easy.response_code().unwrap() == 200 {
                         let contents = easy.get_ref();
                         let contents_string = String::from_utf8_lossy(&contents.0).to_string() ;
-                        println!("exchange_rate <---> {}",contents_string);
+                        //println!("exchange_rate <---> {}",contents_string);
+                        println!("获取汇率success");
                         let (exchange_rate,time) = parse_exchange_rate(contents_string);
-                        //TODO:accountid
-                        //use node_runtime::exchangerate::Trait as T;
-                        //TODO 保存数据<exchangerate::Module<T>>::check_signature( self.accountid ,(exchange_rate*10000.0f64) as u64 ,time);
+                        // 以交易形把数据上传到链上
+                        let hash =H256::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
+                        let message = events::ExchangeRateEvent{
+                            pair: 0u64,
+                            time: time,
+                            rate: (exchange_rate*10000.0f64) as u64 ,
+                            tx_hash: hash ,
+                        };
+                        self.spv.submit(RelayMessage::from(message));
                     }else{
                         println!("获取汇率失败");
                     }
                 };
                 // query the exchange rate every 5 seconds
-                thread::sleep(Duration::from_secs(5));
-
+                thread::sleep(Duration::from_secs(10));
             }
         });
        // sender
@@ -529,15 +546,14 @@ pub fn start_vendor<A, B, C, N>(
     let eth_key = PrivKey::from_str(&config.eth_key).unwrap();
     let eth_pair = KeyPair::from_privkey(eth_key);
     info!("ss58 account: {:?}, eth account: {}", key.public().to_ss58check(), eth_pair);
-
     let info = client.info().unwrap();
     let at = BlockId::Hash(info.best_hash);
     let packet_nonce = PacketNonce {
-            nonce: client.runtime_api().account_nonce(&at, key.public().0.into()).unwrap(),
+            nonce: client.runtime_api().account_nonce(&at, &key.public().0.unchecked_into()).unwrap(),
             last_block: at,
         };
     let packet_nonce2 = PacketNonce {
-        nonce: client.runtime_api().account_nonce(&at, key.public().0.into()).unwrap(),
+        nonce: client.runtime_api().account_nonce(&at, &key.public().0.unchecked_into()).unwrap(),
         last_block: at,
     };
 
@@ -602,11 +618,10 @@ pub fn start_vendor<A, B, C, N>(
     let ext = Exchange{
         client: client.clone(),
         pool: pool.clone(),
-        accountid: key2.public().0.into(),
+        accountid: key2.public().0.unchecked_into(),
         packet_nonce: Arc::new(Mutex::new(packet_nonce2)),
-    };
-
-    ext.start();
+        spv: spv.clone(),
+    }.start();
 
 
     let eth_kovan_tag = H256::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();

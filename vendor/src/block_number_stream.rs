@@ -1,4 +1,4 @@
-use error::{self, ResultExt};
+use crate::error;
 use futures::future::FromErr;
 use futures::{Async, Future, Poll, Stream};
 use std::time::Duration;
@@ -8,6 +8,7 @@ use web3::api::Namespace;
 use web3::helpers::CallFuture;
 use web3::types::U256;
 use web3::Transport;
+use error::ResultExt;
 
 /// Block Number Stream state.
 enum State<T: Transport> {

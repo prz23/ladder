@@ -1,7 +1,7 @@
 use contracts;
-use error::Error;
+use crate::error::Error;
 use web3::types::{Address, H256, U256, Log};
-use utils::IntoRawLog;
+use crate::utils::IntoRawLog;
 use std::str::FromStr;
 
 pub const ETH_COIN: &str = "0000000000000000000000000000000000000000000000000000000000000001";
@@ -318,13 +318,42 @@ impl ExchangeRateEvent{
         result[8..16].copy_from_slice(&u64_to_array(self.time));
         result[16..24].copy_from_slice(&u64_to_array(self.pair));
 
-        result[24..56].copy_from_slice(&self.tx_hash.0[..]);
+       result[24..56].copy_from_slice(&self.tx_hash.0[..]);
         return result;
+    }
+
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        if bytes.len() != 56 {
+            bail!("`bytes`.len() must be {}", 56);
+        }
+        let mut tmp:[u8; 8] = [0u8;8];
+
+        let raw_pair = tmp.copy_from_slice(&bytes[0..8]);
+        let pair = array_to_u64(tmp);
+
+        let raw_time = tmp.copy_from_slice(&bytes[8..16]);
+        let time = array_to_u64(tmp);
+
+        let raw_rate = tmp.copy_from_slice(&bytes[16..24]);
+        let rate = array_to_u64(tmp);
+
+        Ok(Self {
+            pair: pair,
+            time: time,
+            rate: rate,
+            tx_hash: bytes[24..56].into(),
+        })
     }
 }
 pub fn u64_to_array(data: u64) -> [u8; 8] {
     let bytes: [u8; 8] = unsafe { std::mem::transmute(data.to_le()) };
     bytes
+}
+
+pub fn array_to_u64(arr: [u8; 8]) -> u64 {
+    let u = unsafe { std::mem::transmute::<[u8; 8], u64>(arr) };
+    u
 }
 
 #[cfg(test)]
