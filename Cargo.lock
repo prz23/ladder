@@ -3220,7 +3220,7 @@ dependencies = [
 [[package]]
 name = "signer"
 version = "0.1.0"
-source = "git+https://github.com/laddernetwork/signer#a139b37bbaaaa2ef45a3bd0ee86738c448d47433"
+source = "git+https://github.com/laddernetwork/signer#a12da21"
 dependencies = [
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
