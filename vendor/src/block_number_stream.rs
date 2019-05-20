@@ -1,5 +1,5 @@
 use crate::error;
-use error::ResultExt;
+use crate::error::ResultExt;
 use futures::future::FromErr;
 use futures::{Async, Future, Poll, Stream};
 use std::time::Duration;

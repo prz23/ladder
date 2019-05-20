@@ -5,7 +5,7 @@ use crate::message::RelayMessage;
 use crate::state::State;
 use contracts;
 use futures::{Async, Poll, Stream};
-use log_stream::{ChainAlias, LogStream, LogStreamOptions};
+use crate::log_stream::{ChainAlias, LogStream, LogStreamOptions};
 use std::sync::Arc;
 use std::time::Duration;
 use web3::{types::Address, Transport};
@@ -230,11 +230,11 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
 mod tests {
     use super::*;
     use contracts;
-    use rustc_hex::FromHex;
-    use test::MockClient;
+    
+    use crate::test::MockClient;
     use tokio_core::reactor::Core;
-    use utils::StreamExt;
-    use web3::types::{Bytes, Log};
+    
+    
 
     #[test]
     fn test_vendor_stream() {
@@ -273,6 +273,6 @@ mod tests {
         );
         let vendor = Vendor::mock(&transport, client.clone());
         let mut event_loop = Core::new().unwrap();
-        let log_ranges = event_loop.run(vendor.take(2).collect()).unwrap();
+        let _log_ranges = event_loop.run(vendor.take(2).collect()).unwrap();
     }
 }

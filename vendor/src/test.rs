@@ -18,13 +18,13 @@ use futures;
 ///
 /// - mocking transports
 use jsonrpc_core;
-use message::RelayMessage;
+use crate::message::RelayMessage;
 use serde_json;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web3;
 use web3::Transport;
-use SuperviseClient;
+use crate::SuperviseClient;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RequestData {

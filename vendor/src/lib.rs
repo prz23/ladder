@@ -42,7 +42,7 @@ mod test;
 #[cfg(test)]
 extern crate jsonrpc_core;
 #[cfg(test)]
-pub use test::{MockClient, MockTransport};
+pub use crate::test::{MockClient, MockTransport};
 
 #[macro_use]
 mod macros;
@@ -56,38 +56,37 @@ mod state;
 mod utils;
 pub mod vendor;
 
-use client::{blockchain::HeaderBackend, runtime_api::Core as CoreApi, BlockchainEvents};
-use error::ResultExt;
+use crate::client::{blockchain::HeaderBackend, runtime_api::Core as CoreApi, BlockchainEvents};
+use crate::error::ResultExt;
 use futures::{Future, Stream};
-use keystore::Store as Keystore;
-use message::{RelayMessage, RelayType};
-use network::SyncProvider;
+use crate::keystore::Store as Keystore;
+use crate::message::{RelayMessage, RelayType};
+use crate::network::SyncProvider;
 use node_runtime::{
     matrix::*, BankCall, Call, Event, EventRecord, ExchangeCall, MatrixCall, UncheckedExtrinsic,
     VendorApi, /*,exchangerate */
 };
-use primitives::storage::{StorageChangeSet, StorageData, StorageKey};
-use primitives::{
-    crypto::Ss58Codec, crypto::*, ed25519::Pair, ed25519::Public, sr25519::Pair as srPair,
-    sr25519::Public as srPubilc, Pair as TraitPair,
+use crate::primitives::storage::{StorageChangeSet, StorageData, StorageKey};
+use crate::primitives::{
+    crypto::Ss58Codec, crypto::*, ed25519::Pair, Pair as TraitPair,
 };
-use runtime_primitives::codec::{Compact, Decode, Encode};
-use runtime_primitives::generic::{BlockId, Era};
-use runtime_primitives::traits::{Block, BlockNumberToHash, ProvideRuntimeApi};
+use crate::runtime_primitives::codec::{Compact, Decode, Encode};
+use crate::runtime_primitives::generic::{BlockId, Era};
+use crate::runtime_primitives::traits::{Block, BlockNumberToHash, ProvideRuntimeApi};
 use signer::{AbosTransaction, EthTransaction, KeyPair, PrivKey};
-use state::StateStorage;
+use crate::state::StateStorage;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use tokio_core::reactor::Core;
-use transaction_pool::txpool::{self, ExtrinsicFor, Pool as TransactionPool};
-use vendor::Vendor;
+use crate::transaction_pool::txpool::{self, ExtrinsicFor, Pool as TransactionPool};
+use crate::vendor::Vendor;
 
 use node_primitives::{AccountId, Balance, BlockNumber, Hash, Nonce as Index};
 //use node_runtime::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
 
-use log_stream::ChainAlias;
+use crate::log_stream::ChainAlias;
 use std::marker::{Send, Sync};
 use web3::{
     api::Namespace,
@@ -696,7 +695,7 @@ where
     .start();
 
     // exchange
-    let ext = Exchange {
+    let _ext = Exchange {
         client: client.clone(),
         pool: pool.clone(),
         accountid: key2.public().0.unchecked_into(),
@@ -746,7 +745,7 @@ where
                                         warn!("unknown event tag of ingress: {:?}", ie.tag);
                                     }
                                 })
-                                .map_err(|err| {
+                                .map_err(|_err| {
                                     warn!("unexpected format of ingress, message {:?}", message);
                                 });
                         }
