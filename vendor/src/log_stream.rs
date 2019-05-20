@@ -4,7 +4,8 @@ use crate::error::{self, ResultExt};
 //use crate::error;
 use ethabi;
 use futures::future::FromErr;
-use futures::{Async, Future, Poll, Stream};
+use futures::{try_ready, Async, Future, Poll, Stream};
+use log::{debug, info};
 use std::time::Duration;
 use tokio_timer::{Timeout, Timer};
 use web3;
@@ -126,10 +127,9 @@ impl<T: Transport> Stream for LogStream<T> {
         loop {
             let (next_state, value_to_yield) = match self.state {
                 State::AwaitBlockNumber => {
-                    let last_block =
-                        try_stream!(self.block_number_stream.poll().chain_err(|| {
-                            "LogStream: fetching of last confirmed block number failed"
-                        },));
+                    let last_block = try_stream!(self.block_number_stream.poll().chain_err(|| {
+                        "LogStream: fetching of last confirmed block number failed"
+                    },));
                     debug!("LogStream: fetched confirmed block number {}", last_block);
 
                     let from = self.last_checked_block + 1;
@@ -192,9 +192,11 @@ mod tests {
     use super::*;
     use contracts;
     use rustc_hex::FromHex;
+    use serde_json::json;
     use tokio_core::reactor::Core;
     use web3::types::{Bytes, Log};
-
+    use crate::mock_transport;
+    
     #[test]
     fn test_log_stream_twice_no_logs() {
         let deposit_topic = contracts::bridge::events::ingress::filter().topic0;

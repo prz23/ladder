@@ -1,4 +1,5 @@
 use crate::error::{Error, ErrorKind, ResultExt};
+use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::fs;
 use std::io::{self, Read, Write};
@@ -55,8 +56,8 @@ impl StateStorage {
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
-    use super::*;
     use self::tempdir::TempDir;
+    use super::*;
     use std::fs::File;
 
     #[test]

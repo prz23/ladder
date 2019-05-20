@@ -1,11 +1,11 @@
 use super::error::{self, ResultExt};
 use super::SuperviseClient;
 use crate::events;
+use crate::log_stream::{ChainAlias, LogStream, LogStreamOptions};
 use crate::message::RelayMessage;
 use crate::state::State;
 use contracts;
 use futures::{Async, Poll, Stream};
-use crate::log_stream::{ChainAlias, LogStream, LogStreamOptions};
 use std::sync::Arc;
 use std::time::Duration;
 use web3::{types::Address, Transport};
@@ -113,7 +113,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 poll_interval: Duration::from_secs(1),
                 confirmations: 12,
                 transport: transport.clone(),
-                contract_address: "0000000000000000000000000000000000000002".into(),
+                contract_address: "0000000000000000000000000000000000000003".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::deposit::filter(),
                 chain: ChainAlias::ETH,
@@ -123,7 +123,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 poll_interval: Duration::from_secs(1),
                 confirmations: 12,
                 transport: transport.clone(),
-                contract_address: "0000000000000000000000000000000000000002".into(),
+                contract_address: "0000000000000000000000000000000000000004".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::withdraw::filter(),
                 chain: ChainAlias::ETH,
@@ -133,7 +133,7 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
                 poll_interval: Duration::from_secs(1),
                 confirmations: 12,
                 transport: transport.clone(),
-                contract_address: "0000000000000000000000000000000000000002".into(),
+                contract_address: "0000000000000000000000000000000000000005".into(),
                 last_block_number: 3,
                 filter: contracts::bridge::events::replace_auths::filter(),
                 chain: ChainAlias::ETH,
@@ -229,16 +229,19 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use contracts;
-    
     use crate::test::MockClient;
+    use contracts;
+    use serde_json::json;
     use tokio_core::reactor::Core;
-    
-    
+    use crate::mock_transport;
 
     #[test]
     fn test_vendor_stream() {
         let ingress_topic = contracts::bridge::events::ingress::filter().topic0;
+        let egress_topic = contracts::bridge::events::egress::filter().topic0;
+        let deposit_topic = contracts::bridge::events::deposit::filter().topic0;
+        let withdraw_topic = contracts::bridge::events::withdraw::filter().topic0;
+        let authority_topic = contracts::bridge::events::replace_auths::filter().topic0;
 
         let client = Arc::new(MockClient::default());
         let transport = mock_transport!(
@@ -261,18 +264,51 @@ mod tests {
                 }]);
             "eth_blockNumber" =>
                 req => json!([]),
-                res => json!("0x1012");
+                res => json!("0x1011");
             "eth_getLogs" =>
                 req => json!([{
-                    "address": "0x0000000000000000000000000000000000000001",
-                    "fromBlock": "0x1006",
-                    "toBlock": "0x1006",
-                    "topics": [ingress_topic]
+                    "address": "0x0000000000000000000000000000000000000002",
+                    "fromBlock": "0x4",
+                    "toBlock": "0x1005",
+                    "topics": [egress_topic]
+                }]),
+                res => json!([]);
+            "eth_blockNumber" =>
+                req => json!([]),
+                res => json!("0x1011");
+            "eth_getLogs" =>
+                req => json!([{
+                    "address": "0x0000000000000000000000000000000000000003",
+                    "fromBlock": "0x4",
+                    "toBlock": "0x1005",
+                    "topics": [deposit_topic]
+                }]),
+                res => json!([]);
+            "eth_blockNumber" =>
+                req => json!([]),
+                res => json!("0x1011");
+            "eth_getLogs" =>
+                req => json!([{
+                    "address": "0x0000000000000000000000000000000000000004",
+                    "fromBlock": "0x4",
+                    "toBlock": "0x1005",
+                    "topics": [withdraw_topic]
+                }]),
+                res => json!([]);
+            "eth_blockNumber" =>
+                req => json!([]),
+                res => json!("0x1011");
+            "eth_getLogs" =>
+                req => json!([{
+                    "address": "0x0000000000000000000000000000000000000005",
+                    "fromBlock": "0x4",
+                    "toBlock": "0x1005",
+                    "topics": [authority_topic]
                 }]),
                 res => json!([]);
         );
         let vendor = Vendor::mock(&transport, client.clone());
         let mut event_loop = Core::new().unwrap();
-        let _log_ranges = event_loop.run(vendor.take(2).collect()).unwrap();
+        let _log_ranges = event_loop.run(vendor.take(1).collect()).unwrap();
     }
 }

@@ -26,19 +26,19 @@ tokio-core = "0.1.8"
 rustc-hex = "1.0"
 
 node-runtime = { path = "../runtime" }
-sr-primitives = { git = "https://github.com/paritytech/substrate" }
-substrate-client = { git = "https://github.com/paritytech/substrate", default-features = false }
-substrate-network = { git = "https://github.com/paritytech/substrate" }
-substrate-keystore = { git = "https://github.com/paritytech/substrate" }
-substrate-primitives = { git = "https://github.com/paritytech/substrate" }
-substrate-transaction-pool = { git = "https://github.com/paritytech/substrate" }
-srml-session = { git = "https://github.com/paritytech/substrate" }
+runtime_primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate" }
+client = { package = "substrate-client", git = "https://github.com/paritytech/substrate", default-features = false }
+network = { package = "substrate-network", git = "https://github.com/paritytech/substrate" }
+keystore = { package = "substrate-keystore", git = "https://github.com/paritytech/substrate" }
+primitives = { package = "substrate-primitives", git = "https://github.com/paritytech/substrate" }
+transaction_pool = { package = "substrate-transaction-pool", git = "https://github.com/paritytech/substrate" }
+#srml-session = { git = "https://github.com/paritytech/substrate" }
 
 node-primitives = { path = "../primitives"}
 curl = { version = "*"}
 rustc-serialize = { version = "*"}
+jsonrpc-core = "8.0"
 
 [dev-dependencies]
 tempdir = "0.3"
 quickcheck = "0.6.1"
-jsonrpc-core = "8.0"

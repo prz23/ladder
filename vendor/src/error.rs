@@ -1,3 +1,4 @@
+use error_chain::error_chain;
 use ethabi;
 use serde_json;
 use std::io;

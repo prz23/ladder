@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::utils::IntoRawLog;
 use contracts;
+use error_chain::bail;
 use std::str::FromStr;
 use web3::types::{Address, Log, H256, U256};
 

@@ -13,18 +13,18 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Parity-Bridge.  If not, see <http://www.gnu.org/licenses/>.
+use crate::message::RelayMessage;
+use crate::SuperviseClient;
 use futures;
 /// helpers for testing:
 ///
 /// - mocking transports
 use jsonrpc_core;
-use crate::message::RelayMessage;
 use serde_json;
 use std::cell::RefCell;
 use std::rc::Rc;
 use web3;
 use web3::Transport;
-use crate::SuperviseClient;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RequestData {
@@ -130,17 +130,10 @@ macro_rules! mock_transport {
 
 #[derive(Default)]
 pub struct MockClient {
-    data: Vec<RelayMessage>,
 }
 
-impl MockClient {
-    fn count(&self) -> usize {
-        self.data.len()
-    }
-}
 impl SuperviseClient for MockClient {
     fn submit(&self, tx: RelayMessage) {
         println!("{:?}", tx);
-        // self.data.push(tx);
     }
 }

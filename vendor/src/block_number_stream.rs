@@ -1,7 +1,8 @@
 use crate::error;
 use crate::error::ResultExt;
 use futures::future::FromErr;
-use futures::{Async, Future, Poll, Stream};
+use futures::{try_ready, Async, Future, Poll, Stream};
+use log::debug;
 use std::time::Duration;
 use tokio_timer::{Interval, Timeout, Timer};
 use web3;
@@ -106,7 +107,9 @@ impl<T: Transport> Stream for BlockNumberStream<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use tokio_core::reactor::Core;
+    use crate::mock_transport;
 
     #[test]
     fn test_block_number_stream() {

@@ -1,54 +1,7 @@
 #[macro_use]
-extern crate error_chain;
-extern crate tokio_timer;
-extern crate toml;
-#[macro_use]
-extern crate futures;
-extern crate tokio;
-extern crate tokio_core;
-extern crate web3;
-#[macro_use]
-extern crate log;
-
-#[cfg_attr(test, macro_use)]
-extern crate serde_json;
-
-#[macro_use]
-extern crate serde_derive;
-extern crate contracts;
-extern crate ethabi;
-extern crate rustc_hex;
-extern crate signer;
-
-extern crate node_runtime;
-extern crate sr_primitives as runtime_primitives;
-extern crate substrate_client as client;
-extern crate substrate_keystore as keystore;
-extern crate substrate_network as network;
-extern crate substrate_primitives as primitives;
-extern crate substrate_transaction_pool as transaction_pool;
-
-extern crate node_primitives;
-
-extern crate rustc_serialize;
-use rustc_serialize::json;
-
-extern crate curl;
-use curl::easy::{Easy2, Handler, WriteError};
-
-#[cfg(test)]
-#[macro_use]
-mod test;
-#[cfg(test)]
-extern crate jsonrpc_core;
-#[cfg(test)]
-pub use crate::test::{MockClient, MockTransport};
-
-#[macro_use]
 mod macros;
-pub mod error;
-//mod fixed_number;
 pub mod block_number_stream;
+pub mod error;
 pub mod events;
 pub mod log_stream;
 pub mod message;
@@ -56,43 +9,51 @@ mod state;
 mod utils;
 pub mod vendor;
 
-use crate::client::{blockchain::HeaderBackend, runtime_api::Core as CoreApi, BlockchainEvents};
-use crate::error::ResultExt;
-use futures::{Future, Stream};
-use crate::keystore::Store as Keystore;
 use crate::message::{RelayMessage, RelayType};
-use crate::network::SyncProvider;
+use crate::state::StateStorage;
+use crate::vendor::Vendor;
+use client::{blockchain::HeaderBackend, runtime_api::Core as CoreApi, BlockchainEvents};
+use error::ResultExt;
+use futures::{Future, Stream};
+use keystore::Store as Keystore;
+use log::{error, info, warn};
+use network::SyncProvider;
+use node_primitives::{AccountId, Balance, BlockNumber, Hash, Nonce as Index};
 use node_runtime::{
     matrix::*, BankCall, Call, Event, EventRecord, ExchangeCall, MatrixCall, UncheckedExtrinsic,
     VendorApi, /*,exchangerate */
 };
-use crate::primitives::storage::{StorageChangeSet, StorageData, StorageKey};
-use crate::primitives::{
-    crypto::Ss58Codec, crypto::*, ed25519::Pair, Pair as TraitPair,
+use primitives::storage::{StorageChangeSet, StorageData, StorageKey};
+use primitives::{crypto::Ss58Codec, crypto::*, ed25519::Pair, Pair as TraitPair};
+use runtime_primitives::{
+    codec::{Compact, Decode, Encode},
+    generic::{BlockId, Era},
+    traits::{Block, BlockNumberToHash, ProvideRuntimeApi},
 };
-use crate::runtime_primitives::codec::{Compact, Decode, Encode};
-use crate::runtime_primitives::generic::{BlockId, Era};
-use crate::runtime_primitives::traits::{Block, BlockNumberToHash, ProvideRuntimeApi};
-use signer::{AbosTransaction, EthTransaction, KeyPair, PrivKey};
-use crate::state::StateStorage;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, Mutex};
-use tokio_core::reactor::Core;
-use crate::transaction_pool::txpool::{self, ExtrinsicFor, Pool as TransactionPool};
-use crate::vendor::Vendor;
-
-use node_primitives::{AccountId, Balance, BlockNumber, Hash, Nonce as Index};
-//use node_runtime::{Balance, Hash, AccountId, Nonce as Index, BlockNumber};
 
 use crate::log_stream::ChainAlias;
+use curl::easy::{Easy2, Handler, WriteError};
+use rustc_serialize::json;
+use signer::{AbosTransaction, EthTransaction, KeyPair, PrivKey};
 use std::marker::{Send, Sync};
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::sync::{
+    mpsc::{channel, Sender},
+    Arc, Mutex,
+};
+use tokio_core::reactor::Core;
+use transaction_pool::txpool::{self, ExtrinsicFor, Pool as TransactionPool};
 use web3::{
     api::Namespace,
     types::{Address, Bytes, H256, U256},
     Transport,
 };
+
+#[cfg_attr(test, macro_use)]
+mod test;
+#[cfg(test)]
+pub use crate::test::{MockClient, MockTransport};
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
 
