@@ -124,7 +124,7 @@ impl<T: Trait> Module<T> {
         if 1 == Self::already_sent(transcation){
             return Err("This Transcation already been sent!");
         }
-        
+
         //增加一条记录  包含  交易hash => vec (验证者,签名hash)
         let mut stored_vec = Self::record(transcation);
         stored_vec.push((sender.clone(),sign.clone()));
