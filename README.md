@@ -46,7 +46,7 @@ You will also need to install the following packages:
   brew install cmake pkg-config openssl git llvm
   ```
 
-To finish installation of Substrate, jump down to [Build](#Build).
+To finish installation of Substrate, jump down to [Build](#2-build).
 
 #### 1.1.2. Windows
 
@@ -107,16 +107,23 @@ If you are trying to set up Substrate on Windows, you should do the following:
 
 ## 2. Build
 
+Then, grab the source code:
+
+```bash
+git clone https://github.com/laddernetwork/ladder.git
+cd ladder
+```
+
 Then build the code:
 
-```
+```bash
 ./build.sh
 
 cargo build
 ```
 
 You can start a development chain with:
-```
+```bash
 cargo run -- --dev
 ```
 
