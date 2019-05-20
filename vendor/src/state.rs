@@ -56,7 +56,8 @@ impl StateStorage {
 mod tests {
     extern crate tempdir;
     use super::*;
-    use tempdir::TempDir;
+    use self::tempdir::TempDir;
+    use std::fs::File;
 
     #[test]
     fn should_load_save() {
@@ -64,8 +65,8 @@ mod tests {
         let tmp_dir = TempDir::new("example").unwrap();
         let file_path = tmp_dir.path().join("test.json");
 
-        let mut tmp_file = File::create(file_path).unwrap();
-        let mut ss = StateStorage::load(file_path).unwrap();
+        let tmp_file = File::create(&file_path).unwrap();
+        let mut ss = StateStorage::load(&file_path).unwrap();
         println!("{:?}", ss.state);
         let state = State {
             ingress: 10,
@@ -74,7 +75,7 @@ mod tests {
             withdraw: 10,
             authority: 10,
         };
-        ss.save(state).unwrap();
+        ss.save(&state).unwrap();
         drop(tmp_file);
         tmp_dir.close().unwrap();
     }

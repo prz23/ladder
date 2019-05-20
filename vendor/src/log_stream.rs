@@ -1,5 +1,5 @@
 use crate::block_number_stream::{BlockNumberStream, BlockNumberStreamOptions};
-use error::{self, ResultExt};
+use crate::error::{self, ResultExt};
 //use crate::error::ResultExt;
 //use crate::error;
 use ethabi;
@@ -232,6 +232,7 @@ mod tests {
             contract_address: "0000000000000000000000000000000000000001".into(),
             last_block_number: 3,
             filter: contracts::bridge::events::ingress::filter(),
+            chain: ChainAlias::ETH,
         });
 
         let mut event_loop = Core::new().unwrap();
@@ -287,6 +288,7 @@ mod tests {
             contract_address: "0000000000000000000000000000000000000001".into(),
             last_block_number: 3,
             filter: contracts::bridge::events::ingress::filter(),
+            chain: ChainAlias::ETH,
         });
 
         let mut event_loop = Core::new().unwrap();

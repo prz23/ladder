@@ -253,7 +253,7 @@ impl AuthorityEvent {
         index += 4;
 
         let mut last: Vec<Address> = Vec::with_capacity(last_len as usize);
-        for _ in (0..last_len) {
+        for _ in 0..last_len {
             let address: Address = bytes[index..(index + 20)].into();
             index += 20;
             last.push(address);
@@ -264,7 +264,7 @@ impl AuthorityEvent {
         index += 4;
 
         let next: Vec<Address> = (0..next_len)
-            .map(|i| {
+            .map(|_i| {
                 let address: Address = bytes[index..(index + 20)].into();
                 index += 20;
                 address
@@ -332,13 +332,13 @@ impl ExchangeRateEvent {
         }
         let mut tmp: [u8; 8] = [0u8; 8];
 
-        let raw_pair = tmp.copy_from_slice(&bytes[0..8]);
+        let _raw_pair = tmp.copy_from_slice(&bytes[0..8]);
         let pair = array_to_u64(tmp);
 
-        let raw_time = tmp.copy_from_slice(&bytes[8..16]);
+        let _raw_time = tmp.copy_from_slice(&bytes[8..16]);
         let time = array_to_u64(tmp);
 
-        let raw_rate = tmp.copy_from_slice(&bytes[16..24]);
+        let _raw_rate = tmp.copy_from_slice(&bytes[16..24]);
         let rate = array_to_u64(tmp);
 
         Ok(Self {
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_message_from_log() {
-        let (tag, recipient, value, tx_hash, bytes_str) = prepare_data();
+        let (tag, recipient, value, tx_hash, _bytes_str) = prepare_data();
         let ingress_topic = contracts::bridge::events::ingress::filter().topic0;
         let log = Log {
                     address: "0xf1dF5972B7e394201d4fFADD797FAa4A3C8be0ea".into(),
