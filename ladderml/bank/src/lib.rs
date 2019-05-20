@@ -377,13 +377,12 @@ impl<T: Trait> Module<T> {
         // check block number and call next_session if necessary.
         let is_final_block =
             ((block_number - Self::last_length_change()) % Self::length()).is_zero();
-        /*
-        let (should_end_session, apply_rewards) = <ForcingNewSession<T>>::take()
+
+        let (should_end_session, apply_rewards) = None
             .map_or((is_final_block, is_final_block), |apply_rewards| (true, apply_rewards));
-        */
-        if true {
+        if should_end_session {
             runtime_io::print("--------安排上了04-01--------");
-            Self::rotate_session(is_final_block, true);
+            Self::rotate_session(is_final_block, apply_rewards);
         }
     }
 
