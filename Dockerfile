@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:18.10
 LABEL maintainer="laddernetwork"
 LABEL description="This is a docker for ladder node"
 
