@@ -31,9 +31,7 @@ use primitives::{
     sr25519, Pair,
 };
 use substrate_service;
-use substrate_telemetry::TelemetryEndpoints;
-
-const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
+use primitives::crypto::UncheckedFrom;
 
 /// Specialized `ChainSpec`.
 pub type ChainSpec = substrate_service::ChainSpec<GenesisConfig>;
@@ -260,8 +258,8 @@ fn ladder_testnet_genesis() -> GenesisConfig {
                 .unchecked_into(), // 5G1MRi1tTL3yT7sLxote4X71mrrknmD1V4wqV46cXfmvSXb6
             hex!["003911b2203ab1d9f8d0c800b3918c9a08b96a760a3848e69cf0b766498fee4a"]
                 .unchecked_into(), // 5C4zowsXUqg6qA3ggBjUQjcSnWc3Di95PRthTKhcJ4fkKx65
-            hex!["ab7abe64574ebdc8360bb5845fd39b6c7f509d4d6a6c53cf3e378b1e729a0165"]
-                .unchecked_into(), // 5FWLaBimAiD5gdpZWsCBCSVi8gdP6pFpCSpuauEAbWw7y7HU
+            hex!["f223b164b22ca82b3c5b2d83b7598c47281eebe28ced1427791846f2c7cfaeb8"]
+                .unchecked_into(), // 5DGQfV2rtWo1iCoT7t5yapBz9ww6CrcTJ48TCUMLqmfjhcJd
         ),
         (
             hex!["541339a3f3406f14912f2c493d04d8863c1eaeaff06e1a03d7de82ee7d89aa7f"]
@@ -279,13 +277,21 @@ fn ladder_testnet_genesis() -> GenesisConfig {
             hex!["7878bb590eb1a9fde93690038580c84b966c04e838c2005bcf428772eed396c9"]
                 .unchecked_into(), // 5EnfU7B4zEpwd6jvDQxna349JTYDhcoWDgTvRMu61D8wwtur
         ),
+        (
+            hex!["96c72cbd7e76353d9051020c9ca8d41fa3b56770ceabf91e3e2610ffcbc60476"]
+                .unchecked_into(), // 5FUQCy3HjgTuutFyzZUe1AtQFaU39yH5HU1coEiMgWhtpqFx
+            hex!["1a4ad302298e0f647aae3d31b78083655e1447295bbf4559769e6a4e1f5adf75"]
+                .unchecked_into(), // 5CfBL54BxiJiEbiovTXHfRGr75kjmL4mhZfhJk1D9wYYyDQt
+            hex!["b15c0fb0a6a68b8c62c9c704c5671fb94235e81a9718e7a0217b7bfdca8d1c17"]
+                .unchecked_into(), // 5G5FgS2DvWpFTW4pjNL4ugzUYMwEPRuoiWWVX1sE3U49T293
+        ),
     ];
 
     // root account.
     let endowed_accounts: Vec<AccountId> = vec![
         hex!["58149eabec2e986b0dec740f243bbb836f6f6dc48a656e7c036471f1f6e06f6d"].unchecked_into(), //5E4CCLsJ3P1UBXgRdzFEQivMMJEqfg3VBj1tpvx8dsJa2FxQ
     ];
-    const MILLICENTS: u128 = 1_000_000_000;
+    const MILLICENTS: u128 = 1_000;
     const CENTS: u128 = 1_000 * MILLICENTS; // assume this is worth about a cent.
     const DOLLARS: u128 = 100 * CENTS;
 
@@ -309,6 +315,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			balances: endowed_accounts.iter().cloned()
 				.map(|k| (k, ENDOWMENT))
 				.chain(initial_authorities.iter().map(|x| (x.0.clone(), STASH)))
+				.chain(initial_authorities.iter().map(|x| (AccountId::unchecked_from(x.2.clone().0), STASH))) // FIX oracle no need fee
 				.collect(),
 			existential_deposit: 1 * DOLLARS,
 			transfer_fee: 1 * CENTS,
@@ -318,6 +325,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 		indices: Some(IndicesConfig {
 			ids: endowed_accounts.iter().cloned()
 				.chain(initial_authorities.iter().map(|x| x.0.clone()))
+				.chain(initial_authorities.iter().map(|x| x.1.clone()))
 				.collect::<Vec<_>>(),
 		}),
 		session: Some(SessionConfig {
@@ -330,11 +338,11 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			offline_slash: Perbill::from_billionths(1_000_000),
 			session_reward: Perbill::from_billionths(2_065),
 			current_session_reward: 0,
-			validator_count: 3,
+			validator_count: 7,
 			sessions_per_era: 12,
 			bonding_duration: 12,
 			offline_slash_grace: 4,
-			minimum_validator_count: 3,
+			minimum_validator_count: 4,
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 		}),
@@ -415,8 +423,7 @@ pub fn ladder_testnet_config() -> ChainSpec {
         "Ladder Testnet",
         ladder_testnet_genesis,
         vec![],
-        // TODO, remove it when substrate upgrade to latest version. test that hasn't this problem.
-        Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
+        None,
         None,
         None,
         None,
