@@ -600,3 +600,89 @@ impl<T: Trait> Module<T>
         x1.checked_add(&x2);
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use support::{impl_outer_origin, assert_ok,assert_err};
+    use runtime_io::with_externalities;
+    use primitives::{H256, Blake2Hasher};
+    use sr_primitives::BuildStorage;
+    use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
+    use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
+    use signcheck;
+
+    impl_outer_origin!{
+		pub enum Origin for Test {}
+	}
+
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Test;
+
+    impl system::Trait for Test {
+        type Origin = Origin;
+        type Index = u64;
+        type BlockNumber = u64;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type Digest = Digest;
+        type AccountId = u64;
+        type Lookup = IdentityLookup<u64>;
+        type Header = Header;
+        type Event = ();
+        type Log = DigestItem;
+    }
+
+    impl balances::Trait for Test {
+        type Balance = u64;
+        type OnFreeBalanceZero = ();
+        type OnNewAccount = ();
+        type Event = ();
+        type TransactionPayment = ();
+        type TransferPayment = ();
+        type DustRemoval = ();
+    }
+
+
+    impl consensus::Trait for Test {
+        type Log = DigestItem;
+        type SessionKey = UintAuthorityId;
+        type InherentOfflineReport = ();
+    }
+
+    impl timestamp::Trait for Test {
+        type Moment = u64;
+        type OnTimestampSet = ();
+    }
+
+    impl session::Trait for Test {
+        type ConvertAccountIdToSessionKey = ConvertUintAuthorityId;
+        type OnSessionChange = ();
+        type Event = ();
+    }
+
+    impl signcheck::Trait for Test {
+        type Event = ();
+    }
+
+    impl Trait for Test {
+        type Currency = balances::Module<Self>;
+        type Event = ();
+    }
+
+    fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
+        let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
+        runtime_io::TestExternalities::new(t)
+    }
+
+    type Bank = Module<Test>;
+
+    #[test]
+    fn set_minum_signature() {
+        with_externalities(&mut new_test_ext(), || {
+
+        });
+    }
+}
