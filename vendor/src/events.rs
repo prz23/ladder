@@ -318,7 +318,7 @@ pub struct ExchangeRateEvent {
 
 impl ExchangeRateEvent {
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut result = vec![0u8; 24];
+        let mut result = vec![0u8; 56];
         result[0..8].copy_from_slice(&u64_to_array(self.rate));
         result[8..16].copy_from_slice(&u64_to_array(self.time));
         result[16..24].copy_from_slice(&u64_to_array(self.pair));

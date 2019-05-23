@@ -24,7 +24,7 @@ use node_runtime::{
     VendorApi, /*,exchangerate */
 };
 use primitives::storage::{StorageChangeSet, StorageData, StorageKey};
-use primitives::{crypto::Ss58Codec, crypto::*, ed25519::Pair, Pair as TraitPair};
+use primitives::{crypto::Ss58Codec, crypto::*, ed25519::Pair, Pair as TraitPair, ed25519::Public};
 use runtime_primitives::{
     codec::{Compact, Decode, Encode},
     generic::{BlockId, Era},
@@ -314,9 +314,10 @@ where
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
         let accountid = &self.accountid;
+        println!("验证者！！！accountid is {:?}",accountid);
         self.client
             .runtime_api()
-            .check_validator(&at, accountid)
+            .is_authority(&at, accountid)
             .unwrap()
         //self.client.runtime_api().is_authority(&at, &self.key.public().0.into()).unwrap();
         //Ok(1)
@@ -331,7 +332,7 @@ where
 {
     pub client: Arc<C>,
     pub pool: Arc<TransactionPool<A>>,
-    pub accountid: AccountId,
+    pub accountid: Public,
     //pub phantom: std::marker::PhantomData<B>,
     pub packet_nonce: Arc<Mutex<PacketNonce<B>>>,
     pub spv: Arc<V>,
@@ -365,7 +366,7 @@ where
                 easy.get(true).unwrap();
                 easy.url("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny")
                     .unwrap();
-
+                println!("验证者！！！accountid is！！！！！");
                 //let event = receiver.recv().unwrap();
                 // 只有validator才有权限去进行oracle获取并上传汇率
                 if self.check_validators() {
@@ -391,7 +392,7 @@ where
                             rate: (exchange_rate * 10000.0f64) as u64,
                             tx_hash: hash,
                         };
-                        self.spv.submit(RelayMessage::from(message));
+                       self.spv.submit(RelayMessage::from(message));
                     } else {
                         println!("获取汇率失败");
                     }
@@ -655,11 +656,14 @@ where
     }
     .start();
 
+    let id_need = key2.public().0.unchecked_into();
+
+
     // exchange
     let _ext = Exchange {
         client: client.clone(),
         pool: pool.clone(),
-        accountid: key2.public().0.unchecked_into(),
+        accountid: id_need,
         packet_nonce: Arc::new(Mutex::new(packet_nonce2)),
         spv: spv.clone(),
     }

@@ -101,10 +101,7 @@ impl<T: Trait> Module<T> {
     pub fn check_validator(accountid: &T::AccountId) -> bool {
         //判断是否是合法验证者集合中的人
         let validators = <session::Module<T>>::validators();
-        if !validators.contains(accountid) {
-            return false;
-        }
-        true
+        return false;
     }
 
     /// 签名并判断如果当前签名数量足够就发送一个事件
