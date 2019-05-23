@@ -152,3 +152,98 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use support::{impl_outer_origin, assert_ok,assert_err};
+    use runtime_io::with_externalities;
+    use primitives::{H256, Blake2Hasher};
+    use sr_primitives::BuildStorage;
+    use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
+    use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
+
+    impl_outer_origin!{
+		pub enum Origin for Test {}
+	}
+
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Test;
+
+    impl system::Trait for Test {
+        type Origin = Origin;
+        type Index = u64;
+        type BlockNumber = u64;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type Digest = Digest;
+        type AccountId = u64;
+        type Lookup = IdentityLookup<u64>;
+        type Header = Header;
+        type Event = ();
+        type Log = DigestItem;
+    }
+
+    impl Trait for Test {
+        type Event = ();
+    }
+
+    fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
+        let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
+        runtime_io::TestExternalities::new(t)
+    }
+
+    type Signcheck = Module<Test>;
+
+    #[test]
+    fn set_minum_signature() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq!(Signcheck::min_signature(),1);
+            assert_ok!(Signcheck::set_min_num(Origin::signed(2),5));
+            assert_eq!(Signcheck::min_signature(),5);
+            assert_ok!(Signcheck::set_min_num(Origin::signed(3),500));
+            assert_eq!(Signcheck::min_signature(),500);
+
+            assert_err!(Signcheck::set_min_num(Origin::signed(4),2),"too small,should bigger than 5");
+            assert_eq!(Signcheck::min_signature(),500);
+        });
+    }
+
+    #[test]
+    fn check_single_signature() {
+        with_externalities(&mut new_test_ext(), || {
+            // when min_signature is 1  the first tx will success
+            assert_ok!(Signcheck::check_signature(1,H256::from_low_u64_be(15),
+            H256::from_low_u64_be(15),H256::from_low_u64_be(15)));
+            // the second tx will err
+            assert_err!(Signcheck::check_signature(2,H256::from_low_u64_be(15),
+            H256::from_low_u64_be(14),H256::from_low_u64_be(15)),"This Transcation already been sent!");
+        });
+    }
+
+    #[test]
+    fn check_muilt_signature() {
+        with_externalities(&mut new_test_ext(), || {
+            // now set the min_sig to 5
+            assert_ok!(Signcheck::set_min_num(Origin::signed(2),5));
+            assert_eq!(Signcheck::min_signature(),5);
+
+            // then only the 5th transcation will success
+            assert_err!(Signcheck::check_signature(1,H256::from_low_u64_be(15),
+            H256::from_low_u64_be(15),H256::from_low_u64_be(15)),"Not enough signature!");
+            assert_err!(Signcheck::check_signature(2,H256::from_low_u64_be(15),
+            H256::from_low_u64_be(14),H256::from_low_u64_be(15)),"Not enough signature!");
+            assert_err!(Signcheck::check_signature(3,H256::from_low_u64_be(15),
+            H256::from_low_u64_be(13),H256::from_low_u64_be(15)),"Not enough signature!");
+            assert_err!(Signcheck::check_signature(4,H256::from_low_u64_be(15),
+            H256::from_low_u64_be(12),H256::from_low_u64_be(15)),"Not enough signature!");
+            assert_ok!(Signcheck::check_signature(5,H256::from_low_u64_be(15),
+            H256::from_low_u64_be(11),H256::from_low_u64_be(15)));
+
+            // already_sent == 1 means the Hash(15) has been accept
+            assert_eq!(Signcheck::already_sent(H256::from_low_u64_be(15)),1);
+        });
+    }
+
+}
