@@ -84,8 +84,9 @@ decl_module! {
         /// 签名并判断如果当前签名数量足够就发送一个事件
         pub  fn check_exchange(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
 
-        let (who , exchangerate  ,time ,extype) = Self::parse_data(message, signature);
-        let sender = who;
+        let sender = ensure_signed(origin)?;
+        let (exchangerate, time, extype) = Self::parse_tx_data(message);
+
         Self::check_signature(sender,exchangerate,time,extype);
         Ok(())
         }
@@ -134,7 +135,6 @@ impl<T: Trait> Module<T> {
         repeat_vec.push(sender.clone());
         <RepeatPrevent<T>>::insert(time.clone(), repeat_vec.clone());
 
-        //其他验证？
         //Self::_verify(transcation)?;
 
         let numofsigned = Self::num_of_signed(&time);
@@ -162,11 +162,12 @@ impl<T: Trait> Module<T> {
         let mut messagedrain = message.clone();
         let hash: Vec<_> = messagedrain.drain(0..32).collect();
 
-        let tx_hash: T::Hash = Decode::decode(&mut &hash.encode()[..]).unwrap();
+        let tx_hash: T::Hash = Decode::decode(&mut &hash[..]).unwrap();
 
-        let signature_hash: T::Hash = Decode::decode(&mut &signature.encode()[..]).unwrap();
-        let id: Vec<_> = messagedrain.drain(32..64).collect();
-        let who: T::AccountId = Decode::decode(&mut &id.encode()[..]).unwrap();
+        let signature_hash: T::Hash = Decode::decode(&mut &signature[..]).unwrap();
+
+        let time: Vec<_> = messagedrain.drain(0..8).collect();
+        let who: T::AccountId = Decode::decode(&mut &time[..]).unwrap();
 
         let rate_vec: Vec<u8> = messagedrain.drain(32..40).collect();
         let mut rate: u64 = 0;
@@ -203,4 +204,40 @@ impl<T: Trait> Module<T> {
 
         return (who, rate, time, extype);
     }
+
+    /// 解析message --> hash tag  id  exchangerate time extype
+    ///    bit          32   32   32     8          8    8
+    ///    实现         ok   no   ok     ok         ok   ok
+    ///           解析出   发送者id   汇率  该汇率时间  汇率类型（保留字段）
+    fn parse_tx_data(message: Vec<u8>) -> (u64, u64, u64) {
+        let mut messagedrain = message.clone();
+
+        // exchange rate
+        let rate_vec: Vec<u8> = messagedrain.drain(0..8).collect();
+        let mut rate_u64 = Self::u8array_to_u64(rate_vec.as_slice());
+
+        // time of the exchangerate
+        let time_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        let mut time_u64 = Self::u8array_to_u64(time_vec.as_slice());
+
+        // pair type of the rate
+        let pair_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        let mut pair_u64 = Self::u8array_to_u64(pair_vec.as_slice());
+
+        return (rate_u64, time_u64, pair_u64);
+    }
+
+    pub fn u8array_to_u64(arr: &[u8]) -> u64 {
+        let mut len = rstd::cmp::min(8, arr.len());
+        let mut ret = 0u64;
+        let mut i = 0u64;
+        while len > 0 {
+            ret += (arr[len-1] as u64) << (i * 8);
+            len -= 1;
+            i += 1;
+        }
+        ret
+    }
+
 }
+
