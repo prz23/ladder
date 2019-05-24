@@ -56,6 +56,7 @@ pub use exchange::Call as ExchangeCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use support::StorageValue;
 pub use staking::StakerStatus;
+pub use brand::Trademark;
 
 pub use system::EventRecord;
 
@@ -233,6 +234,10 @@ impl finality_tracker::Trait for Runtime {
 	type OnFinalizationStalled = grandpa::SyncedAuthorities<Runtime>;
 }
 
+impl brand::Trait for Runtime {
+    type Event = Event;
+}
+
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, AuthorityId, AuthoritySignature>) where
 		Block = Block,
@@ -262,6 +267,7 @@ construct_runtime!(
 		Signcheck: signcheck::{Module, Call, Storage, Event<T>},
 		Bank: bank::{Module,Call,Storage,Config<T>,Event<T>},
 		Exchange: exchange::{Module,Call,Storage,Event<T>},
+		Brand: brand::{Module, Call, Storage, Config<T>, Event<T>},
 	}
 );
 

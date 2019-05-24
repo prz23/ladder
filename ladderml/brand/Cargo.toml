@@ -1,0 +1,26 @@
+[package]
+name = "brand"
+version = "0.1.0"
+authors = ["Ladder Network <contact@laddernetwork.io>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0", optional = true }
+serde_derive = { version = "1.0", optional = true }
+parity-codec = { version = "3.3", default-features = false }
+srml-support = { git = "https://github.com/paritytech/substrate.git", default-features = false }
+system = { package = "srml-system", git = "https://github.com/paritytech/substrate.git", default-features = false }
+primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate.git", default-features = false }
+runtime_io = { package = "sr-io", git = "https://github.com/paritytech/substrate.git", default-features = false }
+
+[features]
+default = ["std"]
+std = [
+	"serde",
+	"serde_derive",
+	"parity-codec/std",
+	"srml-support/std",
+	"system/std",
+	"primitives/std",
+	"runtime_io/std",
+]
