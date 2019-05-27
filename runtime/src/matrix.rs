@@ -13,7 +13,7 @@ use support::{
     decl_module, decl_storage, decl_event, StorageMap, dispatch::Result, ensure
 };
 
-pub trait Trait: balances::Trait + session::Trait {
+pub trait Trait: session::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
@@ -46,6 +46,15 @@ decl_module! {
             let sender = ensure_signed(origin)?;
             let hash = T::Hashing::hash_of(&message);
             let signature_hash = T::Hashing::hash_of(&signature);
+            match Self::verify_egress_message(sender,hash,signature_hash ){
+                Ok(()) => {
+                    Self::deposit_event(RawEvent::Egress(signature.clone(), message.clone()));
+                    <EgressOf<T>>::insert(hash, message.clone());
+                    return  Ok(());
+                },
+                Err(x) => return Err(x),
+            }
+          /*
             if let Ok(()) = Self::verify_egress_message(sender,hash,signature_hash ) {
 
                 Self::deposit_event(RawEvent::Egress(signature.clone(), message.clone()));
@@ -53,6 +62,7 @@ decl_module! {
                  return  Ok(());
             }
              Err("egress err")
+             */
         }
 
         /// Data Forwarding Timeout Return Message
@@ -111,7 +121,6 @@ decl_storage! {
 
 decl_event! {
     pub enum Event<T> where
-        <T as balances::Trait>::Balance,
         <T as system::Trait>::AccountId,
         <T as system::Trait>::Hash,
         <T as system::Trait>::BlockNumber
@@ -127,7 +136,6 @@ decl_event! {
 
         //bank moduel
 		/// All validators have been rewarded by the given balance.
-		Reward(Balance),
 		//
 		AddDepositingQueue(AccountId),
 
@@ -181,7 +189,7 @@ impl<T: Trait> Module<T>
     fn verify_egress_message(sender: T::AccountId, message: T::Hash, signature: T::Hash) -> Result{
         //是否在验证者集合中
         let validator_set = <session::Module<T>>::validators();
-        ensure!(!validator_set.contains(&sender),"not validator");
+        //ensure!(!validator_set.contains(&sender),"not validator");
 
         //查看该交易是否存在，没得话添加上去
         if !<NumberOfSignedEgressTx<T>>::exists(message) {
@@ -191,7 +199,7 @@ impl<T: Trait> Module<T>
 
         //查看这个签名的是否重复发送交易 重复发送就滚粗
         let mut repeat_vec = Self::egress_signed_sender(&message);
-        ensure!(repeat_vec.contains(&sender),"repeat!");
+        ensure!(!repeat_vec.contains(&sender),"repeat!");
 
         //查看交易是否已被发送
         if 1 == Self::already_sent_egress(&message){
@@ -211,4 +219,91 @@ impl<T: Trait> Module<T>
         Self::deposit_event(RawEvent::EgressVerified(message,stored_vec));
         Ok(())
     }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use support::{impl_outer_origin, assert_ok,assert_err};
+    use runtime_io::with_externalities;
+    use substrate_primitives::{H256, Blake2Hasher};
+    use runtime_primitives::BuildStorage;
+    use runtime_primitives::traits::{BlakeTwo256, IdentityLookup};
+    use runtime_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
+
+    impl_outer_origin!{
+		pub enum Origin for Test {}
+	}
+
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Test;
+
+    impl system::Trait for Test {
+        type Origin = Origin;
+        type Index = u64;
+        type BlockNumber = u64;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type Digest = Digest;
+        type AccountId = u64;
+        type Lookup = IdentityLookup<u64>;
+        type Header = Header;
+        type Event = ();
+        type Log = DigestItem;
+    }
+
+    impl session::Trait for Test {
+        type ConvertAccountIdToSessionKey = ConvertUintAuthorityId;
+        type OnSessionChange = ();
+        type Event = ();
+    }
+
+    impl consensus::Trait for Test {
+        type Log = DigestItem;
+        type SessionKey = UintAuthorityId;
+        type InherentOfflineReport = ();
+    }
+
+    impl timestamp::Trait for Test {
+        type Moment = u64;
+        type OnTimestampSet = ();
+    }
+
+    impl Trait for Test {
+        type Event = ();
+    }
+
+    fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
+        let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
+
+        t.extend(session::GenesisConfig::<Test>{
+            session_length : 1,
+            validators: [1,2,3,4,5].to_vec(),
+            keys: vec![],
+        }.build_storage().unwrap().0);
+
+        t.into()
+    }
+
+    type Matrix = Module<Test>;
+
+    #[test]
+    fn validators_test() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq!(<session::Module<Test>>::validator_count(),5);
+            assert_eq!(<session::Module<Test>>::validators(),vec![1,2,3,4,5]);
+        });
+    }
+
+    #[test]
+    fn egress_test() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_ok!(Matrix::egress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()) );
+            assert_err!(Matrix::egress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()),
+             "repeat!");
+        });
+    }
+
 }
