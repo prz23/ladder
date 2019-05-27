@@ -38,6 +38,7 @@ serde = { version = "1.0", optional = true }
 substrate-keyring = { git = "https://github.com/paritytech/substrate", optional = true }
 consensus_authorities = { package = "substrate-consensus-authorities", git = "https://github.com/paritytech/substrate", default-features = false }
 runtime-io = { package = "sr-io", git = "https://github.com/paritytech/substrate", default-features = false }
+brand = { path = "../ladderml/brand", default_features = false}
 
 
 [dependencies.signcheck]
@@ -97,4 +98,5 @@ std = [
     "bank/std",
     "exchange/std",
     "runtime-io/std",
+    "brand/std",
 ]

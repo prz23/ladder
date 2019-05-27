@@ -23,6 +23,7 @@ use node_runtime::{
     BalancesConfig, BankConfig, ConsensusConfig, ContractConfig, CouncilSeatsConfig,
     CouncilVotingConfig, DemocracyConfig, GrandpaConfig, IndicesConfig, Perbill, Permill,
     SessionConfig, StakerStatus, StakingConfig, SudoConfig, TimestampConfig, TreasuryConfig,
+    Trademark, BrandConfig,
 };
 use primitives::{
     crypto::{Ss58Codec, UncheckedInto},
@@ -57,6 +58,13 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, Author
         get_account_id_from_seed(seed),
         get_session_key_from_seed(seed),
     )
+}
+
+pub fn get_brands(owned: AccountId) -> Vec<(Trademark, AccountId)> {
+    vec![
+        (Trademark{ name: b"ETH-kovan".to_vec(), id: 0 }, owned.clone()),
+        (Trademark{ name: b"ABOS-test".to_vec(), id: 1 }, owned.clone()),
+    ]
 }
 
 /// Helper function to create GenesisConfig for testing
@@ -183,7 +191,7 @@ pub fn testnet_genesis(
 		}),
 		contract: Some(contract_config),
 		sudo: Some(SudoConfig {
-			key: root_key,
+			key: root_key.clone(),
 		}),
 		grandpa: Some(GrandpaConfig {
 			authorities: initial_authorities.iter().map(|x| (x.2.clone(), 1)).collect(),
@@ -196,8 +204,10 @@ pub fn testnet_genesis(
 			reward_balance_value: vec![1000,5000,60000,80000],
 			reward_balance_factor: vec![1,2,3,4],
 			total_despositing_balance:0 ,
-		})
-
+		}),
+        brand: Some(BrandConfig {
+            brands: get_brands(root_key),
+        }),
 	}
 }
 
@@ -412,7 +422,10 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			reward_balance_value: vec![1000,5000,60000,80000],
 			reward_balance_factor: vec![1,2,3,4],
 			total_despositing_balance:0 ,
-		})
+		}),
+        brand: Some(BrandConfig {
+            brands: get_brands(endowed_accounts[0].clone()),
+        }),
 	}
 }
 

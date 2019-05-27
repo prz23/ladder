@@ -645,7 +645,6 @@ mod tests {
         type DustRemoval = ();
     }
 
-
     impl consensus::Trait for Test {
         type Log = DigestItem;
         type SessionKey = UintAuthorityId;
@@ -680,7 +679,7 @@ mod tests {
     type Bank = Module<Test>;
 
     #[test]
-    fn set_minum_signature() {
+    fn resolving_data() {
         with_externalities(&mut new_test_ext(), || {
 
         });
