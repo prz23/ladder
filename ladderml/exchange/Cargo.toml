@@ -75,13 +75,6 @@ git = 'https://github.com/paritytech/substrate.git'
 package = 'srml-session'
 version = '2.0.0'
 
-[dependencies.bank]
-default_features = false
-path = "../bank"
-package = 'ladder-bank'
-version = '0.1.0'
-
-
 [features]
 default = ["std"]
 std = [
@@ -97,5 +90,4 @@ std = [
     'safe-mix/std',
     'sr_primitives/std',
     "session/std",
-    "bank/std",
 ]

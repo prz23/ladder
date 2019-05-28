@@ -21,7 +21,7 @@ pub use std::fmt;
 use parity_codec::{Decode, Encode};
 use rstd::ops::Div;
 
-pub trait Trait: session::Trait + bank::Trait {
+pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
@@ -87,8 +87,10 @@ decl_module! {
         let sender = ensure_signed(origin)?;
         let (exchangerate, time, extype) = Self::parse_tx_data(message);
 
-        Self::check_signature(sender,exchangerate,time,extype);
-        Ok(())
+        match Self::check_signature(sender,exchangerate,time,extype) {
+            Ok(()) => return Ok(()),
+            Err(x) => return Err(x),
+            }
         }
     }
 }
@@ -101,7 +103,7 @@ impl<T: Trait> Module<T> {
 
     pub fn check_validator(accountid: &T::AccountId) -> bool {
         //判断是否是合法验证者集合中的人
-        let validators = <session::Module<T>>::validators();
+        //let validators = <session::Module<T>>::validators();
         return false;
     }
 
@@ -118,7 +120,7 @@ impl<T: Trait> Module<T> {
 
         //查看这个签名的是否重复发送交易 重复发送就滚粗
         let mut repeat_vec = Self::repeat(time);
-        ensure!(repeat_vec.contains(&sender), "repeat!");
+        ensure!(!repeat_vec.contains(&sender), "repeat!");
 
         //查看交易是否已被发送
         if 1 == Self::already_sent(time) {
@@ -200,7 +202,7 @@ impl<T: Trait> Module<T> {
         tx_hash_to_check.clone_from_slice(&hash);
         let mut signature_hash_to_check: [u8; 32] = [0; 32];
         signature_hash_to_check.clone_from_slice(&signature);
-        <bank::Module<T>>::check_secp512(&tx_hash_to_check, &signature_hash_to_check).is_ok();
+        //<bank::Module<T>>::check_secp512(&tx_hash_to_check, &signature_hash_to_check).is_ok();
 
         return (who, rate, time, extype);
     }
@@ -241,3 +243,72 @@ impl<T: Trait> Module<T> {
 
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+    use support::{impl_outer_origin, assert_ok,assert_err};
+    use runtime_io::with_externalities;
+    use primitives::{H256, Blake2Hasher};
+    use sr_primitives::BuildStorage;
+    use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
+    use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
+
+
+    impl_outer_origin!{
+		pub enum Origin for Test {}
+	}
+
+    #[derive(Clone, Eq, PartialEq)]
+    pub struct Test;
+
+    impl system::Trait for Test {
+        type Origin = Origin;
+        type Index = u64;
+        type BlockNumber = u64;
+        type Hash = H256;
+        type Hashing = BlakeTwo256;
+        type Digest = Digest;
+        type AccountId = u64;
+        type Lookup = IdentityLookup<u64>;
+        type Header = Header;
+        type Event = ();
+        type Log = DigestItem;
+    }
+
+
+    impl Trait for Test {
+        type Event = ();
+    }
+
+    fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
+        let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
+        runtime_io::TestExternalities::new(t)
+    }
+
+    type Exchange = Module<Test>;
+
+    #[test]
+    fn resolving_data_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let (a,b,c) = Exchange::parse_tx_data([0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,9].to_vec());
+            assert_eq!(a,1541);
+            assert_eq!(b,7);
+            assert_eq!(c,9);
+        });
+    }
+
+    #[test]
+    fn save_data_test() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,9].to_vec(),[1].to_vec()));
+            assert_eq!(Exchange::already_sent(7),1);
+
+            assert_eq!(Exchange::already_sent(8),0);
+            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,9].to_vec(),[1].to_vec()));
+            assert_eq!(Exchange::already_sent(8),1);
+        });
+    }
+
+}
