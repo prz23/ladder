@@ -32,13 +32,15 @@ decl_module! {
             let hash = T::Hashing::hash_of(&message);
 
             let signature_hash = T::Hashing::hash_of(&signature);
-            if let Ok(()) = Self::verify_ingress_message(sender,hash,signature_hash ) {
 
-                Self::deposit_event(RawEvent::Ingress(signature.clone(), message.clone()));
-                <IngressOf<T>>::insert(hash, message.clone());
-                return  Ok(());
+            match Self::verify_ingress_message(sender,hash,signature_hash ){
+                Ok(()) => {
+                    Self::deposit_event(RawEvent::Ingress(signature.clone(), message.clone()));
+                    <IngressOf<T>>::insert(hash, message.clone());
+                    return  Ok(());
+                },
+                Err(x) => return Err(x),
             }
-            Err("ingress err")
         }
 
         /// Data Forwarding Confirmation Message
@@ -80,6 +82,15 @@ decl_module! {
             Ok(())
         }
 
+        pub fn contain_test(origin) {
+	        let sender:  T::AccountId = ensure_signed(origin)?;
+            let validator_set = <session::Module<T>>::validators();
+            ensure!(validator_set.contains(&sender),"not validator");
+        }
+
+        pub fn contain_tx(origin) {
+            let sender:  T::AccountId = ensure_signed(origin)?;
+        }
 
 		}
     }
@@ -146,14 +157,13 @@ decl_event! {
 
 impl<T: Trait> Module<T>
 {
-
     /// 数据转发请求消息 ingress
     /// Data Forwarding Confirmation Message
     fn verify_ingress_message(sender: T::AccountId, message: T::Hash, signature: T::Hash) -> Result{
 
         //是否在验证者集合中
         let validator_set = <session::Module<T>>::validators();
-        ensure!(!validator_set.contains(&sender),"not validator");
+        ensure!(validator_set.contains(&sender),"not validator");
 
         //查看该交易是否存在，没得话添加上去
         if !<NumberOfSignedIngressTx<T>>::exists(message) {
@@ -163,7 +173,7 @@ impl<T: Trait> Module<T>
 
         //查看这个签名的是否重复发送交易 重复发送就
         let mut repeat_vec = Self::ingress_signed_sender(&message);
-        ensure!(repeat_vec.contains(&sender),"repeat!");
+        ensure!(!repeat_vec.contains(&sender),"repeat!");
 
         //查看交易是否已被发送
         if 1 == Self::already_sent_ingress(&message){
@@ -189,7 +199,7 @@ impl<T: Trait> Module<T>
     fn verify_egress_message(sender: T::AccountId, message: T::Hash, signature: T::Hash) -> Result{
         //是否在验证者集合中
         let validator_set = <session::Module<T>>::validators();
-        //ensure!(!validator_set.contains(&sender),"not validator");
+        ensure!(validator_set.contains(&sender),"not validator");
 
         //查看该交易是否存在，没得话添加上去
         if !<NumberOfSignedEgressTx<T>>::exists(message) {
@@ -219,6 +229,11 @@ impl<T: Trait> Module<T>
         Self::deposit_event(RawEvent::EgressVerified(message,stored_vec));
         Ok(())
     }
+
+    pub fn validators_list() -> Vec<T::AccountId> {
+        <session::Module<T>>::validators()
+    }
+
 }
 
 
@@ -226,7 +241,7 @@ impl<T: Trait> Module<T>
 mod tests {
     use super::*;
     use std::cell::RefCell;
-    use support::{impl_outer_origin, assert_ok,assert_err};
+    use support::{impl_outer_origin, assert_ok,assert_err,assert_eq_uvec};
     use runtime_io::with_externalities;
     use substrate_primitives::{H256, Blake2Hasher};
     use runtime_primitives::BuildStorage;
@@ -298,6 +313,15 @@ mod tests {
     }
 
     #[test]
+    fn ingress_test() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_ok!(Matrix::ingress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()) );
+            assert_err!(Matrix::ingress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()),
+             "repeat!");
+        });
+    }
+
+    #[test]
     fn egress_test() {
         with_externalities(&mut new_test_ext(), || {
             assert_ok!(Matrix::egress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()) );
@@ -306,4 +330,12 @@ mod tests {
         });
     }
 
+    #[test]
+    fn validators_contains_test() {
+        with_externalities(&mut new_test_ext(), || {
+            assert_eq_uvec!(Matrix::validators_list(), vec![1,2,3,4,5]);
+            assert_ok!(Matrix::contain_test(Origin::signed(5)));
+            assert_err!(Matrix::contain_test(Origin::signed(6)),"not validator");
+        });
+    }
 }
