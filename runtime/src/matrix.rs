@@ -10,7 +10,7 @@ use rstd::prelude::Vec;
 use runtime_primitives::traits::*;
 use { system::{self, ensure_signed}};
 use support::{
-    decl_module, decl_storage, decl_event, StorageMap, dispatch::Result, ensure
+    decl_module, decl_storage, decl_event, StorageMap, dispatch::Result, ensure, StorageValue
 };
 
 pub trait Trait: session::Trait {
@@ -67,6 +67,17 @@ decl_module! {
              */
         }
 
+                /// Set the minimum required number of signatures
+        pub  fn set_min_num(origin,new_num: u64) -> Result{
+            let _sender = ensure_signed(origin)?;
+            if new_num < 5 {
+                return Err("too small,should bigger than 5");
+            }
+            <MinNumOfSignature<T>>::put(new_num);
+            //Self::deposit_event(RawEvent::SetMinRequreSignatures(newmin));
+            Ok(())
+        }
+
         /// Data Forwarding Timeout Return Message
         pub fn rollback(_origin, _message: Vec<u8>, _signature: Vec<u8>) -> Result {
             Ok(())
@@ -101,7 +112,8 @@ decl_storage! {
         //pub IngressOf get(ingress_of): map T::Hash => Vec<u8>;
 
         /// ingress & egress
-        MinNumberOfSignatureLimit get(min_signature_limit): u64;
+        /// These amount of signatures are needed to send the event that the transaction verified.
+        MinNumOfSignature get(min_signature): u64 =1;
 
         //记录每个交易的签名的数量
         NumberOfSignedIngressTx get(number_of_signed_ingress): map T::Hash => u64;
@@ -124,8 +136,6 @@ decl_storage! {
         EgressList  get(egress_list) : map T::Hash => Vec<(T::AccountId,T::Hash)>;
         //
         EgressOf  get(egress_of) : map T::Hash => Vec<u8>;
-
-
     }
 }
 
@@ -145,7 +155,7 @@ decl_event! {
 
         Has(Hash),
 
-        //bank moduel
+        // bank moduel
 		/// All validators have been rewarded by the given balance.
 		//
 		AddDepositingQueue(AccountId),
@@ -188,6 +198,16 @@ impl<T: Trait> Module<T>
         repeat_vec.push(sender.clone());
         <IngressSignedSender<T>>::insert(message.clone(),repeat_vec.clone());
 
+        // 判断签名数量是否达到指定要求
+        let numofsigned = Self::number_of_signed_ingress(&message);
+        let newnumofsigned = numofsigned.checked_add(1)
+            .ok_or("Overflow adding a new sign to Tx")?;
+
+        <NumberOfSignedIngressTx<T>>::insert(&message,newnumofsigned);
+        if newnumofsigned < Self::min_signature() {
+            return Err("Not enough signature!");
+        }
+
         //记录已经发送过的交易  同时发送事件Event
         <AlreadySentIngressTx<T>>::insert(&message,1);
         Self::deposit_event(RawEvent::IngressVerified(message,stored_vec));
@@ -223,6 +243,16 @@ impl<T: Trait> Module<T>
         //更新重复记录
         repeat_vec.push(sender.clone());
         <EgressSignedSender<T>>::insert(message.clone(),repeat_vec.clone());
+
+        // 判断签名数量是否达到指定要求
+        let numofsigned = Self::number_of_signed_ingress(&message);
+        let newnumofsigned = numofsigned.checked_add(1)
+            .ok_or("Overflow adding a new sign to Tx")?;
+
+        <NumberOfSignedEgressTx<T>>::insert(&message,newnumofsigned);
+        if newnumofsigned < Self::min_signature() {
+            return Err("Not enough signature!");
+        }
 
         //记录已经发送过的交易  同时发送事件Event
         <AlreadySentEgressTx<T>>::insert(&message,1);
@@ -292,13 +322,11 @@ mod tests {
 
     fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
         let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
-
         t.extend(session::GenesisConfig::<Test>{
             session_length : 1,
             validators: [1,2,3,4,5].to_vec(),
             keys: vec![],
         }.build_storage().unwrap().0);
-
         t.into()
     }
 
@@ -316,8 +344,17 @@ mod tests {
     fn ingress_test() {
         with_externalities(&mut new_test_ext(), || {
             assert_ok!(Matrix::ingress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()) );
+            assert_err!(Matrix::ingress(Origin::signed(6),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,33].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()),
+             "not validator");
             assert_err!(Matrix::ingress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()),
              "repeat!");
+
+            assert_ok!(Matrix::set_min_num(Origin::signed(1),5));
+            assert_err!(Matrix::ingress(Origin::signed(5),[3,4,5].to_vec(),[6,7,8].to_vec()),"Not enough signature!");
+            assert_err!(Matrix::ingress(Origin::signed(4),[3,4,5].to_vec(),[6,7,7].to_vec()),"Not enough signature!");
+            assert_err!(Matrix::ingress(Origin::signed(3),[3,4,5].to_vec(),[6,7,6].to_vec()),"Not enough signature!");
+            assert_err!(Matrix::ingress(Origin::signed(2),[3,4,5].to_vec(),[6,7,5].to_vec()),"Not enough signature!");
+            assert_ok!(Matrix::ingress(Origin::signed(1),[3,4,5].to_vec(),[6,7,4].to_vec()));
         });
     }
 
@@ -325,6 +362,8 @@ mod tests {
     fn egress_test() {
         with_externalities(&mut new_test_ext(), || {
             assert_ok!(Matrix::egress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()) );
+            assert_err!(Matrix::egress(Origin::signed(6),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,33].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()),
+             "not validator");
             assert_err!(Matrix::egress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()),
              "repeat!");
         });
