@@ -44,7 +44,10 @@ decl_storage! {
 
         /// 记录每个交易的签名的数量
         /// Record the number of signatures per transaction got
-        NumberOfSignedContract get(num_of_signed): map u64 => u64;
+        NumberOfSignedContract get(num_of_signed): map (u64,u64) => u64;
+
+        // Latest Time Record of other assets' exchangerate type=>(time,rate)
+        LatestTime get(latest_time): map u64 => (u64,u64);
 
         /// 需要这些数量的签名，才发送这个交易通过的事件
         /// These amount of signatures are needed to send the event that the transaction verified.
@@ -53,11 +56,15 @@ decl_storage! {
         //record transaction   Hash => (accountid,sign)
         IdSignTxList  get(all_list) : map u64 => (T::AccountId,u64);
         IdSignTxListB  get(all_list_b) : map u64 => Vec<(T::AccountId,u64)>;
-        RepeatPrevent  get(repeat) : map u64 => Vec<T::AccountId>;
+        RepeatPrevent  get(repeat) : map (u64,u64) => Vec<T::AccountId>;
+
+        /// EHT exchangerate    Vec<(time,exchangerate)>
+        EthExchangeRate  get(eth_exchange_rate) : Vec<(u64,u64)>;
+
 
         /// 已经发送过的交易记录  防止重复发送事件
         /// Transaction records that have been sent prevent duplication of events
-        AlreadySentTx get(already_sent) : map u64 => u64;
+        AlreadySentTx get(already_sent) : map (u64,u64) => u64;
 
        // Nonce: u64;
     }
@@ -113,17 +120,17 @@ impl<T: Trait> Module<T> {
         let sender = who;
 
         //查看该交易是否存在，没得话添加上去
-        if !<NumberOfSignedContract<T>>::exists(time) {
-            <NumberOfSignedContract<T>>::insert(&time, 0);
-            <AlreadySentTx<T>>::insert(&time, 0);
+        if !<NumberOfSignedContract<T>>::exists((time,extype)) {
+            <NumberOfSignedContract<T>>::insert(&(time,extype), 0);
+            <AlreadySentTx<T>>::insert(&(time,extype), 0);
         }
 
         //查看这个签名的是否重复发送交易 重复发送就滚粗
-        let mut repeat_vec = Self::repeat(time);
+        let mut repeat_vec = Self::repeat((time,extype));
         ensure!(!repeat_vec.contains(&sender), "repeat!");
 
         //查看交易是否已被发送
-        if 1 == Self::already_sent(time) {
+        if 1 == Self::already_sent((time,extype)) {
             return Err("has been sent");
         }
 
@@ -135,23 +142,22 @@ impl<T: Trait> Module<T> {
         stored_vec.push((sender.clone(), exchangerate.clone()));
         <IdSignTxListB<T>>::insert(time.clone(), stored_vec.clone());
         repeat_vec.push(sender.clone());
-        <RepeatPrevent<T>>::insert(time.clone(), repeat_vec.clone());
+        <RepeatPrevent<T>>::insert((time,extype), repeat_vec.clone());
 
         //Self::_verify(transcation)?;
 
-        let numofsigned = Self::num_of_signed(&time);
+        let numofsigned = Self::num_of_signed(&(time,extype));
         let newnumofsigned = numofsigned
             .checked_add(1)
             .ok_or("Overflow adding a new sign to Tx")?;
-        <NumberOfSignedContract<T>>::insert(&time, newnumofsigned);
+        <NumberOfSignedContract<T>>::insert(&(time,extype), newnumofsigned);
         if newnumofsigned <= Self::min_signature() {
             return Err("not enough signatusign_and_checkre");
         }
 
+        Self::save_lastexchange_data(time,exchangerate,extype);
         // Record the transaction and sending event
-        <AlreadySentTx<T>>::insert(&time, 1);
-        Self::deposit_event(RawEvent::Txisok(time));
-
+        <AlreadySentTx<T>>::insert(&(time,extype), 1);
         Self::deposit_event(RawEvent::TranscationVerified(time, stored_vec));
         Ok(())
     }
@@ -241,6 +247,15 @@ impl<T: Trait> Module<T> {
         ret
     }
 
+    fn save_lastexchange_data(time:u64, rate:u64, exchangetype:u64) {
+        <LatestTime<T>>::insert(exchangetype,(time,rate));
+    }
+
+    // get_the_latest_exchangerate returns rate and time
+    fn get_the_latest_exchangerate(exchangetype: u64) -> (u64,u64) {
+       <LatestTime<T>>::get(exchangetype)
+    }
+
 }
 
 
@@ -254,7 +269,7 @@ mod tests {
     use sr_primitives::BuildStorage;
     use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
     use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
-
+    use support::{StorageMap,StorageValue};
 
     impl_outer_origin!{
 		pub enum Origin for Test {}
@@ -302,12 +317,22 @@ mod tests {
     #[test]
     fn save_data_test() {
         with_externalities(&mut new_test_ext(), || {
-            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,9].to_vec(),[1].to_vec()));
-            assert_eq!(Exchange::already_sent(7),1);
+            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,7,0,0,0,0,0,0,0,1].to_vec(),[1].to_vec()));
+            assert_eq!(Exchange::already_sent((7,1)),1);
 
-            assert_eq!(Exchange::already_sent(8),0);
-            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,9].to_vec(),[1].to_vec()));
-            assert_eq!(Exchange::already_sent(8),1);
+            assert_eq!(Exchange::already_sent((8,1)),0);
+            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,1].to_vec(),[1].to_vec()));
+            assert_eq!(Exchange::already_sent((8,1)),1);
+            //test if the exchangerate pass
+            assert_eq!(Exchange::already_sent((8,2)),0);
+            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,6,5,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,2].to_vec(),[1].to_vec()));
+            assert_eq!(Exchange::already_sent((8,2)),1);
+
+            //test if the exchangerate change by time
+            assert_eq!(Exchange::get_the_latest_exchangerate(2),(8,1541));
+            assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,7,5,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,2].to_vec(),[1].to_vec()));
+            assert_eq!(Exchange::get_the_latest_exchangerate(2),(9,1797));
+
         });
     }
 
