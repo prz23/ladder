@@ -48,7 +48,7 @@ decl_storage! {
 
         // Latest Time Record of other assets' exchangerate type=>(time,rate)
         LatestTime get(latest_time): map u64 => (u64,u64);
-
+        LatestExchangeRate get(latest_exrate): map u64 => u64;
         /// 需要这些数量的签名，才发送这个交易通过的事件
         /// These amount of signatures are needed to send the event that the transaction verified.
         MinNumOfSignature get(min_signature): u64;
@@ -221,15 +221,18 @@ impl<T: Trait> Module<T> {
         let mut messagedrain = message.clone();
 
         // exchange rate
-        let rate_vec: Vec<u8> = messagedrain.drain(0..8).collect();
+        let mut rate_vec: Vec<u8> = messagedrain.drain(0..8).collect();
+        rate_vec.reverse();
         let mut rate_u64 = Self::u8array_to_u64(rate_vec.as_slice());
 
         // time of the exchangerate
-        let time_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        let mut time_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        time_vec.reverse();
         let mut time_u64 = Self::u8array_to_u64(time_vec.as_slice());
 
         // pair type of the rate
-        let pair_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        let mut pair_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        pair_vec.reverse();
         let mut pair_u64 = Self::u8array_to_u64(pair_vec.as_slice());
 
         return (rate_u64, time_u64, pair_u64);
@@ -249,6 +252,7 @@ impl<T: Trait> Module<T> {
 
     fn save_lastexchange_data(time:u64, rate:u64, exchangetype:u64) {
         <LatestTime<T>>::insert(exchangetype,(time,rate));
+        <LatestExchangeRate<T>>::insert(exchangetype,rate);
     }
 
     // get_the_latest_exchangerate returns rate and time
@@ -332,7 +336,6 @@ mod tests {
             assert_eq!(Exchange::get_latest_exchangerate(2),(8,1541));
             assert_ok!(Exchange::check_exchange(Origin::signed(6),[0,0,0,0,0,0,7,5,0,0,0,0,0,0,0,9,0,0,0,0,0,0,0,2].to_vec(),[1].to_vec()));
             assert_eq!(Exchange::get_latest_exchangerate(2),(9,1797));
-
         });
     }
 
