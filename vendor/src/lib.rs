@@ -504,7 +504,7 @@ impl<P> SideSender<P>
 where
     P: SenderProxy + Send + Sync + 'static,
 {
-    fn start(mut self) -> Sender<RawEvent<Balance, AccountId, Hash, BlockNumber>> {
+    fn start(mut self) -> Sender<RawEvent<AccountId, Hash, BlockNumber>> {
         let (sender, receiver) = channel();
         std::thread::spawn(move || {
             let mut event_loop = Core::new().unwrap();
