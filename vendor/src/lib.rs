@@ -314,13 +314,16 @@ where
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
         let accountid = &self.accountid;
-        println!("验证者！！！accountid is {:?}",accountid);
-        self.client
-            .runtime_api()
-            .is_authority(&at, accountid)
-            .unwrap()
-        //self.client.runtime_api().is_authority(&at, &self.key.public().0.into()).unwrap();
-        //Ok(1)
+        //println!("验证者！！！accountid is {:?}",accountid);
+        self.client.runtime_api().is_authority(&at, accountid).unwrap()
+    }
+}
+
+struct Collector(Vec<u8>);
+impl Handler for Collector {
+    fn write(&mut self, data: &[u8]) -> Result<usize, WriteError> {
+        self.0.extend_from_slice(data);
+        Ok(data.len())
     }
 }
 
@@ -351,57 +354,45 @@ where
     V: SuperviseClient + Send + Sync + 'static,
 {
     fn start(self) {
-        // let (sender, receiver) = channel();
         std::thread::spawn(move || {
-            println!("1111111111111111111111");
-            struct Collector(Vec<u8>);
-            impl Handler for Collector {
-                fn write(&mut self, data: &[u8]) -> Result<usize, WriteError> {
-                    self.0.extend_from_slice(data);
-                    Ok(data.len())
-                }
-            }
             loop {
-                let mut easy = Easy2::new(Collector(Vec::new()));
-                easy.get(true).unwrap();
-                easy.url("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny")
-                    .unwrap();
-                println!("验证者！！！accountid is！！！！！");
-                //let event = receiver.recv().unwrap();
-                // 只有validator才有权限去进行oracle获取并上传汇率
-                if self.check_validators() {
-                    // perform the http get method and fetch the responsed
-                    if easy.perform().is_err() {
-                        continue;
-                    }
-                    // 调用http——get查询是否成功
-                    if easy.response_code().unwrap() == 200 {
-                        let contents = easy.get_ref();
-                        let contents_string = String::from_utf8_lossy(&contents.0).to_string();
-                        //println!("exchange_rate <---> {}",contents_string);
-                        println!("获取汇率success");
-                        let (exchange_rate, time) = parse_exchange_rate(contents_string);
-                        // 以交易形把数据上传到链上
-                        let hash = H256::from_str(
-                            "0000000000000000000000000000000000000000000000000000000000000001",
-                        )
-                        .unwrap();
-                        let message = events::ExchangeRateEvent {
-                            pair: 0u64,
-                            time: time,
-                            rate: (exchange_rate * 10000.0f64) as u64,
-                            tx_hash: hash,
-                        };
-                       self.spv.submit(RelayMessage::from(message));
-                    } else {
-                        println!("获取汇率失败");
-                    }
-                };
+                self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:BTCUSD?unit=cny",1);
+                self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny",2);
                 // query the exchange rate every 5 seconds
                 thread::sleep(Duration::from_secs(10));
             }
         });
-        // sender
+    }
+
+    fn get_exchange_rate(&self, url:&str, extype: u64){
+        let mut easy = Easy2::new(Collector(Vec::new()));
+        easy.get(true).unwrap();
+        easy.url(url).unwrap();
+
+        // 只有validator才有权限去进行oracle获取并上传汇率
+        if self.check_validators() {
+            // perform the http get method and fetch the responsed
+            if easy.perform().is_err() { println!("err"); }
+
+            if easy.response_code().unwrap() == 200 {
+                let contents = easy.get_ref();
+                let contents_string = String::from_utf8_lossy(&contents.0).to_string();
+                //println!("exchange_rate <---> {}",contents_string);
+                println!("获取汇率success");
+                let (exchange_rate, time) = parse_exchange_rate(contents_string);
+                // 以交易形把数据上传到链上
+                let hash = H256::from_str("0000000000000000000000000000000000000000000000000000000000000001", ).unwrap();
+                let message = events::ExchangeRateEvent {
+                    pair: extype,
+                    time: time,
+                    rate: (exchange_rate * 100000.0f64) as u64,
+                    tx_hash: hash,
+                };
+                self.spv.submit(RelayMessage::from(message));
+            } else {
+                println!("获取汇率失败");
+            }
+        };
     }
 }
 
