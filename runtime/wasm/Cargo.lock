@@ -910,7 +910,6 @@ dependencies = [
 name = "ladder-exchange"
 version = "0.1.0"
 dependencies = [
- "ladder-bank 0.1.0",
  "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1454,6 +1453,7 @@ dependencies = [
  "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sr-io 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sr-primitives 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sr-std 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sr-version 2.0.0 (git+https://github.com/paritytech/substrate)",

@@ -13,6 +13,7 @@ use web3::api::Namespace;
 use web3::helpers::CallFuture;
 use web3::types::{Address, Filter, FilterBuilder, Log, H256};
 use web3::Transport;
+use crate::label::ChainAlias;
 
 pub fn abos_logs<T: Transport>(transport: &T, filter: Filter) -> CallFuture<Vec<Log>, T::Out> {
     let filter = web3::helpers::serialize(&filter);
@@ -70,13 +71,6 @@ enum State<T: Transport> {
     },
 }
 
-/// Alias of Chain to diff.
-#[derive(Copy, Clone)]
-pub enum ChainAlias {
-    ETH,
-    ABOS,
-}
-
 pub struct LogStream<T: Transport> {
     block_number_stream: BlockNumberStream<T>,
     request_timeout: Duration,
@@ -103,6 +97,7 @@ impl<T: Transport> LogStream<T> {
             confirmations: options.confirmations,
             transport: options.transport.clone(),
             last_block_number: options.last_block_number,
+            chain: options.chain,
         };
 
         LogStream {
@@ -116,6 +111,10 @@ impl<T: Transport> LogStream<T> {
             topic,
             chain: options.chain,
         }
+    }
+
+    pub fn chain_alias(&self) -> &ChainAlias {
+        &self.chain
     }
 }
 
@@ -164,7 +163,7 @@ impl<T: Transport> Stream for LogStream<T> {
                     let logs = try_ready!(future
                         .poll()
                         .chain_err(|| "LogStream: polling web3 logs failed",));
-                    info!(
+                    debug!(
                         "LogStream (topic: {:?}): fetched {} logs from block {} to block {}",
                         self.topic,
                         logs.len(),

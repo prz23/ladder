@@ -10,6 +10,7 @@ use web3::api::Namespace;
 use web3::helpers::CallFuture;
 use web3::types::U256;
 use web3::Transport;
+use crate::label::ChainAlias;
 
 /// Block Number Stream state.
 enum State<T: Transport> {
@@ -23,6 +24,7 @@ pub struct BlockNumberStreamOptions<T> {
     pub confirmations: u32,
     pub transport: T,
     pub last_block_number: u64,
+    pub chain: ChainAlias,
 }
 
 /// `Stream` that repeatedly polls `eth_blockNumber` and yields new block numbers.
@@ -34,6 +36,7 @@ pub struct BlockNumberStream<T: Transport> {
     timer: Timer,
     poll_interval: Interval,
     state: State<T>,
+    chain: ChainAlias,
 }
 
 impl<T: Transport> BlockNumberStream<T> {
@@ -48,6 +51,7 @@ impl<T: Transport> BlockNumberStream<T> {
             last_checked_block: options.last_block_number,
             timer,
             state: State::AwaitInterval,
+            chain: options.chain,
         }
     }
 }
@@ -65,7 +69,11 @@ impl<T: Transport> Stream for BlockNumberStream<T> {
                         .poll_interval
                         .poll()
                         .chain_err(|| { format!("BlockNumberStream polling interval failed",) }));
-                    let future = web3::api::Eth::new(&self.transport).block_number();
+                    // let future = web3::api::Eth::new(&self.transport).block_number();
+                    let future = match self.chain {
+                        ChainAlias::ETH => web3::api::Eth::new(&self.transport).block_number(),
+                        ChainAlias::ABOS => web3::api::Abos::new(&self.transport).block_number(),
+                    };
                     let next_state = State::AwaitBlockNumber(
                         self.timer.timeout(future.from_err(), self.request_timeout),
                     );
@@ -134,6 +142,7 @@ mod tests {
             confirmations: 12,
             transport: transport.clone(),
             last_block_number: 3,
+            chain: ChainAlias::ETH,
         });
 
         let mut event_loop = Core::new().unwrap();
