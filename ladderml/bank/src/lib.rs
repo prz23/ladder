@@ -24,16 +24,6 @@ use rstd::ops::Div;
 use support::traits::Currency;
 
 use signcheck;
-/*
-/// 用来存储奖励转换算法
-#[derive(Encode, Decode, Default, Clone, PartialEq)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct RewardFactor<U> {
-    number: U,
-    x: Vec<U>,
-    y: Vec<U>,
-}
-*/
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
@@ -50,9 +40,6 @@ decl_module! {
         fn deposit_event<T>() = default;
 
         /// deposit
-        //offset 0:32  who         ::   AccountID
-        //offset 32:48 bytes        ::   money
-        //origin, hash 32: T::Hash, tag 32: T::Hash, id 20: T::AccountId, amount 32: T::Balance, signature: Vec<u8>
         //(origin, message: Vec, signature: Vec)
         pub fn deposit(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
@@ -62,85 +49,35 @@ decl_module! {
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
 */
-            // 解析message --> 以太坊交易的hash tx_hash  abmatrix上的账号who
-            //                 该账号的抵押数量amount   整个交易的签名signature_hash
-            let (tx_hash, who, amount, signature_hash,_coin_hash) = Self::split_message(message.clone(),signature);
-            // 整个交易的hash
-            //let message_hash = Decode::decode(&mut &message.encode()[..]).unwrap();
-            runtime_io::print("开始判断是否重复抵押");
+            // resolving message --> Ethereum's transcation hash  tx_hash   accountid
+            //                       depositing amount    signature_hash
+            let (tx_hash, who, amount, signature_hash,coin_type) = Self::split_message(message.clone(),signature);
+
             // ensure no repeat desposit
             ensure!(Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already depositing.");
             // ensure no repeat intentions to desposit
             ensure!(Self::intentions_desposit_vec().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already in queue.");
 
             //check the validity and number of signatures
-            runtime_io::print("开始检查签名");
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, tx_hash){
                 Ok(y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
-            // update the list of intentions to desposit
-            runtime_io::print("抵押账号通过验证=>存储其 accountid 和 balance 入intentions");
-            // update the list of intentions to desposit
-            <IntentionsDespositVec<T>>::put({
-                let mut v =  Self::intentions_desposit_vec();
-                v.push(who.clone());
-                v
-            });
-            <IntentionsDesposit<T>>::insert(who.clone(),T::Balance::sa(amount as u64));
-            // 发送一个event
-            Self::deposit_event(RawEvent::AddDepositingQueue(who));
-            Ok(())
-        }
 
-        /// 直接传参数抵押测试用接口
-        pub fn deposit2  (origin, hash: T::Hash, _tag: T::Hash, id: T::AccountId,amount: T::Balance, signature: Vec<u8>) -> Result {
-            let sender = ensure_signed(origin)?;
-            let who =  id;
-
-            let validators = <session::Module<T>>::validators();
-            ensure!(validators.contains(&sender),"Not validator");
-
-            // ensure no repeat
-            ensure!(Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already depositing.");
-            // ensure no repeat
-            ensure!(Self::intentions_desposit_vec().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already in queue.");
-
-            //decode the signature
-            let signature_hash =  Decode::decode(&mut &signature.encode()[..]).unwrap();
-
-            runtime_io::print("开始检查签名");
-            match  Self::check_signature(sender.clone(), hash, signature_hash, hash){
-                Ok(y) =>  runtime_io::print("ok") ,
-                Err(x) => return Err(x),
-            }
-
-            runtime_io::print("抵押账号通过验证=>存储其 accountid 和 balance 入intentions");
             // update the list of intentions to desposit
             <IntentionsDespositVec<T>>::put({
                 let mut v =  Self::intentions_desposit_vec();
                 v.push(who.clone());
                 v
             });
-
-            <IntentionsDesposit<T>>::insert(who.clone(),amount);
-
-            // 发送一个event
+            <IntentionsDesposit<T>>::insert(who.clone(),(T::Balance::sa(amount as u64) , coin_type));
+            // emit an event
             Self::deposit_event(RawEvent::AddDepositingQueue(who));
             Ok(())
         }
 
-        // 领取500快
-        pub fn get_free_money(origin, who: T::AccountId) -> Result {
-             let sender = ensure_signed(origin)?;
-             let  new_balance = <BalanceOf<T> as As<u64>>::sa(5000);
-             // 新建账户并给他转入5000
-             T::Currency::deposit_creating(&who,new_balance);
-             Ok(())
-        }
-
-        /// 点击领取
-        pub fn draw_reward_all(origin, _message: Vec<u8> , _signature: Vec<u8>) -> Result {
+        /// Take the initiative to receive awards
+        pub fn draw_reward_all(origin) -> Result {
              let sender = ensure_signed(origin)?;
 
              ensure!(!Self::despositing_account().iter().find(|&t| t == &sender).is_none(), "Cannot draw if not depositing.");
@@ -158,55 +95,27 @@ decl_module! {
 
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
-            // 解析message --> hash  tag  id  amount
-            let (_tx_hash,who,_amount,signature_hash,_coin_hash) = Self::split_message(message.clone(),signature);
+            // resovling message --> hash  tag  id  amount
+            let (_tx_hash,who,amount,signature_hash,coin_type) = Self::split_message(message.clone(),signature);
             let message_hash = Decode::decode(&mut &message.encode()[..]).unwrap();
 
             //check the validity and number of signatures
-            runtime_io::print("开始检查签名");
             match  Self::check_signature(sender.clone(), message_hash, signature_hash, message_hash){
                 Ok(y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
             // ensure no repeat
             ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
-            ensure!(Self::intentions_withdraw().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
-            runtime_io::print("============withdraw2===========");
-            <IntentionsWithdraw<T>>::put({
-                let mut v =  Self::intentions_withdraw();
+            ensure!(Self::intentions_withdraw_vec().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
+
+            <IntentionsWithdrawVec<T>>::put({
+                let mut v =  Self::intentions_withdraw_vec();
                 v.push(who.clone());
                 v
             });
+            <IntentionsWithdraw<T>>::insert(who.clone(),(T::Balance::sa(amount as u64) , coin_type));
 
-            // 发送一个event
-            Self::deposit_event(RawEvent::AddWithdrawQueue(who));
-            Ok(())
-        }
-
-        pub fn withdraw2(origin, hash: T::Hash, _tag: T::Hash, id: T::AccountId,_amount: T::Balance, signature: Vec<u8>) -> Result {
-            //TODO:
-            let sender = ensure_signed(origin)?;
-            let who =  id;
-
-            // ensure no repeat
-            ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
-            ensure!(Self::intentions_withdraw().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
-
-            let signature_hash =  Decode::decode(&mut &signature.encode()[..]).unwrap();
-            runtime_io::print("开始检查withdraw签名");
-            match  Self::check_signature(sender.clone(), hash, signature_hash, hash){
-                Ok(y) =>  runtime_io::print("ok") ,
-                Err(x) => return Err(x),
-            }
-
-            runtime_io::print("============withdraw2===========");
-            <IntentionsWithdraw<T>>::put({
-                let mut v =  Self::intentions_withdraw();
-                v.push(who.clone());
-                v
-            });
-
-            // 发送一个event
+            // emit an event
             Self::deposit_event(RawEvent::AddWithdrawQueue(who));
             Ok(())
         }
@@ -256,6 +165,7 @@ decl_module! {
                  _ => Ok(()),
              }
         }
+
         /// a new session starts
 		fn on_finalize(n: T::BlockNumber) {
 		    Self::check_rotate_session(n);
@@ -266,20 +176,27 @@ decl_module! {
 decl_storage! {
     trait Store for Module<T: Trait> as Bank {
         /// bank & session
-        /// record deposit info       AccountId -> message & signature
-        DepositInfo get(deposit_info) : map  T::AccountId => (Vec<u8>,Vec<u8>);
+
         /// record depositing info of balance & session_time
         DespoitingAccount get(despositing_account): Vec<T::AccountId>;
-        DespositingBalance get(despositing_banance): map T::AccountId => T::Balance;
+        /// if the map is 0 ,delete the above Vec
+        DepositngAccountTotal get(depositing_account_total) : map T::AccountId => u64;
+
+        /// accountid => (balance , type)
+        DespositingBalance get(despositing_banance): map T::AccountId => Vec<(T::Balance,u64)>;
         DespositingTime get(despositing_time): map T::AccountId => u32;
 
-        /// All the accounts with a desire to deposit
+        /// All the accounts with a desire to deposit.  to control one time one deposit.
         IntentionsDespositVec  get(intentions_desposit_vec) :  Vec<T::AccountId>;
-        IntentionsDesposit  get(intentions_desposit): map T::AccountId => T::Balance;
-       	/// The block at which the `who`'s funds become entirely liquid.
-		pub DepositBondage get(deposit_bondage): map T::AccountId => T::BlockNumber;
-        /// All the accounts with a desire to withdraw
-        IntentionsWithdraw  get(intentions_withdraw): Vec<T::AccountId>;
+        /// accountid => balance cointype
+        IntentionsDesposit  get(intentions_desposit): map T::AccountId => (T::Balance , u64);
+
+
+        /// All the accounts with a desire to withdraw.  to control one time one deposit.
+        IntentionsWithdrawVec  get(intentions_withdraw_vec): Vec<T::AccountId>;
+         /// accountid => balance cointype
+        IntentionsWithdraw get(intentions_withdraw): map T::AccountId => (T::Balance , u64);
+
 
         /// Bank session reward factor
         RewardSessionValue  get(reward_session_value) config(): Vec<u32>;
@@ -289,7 +206,6 @@ decl_storage! {
         RewardBalanceFactor  get(reward_balance_factor) config(): Vec<u8>;
 
         //RewardFactorS get(reward_factor) config():map u64 => RewardFactor<u64>;
-
 
         ///Session module
 		/// Block at which the session length last changed.
@@ -308,13 +224,15 @@ decl_storage! {
 		RewardRecord get(reward_record):  map T::AccountId => T::Balance;
 		/// true -- 领取模式  false -- 自动发放模式
 		EnableRewardRecord get(enable_record) config(): bool;
-        /// 全链总余额
+        ///
         TotalDespositingBalacne  get(total_despositing_balance) config(): T::Balance;
+        /// MAP of cointype => (TotalDeposit , AllReward)
+        CoinDeposit get(coin_deposit) : map u64 => T::Balance;
+        CoinReward get(coin_reward) : map u64 => T::Balance;
 
-        /// 投资比例
+        /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
         DespositExchangeRate get(desposit_exchange_rate) :  u64 = 10000000000000;
 
-        save get(save_tx) : Vec<Vec<u8>>;
     }
 }
 
@@ -342,14 +260,15 @@ decl_event! {
 
 impl<T: Trait> Module<T>
 {
-    fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash,T::Hash) {
+    fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash,u64) {
 
         // 解析message --> hash  tag  id  amount
         let mut messagedrain = message.clone();
 
         // Coin 0-32
-        let coin_vec: Vec<_> = messagedrain.drain(0..32).collect();
-        let coint_hash= Decode::decode(&mut &coin_vec[..]).unwrap();
+        let mut coin_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        coin_vec.reverse();
+        let mut coin_type = Self::u8array_to_u64(coin_vec.as_slice());
 
         // Who 33-64
         let who_vec: Vec<_> = messagedrain.drain(0..32).collect();
@@ -368,14 +287,7 @@ impl<T: Trait> Module<T>
         // Signature_Hash
         let signature_hash =  Decode::decode(&mut &signature[..]).unwrap();
 
-        <save<T>>::put({
-            let mut xx = Self::save_tx();
-            xx.push(hash.clone());
-            xx.push(who_vec.clone());
-            xx  }
-        );
-
-        return (tx_hash,who,amountu64,signature_hash,coint_hash);
+        return (tx_hash,who,amountu64,signature_hash,coin_type);
     }
 
     pub fn signature521(signature: Vec<u8>, hash: Vec<u8>){
@@ -387,7 +299,7 @@ impl<T: Trait> Module<T>
         Self::check_secp512(&tx_hash_to_check,&signature_hash_to_check).is_ok();
     }
 
-    /// Hook to be called after transaction processing.  间隔一段时间才触发 rotate_session
+    /// Hook to be called after transaction processing.
     pub fn check_rotate_session(block_number: T::BlockNumber) {
         // do this last, after the staking system has had chance to switch out the authorities for the
         // new set.
@@ -396,7 +308,7 @@ impl<T: Trait> Module<T>
         let (should_end_session, apply_rewards) = None
             .map_or((is_final_block, is_final_block), |apply_rewards| (true, apply_rewards));
         if should_end_session {
-            runtime_io::print("--------安排上了04-01--------");
+            runtime_io::print("Start new session of bank");
             Self::rotate_session(is_final_block, apply_rewards);
         }
     }
@@ -432,7 +344,7 @@ impl<T: Trait> Module<T>
         }
         Self::adjust_deposit_list();
 
-        // 1直接发奖励至账户  2点击领取奖励
+        // 1. Reward directly to account 2. Click to get reward
         match Self::enable_record() {
             true => Self::reward_deposit_record(),
             _ =>  Self::reward_deposit(),
@@ -440,87 +352,69 @@ impl<T: Trait> Module<T>
     }
 
     fn adjust_deposit_list(){
-        //修改全部的表 deposit 部分   已经判断过重复了所以直接天加
+        // Modify depositing part of all tables
         let mut int_des_vec =  Self::intentions_desposit_vec();
-        let mut des_vec = Self::despositing_account();
         while let  Some(who)=int_des_vec.pop(){
-            runtime_io::print("========add===========");
-            //更新正在抵押人列表
-            let balances = <IntentionsDesposit<T>>::get(who.clone());
-            <DespositingBalance<T>>::insert(who.clone(), balances );
-            <DespositingTime<T>>::insert(who.clone(), 0);
-            des_vec.push(who.clone());
+            runtime_io::print("intentions to depositing");
+            // update the map of the depositing account
+            let (balances,coin_type) = <IntentionsDesposit<T>>::get(who.clone());
+            Self::depositing_withdraw_record(who.clone(),balances,coin_type,true);
+            Self::deposit_statistics_reward(coin_type,balances,true);
 
-            let total_deposit_balance = <TotalDespositingBalacne<T>>::get();
-            <TotalDespositingBalacne<T>>::put(balances+total_deposit_balance);
+            <DespositingTime<T>>::insert(who.clone(), 0);
             <IntentionsDesposit<T>>::remove(who);
         }
-        <DespoitingAccount<T>>::put(des_vec);
         <IntentionsDespositVec<T>>::put(int_des_vec);
 
-        /////////////////////////////////////////////////////////a
-        let mut des_vec2 = Self::despositing_account();
-        let mut vec_with =  Self::intentions_withdraw();
+        //===================================================================//
+        // update the map of withdraw
+        let mut vec_with =  Self::intentions_withdraw_vec();
         while let Some(who) = vec_with.pop() {
-            runtime_io::print("========remove===========");
-            //增加 despoit 记录  同时创建session记录
-            let balances = <DespositingBalance<T>>::get(who.clone());
-
-            <DespositingBalance<T>>::remove(who.clone());
-            des_vec2.push(who.clone());
-            //抵押总余额
-            let total_deposit_balance = <TotalDespositingBalacne<T>>::get();
-            <TotalDespositingBalacne<T>>::put(balances+total_deposit_balance);
+            runtime_io::print("withdraw to quit");
+            let (balances,coin_type) = <IntentionsWithdraw<T>>::get(who.clone());
+            Self::depositing_withdraw_record(who.clone(),balances,coin_type,false);
+            Self::deposit_statistics_reward(coin_type,balances,false);
 
             <DespositingTime<T>>::remove(who.clone());
+            <IntentionsWithdraw<T>>::remove(who);
         }
-        <IntentionsWithdraw<T>>::put(vec_with);
-        <DespoitingAccount<T>>::put(des_vec2);
+        <IntentionsWithdrawVec<T>>::put(vec_with);
 
-        runtime_io::print("对表里的session time进行更新");
-        //对表进行session time更新
+        // update the session time of the depositing account
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             <DespositingTime<T>>::insert(v,Self::despositing_time(v)+1);
         });
     }
 
-    /// 新功能 => 模拟chainX 把奖励记录下来，点击领取才发钱
+    /// Record the reward and click on it to get the money.
     fn count_draw_reward(accountid: T::AccountId) -> T::Balance {
-
         let mut reward= <RewardRecord<T>>::get(accountid.clone());
-
         <RewardRecord<T>>::insert(accountid,T::Balance::sa(0));
-
         reward
     }
-    /// 新功能 => 模拟chainX 把奖励记录下来，点击领取才发钱
+
+    /// Record the reward and click on it to get the money.
     fn reward_deposit_record() {
-        //循环历遍一下所有deposit列表，分别对每个账户的奖励进行记录
-        //首先判断session 决定一个 时间比率
-        //再判断balance 决定一个 存款比率
-        //两个比率结合起来决定一个 乘积因子Xbalance => 然后往账户的记录上记录奖励额度
-        runtime_io::print("发钱====发到记录里面！！！！！！！！！！！！");
+        //循环历遍一下所有deposit列表，分别对每个账户的每种币的抵押的奖励进行记录
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),<DespositingBalance<T>>::get(v));
-            let now_reward = <RewardRecord<T>>::get(v);
-            <RewardRecord<T>>::insert(v,reward+now_reward);
+            let depositing_vec = <DespositingBalance<T>>::get(v);
+            depositing_vec.iter().enumerate().for_each(|(i,&(balances,cointype))| {
+                let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),balances);
+                let now_reward = <RewardRecord<T>>::get(v);
+                <RewardRecord<T>>::insert(v,reward+now_reward);
+            });
         });
     }
 
-    ///每个周期直接给指定的抵押账户发奖励的钱
+    /// Money awarded directly to a specified deposit account in each session
     fn reward_deposit() {
         //循环历遍一下所有deposit列表，分别对每个账户进行单独的发钱处理
         //首先判断session 决定一个 时间比率
         //再判断balance 决定一个 存款比率
         //两个比率结合起来决定一个 乘积因子Xbalance => 然后往账户发
-        runtime_io::print("发钱发钱发钱发钱发钱发钱发钱发钱发钱发钱");
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            //TODO:测试时候注释
-            runtime_io::print("================TEST==================");
-
-            let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),<DespositingBalance<T>>::get(v));
+            //let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),<DespositingBalance<T>>::get(v));
            // let _ = <balances::Module<T>>::reward(v, reward);
-
         });
     }
 
@@ -565,7 +459,7 @@ impl<T: Trait> Module<T>
         }
 
         let rate =  (final_se * final_ba);
-        <DespositingBalance<T>>::get(who)*T::Balance::sa( rate as u64)/T::Balance::sa(100 as u64)
+        money*T::Balance::sa( rate as u64)/T::Balance::sa(100 as u64)
     }
 
     fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: T::Hash) -> Result {
@@ -574,12 +468,83 @@ impl<T: Trait> Module<T>
     }
 
     pub fn check_secp512(signature: &[u8; 65], tx: &[u8; 32]) -> Result {
-        runtime_io::print("asd");
         //TODO: if runtime_io::secp256k1_ecdsa_recover(signature,tx).is_ok(){ } else {
         //  return Err(()); }
         //TODO:
         Ok(())
     }
+
+
+    /// Record all reward statistics . The total deposit amout and reward of various types of coin.
+    pub fn deposit_statistics_reward(coin_type: u64,  reward_amount: T::Balance, add: bool){
+        let mut reward = <CoinReward<T>>::get(coin_type);
+        if add {
+            reward = reward + reward_amount;
+            <CoinReward<T>>::insert(coin_type,reward);
+        }else {
+            //TODO:: 这里要不要判断下是否减成零了？
+            reward = reward - reward_amount;
+            <CoinReward<T>>::insert(coin_type,reward);
+        }
+    }
+
+    /// Adjust deposing_list
+    pub fn depositing_withdraw_record(who: T::AccountId, balance:T::Balance, coin_type:u64, d_w: bool){
+        let mut depositing_vec = <DespositingBalance<T>>::get(who.clone());
+        let mut  mark = 0usize;
+        let mut new_balance = T::Balance::sa(0);
+        depositing_vec.iter().enumerate().for_each( |(i,&(oldbalance,cointype))| {
+            if  coin_type == cointype{
+                if d_w {
+                    //deposit
+                    new_balance = oldbalance + balance;
+                    mark = i;
+                }else {
+                    //withdraw
+                    new_balance = oldbalance - balance;
+                    mark = i;
+                }
+            }
+        });
+        // change the depositing data vector and put it back to map
+        depositing_vec.insert(mark,(new_balance,coin_type));
+        <DespositingBalance<T>>::insert(who.clone(),depositing_vec);
+
+        Self::depositing_access_control(who);
+    }
+
+    /// use DepositngAccountTotal to control  DespoitingAccount
+    pub fn depositing_access_control(who:T::AccountId){
+        let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
+        let all_data_vec = <DespositingBalance<T>>::get(who.clone());
+        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+            // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
+            if bal != T::Balance::sa(0u64) {
+                deposit_total = deposit_total + 1;
+            }
+        });
+        <DepositngAccountTotal<T>>::insert(who.clone(),deposit_total);
+
+        // if all type of coin is Zero ,  the accountid will be removed from the DepositingVec.
+        if <DepositngAccountTotal<T>>::get(who.clone()) == 0 {
+            let mut vec = Self::despositing_account();
+            let mut mark = 0usize;
+            vec.iter().enumerate().for_each(|(t,id)|{
+                if id.clone() == who {
+                    mark = t;
+                }
+            });
+            vec.remove(mark);
+            <DespoitingAccount<T>>::put(vec);
+        }else {
+            let mut vec = Self::despositing_account();
+            vec.push(who.clone());
+            <DespoitingAccount<T>>::put(vec);
+
+        }
+
+    }
+
 
 
     pub fn u8array_to_u64(arr: &[u8]) -> u64 {
@@ -592,6 +557,11 @@ impl<T: Trait> Module<T>
             i += 1;
         }
         ret
+    }
+
+    // Input coin type , Output the corresponding amount of ladder balance
+    pub fn deposit_exchange(coin_type:u64) -> u64 {
+        5u64
     }
 
     pub fn balancetest(x1:T::Balance,x2:T::Balance){
@@ -681,7 +651,13 @@ mod tests {
     #[test]
     fn resolving_data() {
         with_externalities(&mut new_test_ext(), || {
-
+            //let coin_vec: Vec<_> = [1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4].to_vec();
+            //let coin_hash= Decode::decode(&mut &coin_vec[..]).unwrap();
+            //assert_eq!(coin_hash,44);
+            let message = [0u8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,7,4,2,4,1,d,b,5,f,3,e,b,a,e,e,c,f,9,5,0,6,e,4,a,e,9,8, 8,1,8,6,0,9,3,3,4,1,6,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2, 3,8,6,f,2,6,f,c,1,0,0,0,0,e,3,5,5,4,a,6,b,1,e,f,7,3,5,8,c,d,b,8, 0,7,1,c,2,6,5,1,d,5,3,b,d,f,a,6,2,8,a,e,2,1,3,7,3,b,7,5,4,2,8,a,3,b,c,8,0,4,e,f,1,6,6,0,4].to_vec();
+            //signature =[987e80e34cad5245bde33aa3df7132d6053e4d60bad87809476f46163c17d14d0c3786de0e05dcb8248658e7c4a9fd250ca889a3fba3c3b4a51078d10ca0992c00];
+            let  signature = [1,2,3].to_vec();
+            Bank::deposit(Origin::signed(1),message,signature);
         });
     }
 }
