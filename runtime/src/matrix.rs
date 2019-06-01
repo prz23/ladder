@@ -30,7 +30,6 @@ decl_module! {
         pub fn ingress(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
             let hash = T::Hashing::hash_of(&message);
-
             let signature_hash = T::Hashing::hash_of(&signature);
 
             match Self::verify_ingress_message(sender,hash,signature_hash ){
@@ -172,8 +171,10 @@ impl<T: Trait> Module<T>
     fn verify_ingress_message(sender: T::AccountId, message: T::Hash, signature: T::Hash) -> Result{
 
         //是否在验证者集合中
-        let validator_set = <session::Module<T>>::validators();
-        ensure!(validator_set.contains(&sender),"not validator");
+        // TODO validator unequal with sessionkey
+        // let validator_set = <session::Module<T>>::validators();
+        // println!("#########{:?} sender:{:?}", validator_set, sender);
+        // ensure!(validator_set.contains(&sender),"not validator");
 
         //查看该交易是否存在，没得话添加上去
         if !<NumberOfSignedIngressTx<T>>::exists(message) {
@@ -218,8 +219,9 @@ impl<T: Trait> Module<T>
     /// Data Forwarding Confirmation Message
     fn verify_egress_message(sender: T::AccountId, message: T::Hash, signature: T::Hash) -> Result{
         //是否在验证者集合中
-        let validator_set = <session::Module<T>>::validators();
-        ensure!(validator_set.contains(&sender),"not validator");
+        // TODO validator unequal with sessionkey
+        // let validator_set = <session::Module<T>>::validators();
+        // ensure!(validator_set.contains(&sender),"not validator");
 
         //查看该交易是否存在，没得话添加上去
         if !<NumberOfSignedEgressTx<T>>::exists(message) {

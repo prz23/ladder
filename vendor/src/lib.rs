@@ -8,15 +8,17 @@ pub mod message;
 mod state;
 mod utils;
 pub mod vendor;
+pub mod label;
 
 use crate::message::{RelayMessage, RelayType};
 use crate::state::StateStorage;
 use crate::vendor::Vendor;
+use crate::label::ChainAlias;
 use client::{blockchain::HeaderBackend, runtime_api::Core as CoreApi, BlockchainEvents};
 use error::ResultExt;
 use futures::{Future, Stream};
 use keystore::Store as Keystore;
-use log::{error, info, warn};
+use log::{error, info, warn, debug, trace};
 use network::SyncProvider;
 use node_primitives::{AccountId, Balance, BlockNumber, Hash, Nonce as Index};
 use node_runtime::{
@@ -30,8 +32,6 @@ use runtime_primitives::{
     generic::{BlockId, Era},
     traits::{Block, BlockNumberToHash, ProvideRuntimeApi},
 };
-
-use crate::log_stream::ChainAlias;
 use signer::{AbosTransaction, EthTransaction, KeyPair, PrivKey};
 use std::marker::{Send, Sync};
 use std::path::{Path, PathBuf};
@@ -47,6 +47,7 @@ use web3::{
     types::{Address, Bytes, H256, U256},
     Transport,
 };
+use rustc_hex::ToHex;
 mod exchange;
 use exchange::Exchange;
 
@@ -112,6 +113,12 @@ where
     }
 }
 
+fn get_tag(tag: &H256, index: usize) -> u64 {
+    let mut arr = [0u8; 8];
+    arr.copy_from_slice(&tag.0[index..(index + 8)]);
+    events::array_to_u64(arr)
+}
+
 impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N>
 where
     A: txpool::ChainApi<Block = B>,
@@ -120,23 +127,45 @@ where
     N: SyncProvider<B>,
     C::Api: VendorApi<B> + CoreApi<B>,
 {
-    fn submit(&self, message: RelayMessage) {
+    fn submit(&self, relay_message: RelayMessage) {
         let local_id: AccountId = self.key.public().0.unchecked_into();
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
-        // let auths = self.client.runtime_api().authorities(&at).unwrap();
-        // if auths.contains(&AuthorityId::from(self.key.public().0)) {
         if self
             .client
             .runtime_api()
             .is_authority(&at, &self.key.public().0.unchecked_into())
             .unwrap()
         {
+            let mut message = relay_message.clone();
+            //TODO refactor ,now just amend value.
+            if message.ty == RelayType::Ingress {
+                let mut ingress = events::IngressEvent::from_bytes(&message.raw).unwrap();
+                let tag = ingress.tag;
+                // H256 1 = [ 0x0, 0x0, ......., 0x1 ]; big endian
+                let from_tag = u64::from_be(get_tag(&tag, 8));
+                let to_tag = u64::from_be(get_tag(&tag, 24));
+                info!("@@@@@@@@@@@@@@from tag: {}, to tag: {}", from_tag, to_tag);
+                let mut from_price = self.client.runtime_api().price_of(&at, from_tag).unwrap();
+                let mut to_price = self.client.runtime_api().price_of(&at, to_tag).unwrap();
+                info!("@@@@@@@@@@@@@@from price: {}. to price:{}", from_price, to_price);
+                // TODO when can't get price, then set 1:1
+                if to_price == 0 || from_price == 0 {
+                    to_price = 1;
+                    from_price = 1;
+                }
+                let to_value = ( ingress.value * to_price ) / from_price;
+                ingress.value = to_value;
+                message.raw = ingress.to_bytes();
+            }
             let nonce = self.get_nonce();
-            let signature = signer::Eth::sign_message(&self.eth_key, &message.raw).into();
+            let signature:Vec<u8> = signer::Eth::sign_message(&self.eth_key, &message.raw).into();
 
             let function = match message.ty {
-                RelayType::Ingress => Call::Matrix(MatrixCall::ingress(message.raw, signature)),
+                RelayType::Ingress => {
+                    info!("message: {}, signature: {}", message.raw.to_hex(), signature.to_hex());
+                    Call::Matrix(MatrixCall::ingress(message.raw, signature))
+                },
                 RelayType::Egress => Call::Matrix(MatrixCall::egress(message.raw, signature)),
                 RelayType::Deposit => Call::Bank(BankCall::deposit(message.raw, signature)),
                 RelayType::Withdraw => Call::Bank(BankCall::withdraw(message.raw, signature)),
@@ -165,8 +194,8 @@ where
             );
 
             let xt: ExtrinsicFor<A> = Decode::decode(&mut &extrinsic.encode()[..]).unwrap();
-            println!("extrinsic {:?}", xt);
-            println!("@submit transaction {:?}", self.pool.submit_one(&at, xt));
+            trace!("extrinsic {:?}", xt);
+            info!("@submit transaction {:?}", self.pool.submit_one(&at, xt));
         }
     }
 }
@@ -180,9 +209,9 @@ pub struct RunStrategy {
 #[derive(Clone)]
 pub struct VendorServiceConfig {
     pub kovan_url: String,
-    pub ropsten_url: String,
+    pub abos_url: String,
     pub kovan_address: String,
-    pub ropsten_address: String,
+    pub abos_address: String,
     pub db_path: String,
     pub eth_key: String,
     pub strategy: RunStrategy,
@@ -267,7 +296,7 @@ where
     }
 }
 
-///////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////
 type SignData = Vec<u8>;
 
 struct SignContext {
@@ -302,15 +331,19 @@ impl SenderProxy for EthProxy {
             to: Some(self.context.contract_address),
             value: 0.into(),
             data: payload,
-            gas_price: 2000000000.into(),
+            gas_price: 1000000000.into(),
             gas: 41000.into(),
         };
         let data = signer::Eth::sign_transaction(self.pair.privkey(), &transaction);
 
         let future = web3::api::Eth::new(&transport).send_raw_transaction(Bytes::from(data));
-        let hash = event_loop.run(future).unwrap();
+        match event_loop.run(future) {
+            Ok(hash) => {
         info!("send to eth transaction hash: {:?}", hash);
         self.context.nonce += 1.into();
+            },
+            Err(e) => error!("send to eth error! case:{:?}", e),
+        }
     }
 }
 
@@ -426,7 +459,7 @@ where
     let key = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
     let key2 = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
     let kovan_address = Address::from_str(&config.kovan_address).unwrap();
-    let ropsten_address = Address::from_str(&config.ropsten_address).unwrap();
+    let abos_address = Address::from_str(&config.abos_address).unwrap();
     let eth_key = PrivKey::from_str(&config.eth_key).unwrap();
     let eth_pair = KeyPair::from_privkey(eth_key);
     info!(
@@ -472,20 +505,20 @@ where
     }
     .start();
 
-    //new a thread to listen ropsten network
+    //new a thread to listen abos network
     SideListener {
-        url: config.ropsten_url.clone(),
-        db_file: Path::new(&config.db_path).join("ropsten_storage.json"),
-        contract_address: ropsten_address,
+        url: config.abos_url.clone(),
+        db_file: Path::new(&config.db_path).join("abos_storage.json"),
+        contract_address: abos_address,
         spv: spv.clone(),
         enable: config.strategy.listener,
-        chain: ChainAlias::ETH,
+        chain: ChainAlias::ABOS,
     }
     .start();
 
     // A thread that send transaction to ETH
     let kovan_sender = SideSender {
-        name: "ETH_Kovan".to_string(),
+        name: "ETH-kovan".to_string(),
         url: config.kovan_url.clone(),
         contract_address: kovan_address,
         pair: eth_pair.clone(),
@@ -501,18 +534,18 @@ where
     }
     .start();
 
-    let ropsten_sender = SideSender {
-        name: "ETH_Ropsten".to_string(),
-        url: config.ropsten_url.clone(),
-        contract_address: ropsten_address,
+    let abos_sender = SideSender {
+        name: "ABOS-test".to_string(),
+        url: config.abos_url.clone(),
+        contract_address: abos_address,
         pair: eth_pair.clone(),
         enable: config.strategy.sender,
-        proxy: EthProxy {
+        proxy: AbosProxy {
             pair: eth_pair.clone(),
             context: SignContext {
                 height: 0,
                 nonce: U256::from(0),
-                contract_address: ropsten_address,
+                contract_address: abos_address,
             },
         },
     }
@@ -532,9 +565,9 @@ where
     .start();
 
     let eth_kovan_tag =
-        H256::from_str("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
-    let eth_ropsten_tag =
-        H256::from_str("0000000000000000000000000000000000000000000000000000000000000002").unwrap();
+        H256::from_str(events::ETH_COIN).unwrap();
+    let abos_tag =
+        H256::from_str(events::ABOS_COIN).unwrap();
     // how to fetch real key?
     let events_key = StorageKey(primitives::twox_128(b"System Events").to_vec());
     let storage_stream = client
@@ -560,20 +593,20 @@ where
             events.iter().for_each(|event| {
                 if let Event::matrix(e) = event {
                     match e {
-                        RawEvent::Ingress(message, signatures) => {
-                            println!("raw event ingress: {:?}, {:?}", message, signatures);
+                        RawEvent::Ingress(signatures, message) => {
+                            info!("raw event ingress: message: {}, signatures: {}", message.to_hex(), signatures.to_hex());
                             events::IngressEvent::from_bytes(message)
                                 .map(|ie| {
-                                    if ie.tag == eth_kovan_tag {
+                                    if ie.tag[24..32] == eth_kovan_tag[24..32] {
                                         kovan_sender.send(e.clone()).unwrap();
-                                    } else if ie.tag == eth_ropsten_tag {
-                                        ropsten_sender.send(e.clone()).unwrap();
+                                    } else if ie.tag[24..32] == abos_tag[24..32] {
+                                        abos_sender.send(e.clone()).unwrap();
                                     } else {
                                         warn!("unknown event tag of ingress: {:?}", ie.tag);
                                     }
                                 })
                                 .map_err(|_err| {
-                                    warn!("unexpected format of ingress, message {:?}", message);
+                                    warn!("unexpected format of ingress, message {:?}", message.to_hex());
                                 });
                         }
                         _ => {}

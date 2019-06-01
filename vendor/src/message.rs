@@ -1,7 +1,7 @@
 use crate::events::*;
 use web3::types::H256;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RelayType {
     Ingress,
     Egress,
@@ -11,7 +11,7 @@ pub enum RelayType {
     ExchangeRate,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RelayMessage {
     /// The hash of transaction.
     pub hash: H256,

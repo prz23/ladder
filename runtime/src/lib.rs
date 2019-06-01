@@ -406,9 +406,10 @@ impl_runtime_apis! {
 	    fn check_validator(account: &AccountId) -> bool {
 	       Exchange::check_validator(account)
 	    }
-	    fn record_data(account: &AccountId, exchangerate: u64, time: u64){
-           //Exchangerate::check_signature(account,exchangerate,time);
-	    }
+
+        fn price_of(tag: u64) -> u64 {
+            Exchange::latest_exrate(tag)
+        }
 	}
 }
 
@@ -419,6 +420,6 @@ decl_runtime_apis! {
 		fn account_nonce(account: &AccountId) -> Nonce;
 		fn is_authority(id: &SessionKey) -> bool;
 		fn check_validator(account: &AccountId) -> bool;
-	    fn record_data(account: &AccountId, exchangerate: u64, time: u64);
+        fn price_of(tag: u64) -> u64;
 	}
 }

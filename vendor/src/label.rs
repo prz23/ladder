@@ -5,13 +5,14 @@
 /// Label must be H256 type, so S and T is u128 type. to make a cross transaction, 
 /// we should fill the label in transaction.
 
-use restc_hex::{ToHex, FromHex};
+// use restc_hex::{ToHex, FromHex};
+use std::cmp::PartialEq;
 
-static ETH_MAIN = "";
-static ABOS_MAIN = "";
-static ABOS_TEST = "";
-static ETH_KOVAN = "";
-static ETH_ROPSTEN = "";
+static ETH_MAIN:&str = "";
+static ABOS_MAIN:&str = "";
+static ABOS_TEST:&str = "";
+static ETH_KOVAN:&str = "";
+static ETH_ROPSTEN:&str = "";
 
 /*
 we should wrap it with new type.
@@ -27,29 +28,14 @@ struct Label {
     to: Tag,
 }
 
-impl From<[u8; 32]> for Label {
-    fn from(data: [u8; 32]) -> Self {
-        Label {
-            from: Tag(data[0..16]),
-            to: Tag(data[16..32]),
-        }
-    }
-}
-
-impl Label {
-    /// convert label to hex string
-    fn hex(&self) -> String {
-        self.to_hex()
-    }
-    
-    /// convert hex string to label
-    fn from_hex(&self) -> Result<Label, &str> {
-        let data: Vec<u8> = 
-        Ok(Label::default())
-    }
-}
-
 // TODO impl the feature of type,such as string change to tag.
-#[derive(Debug, partialEq)]
+#[derive(Default, Debug)]
 struct Tag([u8; 16]);
 
+
+/// Alias of Chain to diff.
+#[derive(Copy, Clone)]
+pub enum ChainAlias {
+    ETH,
+    ABOS,
+}

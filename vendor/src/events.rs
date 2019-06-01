@@ -1,15 +1,27 @@
 use crate::error::Error;
 use crate::utils::IntoRawLog;
+use crate::label::ChainAlias;
 use contracts;
 use error_chain::bail;
 use std::str::FromStr;
 use web3::types::{Address, Log, H256, U256};
 
 pub const ETH_COIN: &str = "0000000000000000000000000000000000000000000000000000000000000001";
+pub const ABOS_COIN: &str = "0000000000000000000000000000000000000000000000000000000000000002";
 pub const MESSAGE_LENGTH: usize = 116;
 pub const BANKER_LENGTH: usize = 116;
 pub const AUTHORITY_MINIMUM_LENGTH: usize = 72;
 pub const ORACLE_LENTH: usize = 116; // 8 8
+
+impl ChainAlias {
+    // TODO refactor
+    fn coin(&self) -> H256 {
+        match &self {
+            ChainAlias::ETH => H256::from_str(ETH_COIN).unwrap(),
+            ChainAlias::ABOS => H256::from_str(ABOS_COIN).unwrap(),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct IngressEvent {
@@ -20,11 +32,13 @@ pub struct IngressEvent {
 }
 
 impl IngressEvent {
-    pub fn from_log(raw_log: &Log) -> Result<Self, Error> {
+    pub fn from_log(raw_log: &Log, chain: &ChainAlias) -> Result<Self, Error> {
         let hash = raw_log
             .transaction_hash
             .ok_or_else(|| "`log` must be mined and contain `transaction_hash`")?;
-        let log = contracts::bridge::events::ingress::parse_log(raw_log.into_raw_log())?;
+        let mut log = contracts::bridge::events::ingress::parse_log(raw_log.into_raw_log())?;
+        let coin = chain.coin();
+        log.tag.0[0..16].copy_from_slice(&coin.0[16..32]);
         Ok(Self {
             tag: log.tag,
             recipient: log.recipient,
@@ -65,11 +79,13 @@ pub struct EgressEvent {
 }
 
 impl EgressEvent {
-    pub fn from_log(raw_log: &Log) -> Result<Self, Error> {
+    pub fn from_log(raw_log: &Log, chain: &ChainAlias) -> Result<Self, Error> {
         let hash = raw_log
             .transaction_hash
             .ok_or_else(|| "`log` must be mined and contain `transaction_hash`")?;
-        let log = contracts::bridge::events::egress::parse_log(raw_log.into_raw_log())?;
+        let mut log = contracts::bridge::events::egress::parse_log(raw_log.into_raw_log())?;
+        let coin = chain.coin();
+        log.tag.0[0..16].copy_from_slice(&coin.0[16..32]);
         Ok(Self {
             tag: log.tag,
             recipient: log.recipient,
@@ -110,13 +126,13 @@ pub struct DepositEvent {
 }
 
 impl DepositEvent {
-    pub fn from_log(raw_log: &Log) -> Result<Self, Error> {
+    pub fn from_log(raw_log: &Log, chain: &ChainAlias) -> Result<Self, Error> {
         let hash = raw_log
             .transaction_hash
             .ok_or_else(|| "`log` must be mined and contain `transaction_hash`")?;
         let log = contracts::bridge::events::deposit::parse_log(raw_log.into_raw_log())?;
         Ok(Self {
-            coin: H256::from_str(ETH_COIN).unwrap(),
+            coin: chain.coin(),
             recipient: log.beneficiary,
             value: log.amount,
             tx_hash: hash,
@@ -155,13 +171,13 @@ pub struct WithdrawEvent {
 }
 
 impl WithdrawEvent {
-    pub fn from_log(raw_log: &Log) -> Result<Self, Error> {
+    pub fn from_log(raw_log: &Log, chain: &ChainAlias) -> Result<Self, Error> {
         let hash = raw_log
             .transaction_hash
             .ok_or_else(|| "`log` must be mined and contain `transaction_hash`")?;
         let log = contracts::bridge::events::withdraw::parse_log(raw_log.into_raw_log())?;
         Ok(Self {
-            coin: H256::from_str(ETH_COIN).unwrap(),
+            coin: chain.coin(),
             recipient: log.beneficiary,
             value: log.amount,
             tx_hash: hash,
