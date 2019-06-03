@@ -103,7 +103,7 @@ impl<A, B, Q, V> Exchange<A, B, Q, V>
                 self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:BTCUSD?unit=cny",1);
                 self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny",2);
                 // query the exchange rate every 5 seconds
-                thread::sleep(Duration::from_secs(10));
+                thread::sleep(Duration::from_secs(45));
             }
         });
     }

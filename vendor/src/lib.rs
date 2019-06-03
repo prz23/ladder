@@ -204,6 +204,7 @@ where
 pub struct RunStrategy {
     pub listener: bool,
     pub sender: bool,
+    pub enableexchange: bool,
 }
 
 #[derive(Clone)]
@@ -553,7 +554,7 @@ where
 
     let id_need = key2.public().0.unchecked_into();
 
-
+    if config.strategy.enableexchange {
     // exchange
     let _ext = Exchange {
         client: client.clone(),
@@ -562,7 +563,8 @@ where
         packet_nonce: Arc::new(Mutex::new(packet_nonce2)),
         spv: spv.clone(),
     }
-    .start();
+        .start();
+    }
 
     let eth_kovan_tag =
         H256::from_str(events::ETH_COIN).unwrap();

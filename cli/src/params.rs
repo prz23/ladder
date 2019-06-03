@@ -10,6 +10,10 @@ pub struct VendorCmd {
     /// Enable sender mode
     #[structopt(long = "sender")]
     pub sender: bool,
+    /// Enable sender mode
+    #[structopt(long = "enableexchange")]
+    pub enableexchange: bool,
+
 }
 
 impl GetLogFilter for VendorCmd {
@@ -29,6 +33,7 @@ impl Into<RunStrategy> for VendorCmd {
         RunStrategy {
             listener: self.listener,
             sender: self.sender,
+            enableexchange: self.enableexchange,
         }
     }
 }
