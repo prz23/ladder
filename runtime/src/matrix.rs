@@ -34,7 +34,7 @@ decl_module! {
 
             match Self::verify_ingress_message(sender,hash,signature_hash ){
                 Ok(()) => {
-                    Self::deposit_event(RawEvent::Ingress(signature.clone(), message.clone()));
+                    Self::deposit_event(RawEvent::Ingress(message.clone(),signature.clone()));
                     <IngressOf<T>>::insert(hash, message.clone());
                     return  Ok(());
                 },
@@ -49,7 +49,7 @@ decl_module! {
             let signature_hash = T::Hashing::hash_of(&signature);
             match Self::verify_egress_message(sender,hash,signature_hash ){
                 Ok(()) => {
-                    Self::deposit_event(RawEvent::Egress(signature.clone(), message.clone()));
+                    Self::deposit_event(RawEvent::Egress(message.clone(),signature.clone()));
                     <EgressOf<T>>::insert(hash, message.clone());
                     return  Ok(());
                 },
