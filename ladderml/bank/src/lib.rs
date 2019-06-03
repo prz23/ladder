@@ -282,7 +282,6 @@ impl<T: Trait> Module<T>
 
         // Tx_Hash 97-128
         let hash:Vec<u8> = messagedrain.drain(0..32).collect();
-        who_vec.reverse();
         let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
 
         // Signature_Hash
