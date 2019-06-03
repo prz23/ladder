@@ -59,7 +59,7 @@ decl_module! {
             ensure!(Self::intentions_desposit_vec().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already in queue.");
 
             //check the validity and number of signatures
-            match  Self::check_signature(sender.clone(), tx_hash, signature_hash, tx_hash){
+            match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
                 Ok(y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
@@ -96,11 +96,11 @@ decl_module! {
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
             // resovling message --> hash  tag  id  amount
-            let (_tx_hash,who,amount,signature_hash,coin_type) = Self::split_message(message.clone(),signature);
-            let message_hash = Decode::decode(&mut &message.encode()[..]).unwrap();
+            let (tx_hash,who,amount,signature_hash,coin_type) = Self::split_message(message.clone(),signature);
+            //let message_hash = Decode::decode(&mut &message.encode()[..]).unwrap();
 
             //check the validity and number of signatures
-            match  Self::check_signature(sender.clone(), message_hash, signature_hash, message_hash){
+            match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
                 Ok(y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
@@ -462,7 +462,7 @@ impl<T: Trait> Module<T>
         money*T::Balance::sa( rate as u64)/T::Balance::sa(100 as u64)
     }
 
-    fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: T::Hash) -> Result {
+    fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: Vec<u8>) -> Result {
         //ensure enough signature
         <signcheck::Module<T>>::check_signature(who,tx,signature ,message_hash)
     }

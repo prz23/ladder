@@ -49,7 +49,7 @@ decl_storage! {
 
         //record transaction   Hash => (accountid,sign)
         Record  get(record) : map T::Hash => Vec<(T::AccountId,T::Hash)>;
-
+        MessageRecord get(message_record) : map T::Hash => Vec<u8>;
         /// Preventing duplicate signatures   map txHash => Vec<signatureHash>
         RepeatPrevent  get(repeat_prevent) : map T::Hash => Vec<T::Hash>;
 
@@ -84,7 +84,7 @@ impl<T: Trait> Module<T> {
     }
 
     /// determine if the current number of signatures is sufficient to send an event
-    pub  fn check_signature(who: T::AccountId, transcation: T::Hash, sign: T::Hash, message: T::Hash) -> Result{
+    pub  fn check_signature(who: T::AccountId, transcation: T::Hash, sign: T::Hash, message: Vec<u8>) -> Result{
         //TODO： 判断这个信息发送的人是否是validator     不在这里 已经前置了
         let sender = who;
 
@@ -111,6 +111,7 @@ impl<T: Trait> Module<T> {
         let mut stored_vec = Self::record(transcation);
         stored_vec.push((sender.clone(),sign.clone()));
         <Record<T>>::insert(transcation.clone(),stored_vec.clone());
+        <MessageRecord<T>>::insert(transcation.clone(),message.clone());
 
         // TODO: other verification
         Self::_verify(transcation)?;
