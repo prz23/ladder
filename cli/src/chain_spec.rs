@@ -62,8 +62,8 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, Author
 
 pub fn get_brands(owned: AccountId) -> Vec<(Trademark, AccountId)> {
     vec![
-        (Trademark{ name: b"ETH-kovan".to_vec(), id: 0 }, owned.clone()),
-        (Trademark{ name: b"ABOS-test".to_vec(), id: 1 }, owned.clone()),
+        (Trademark{ name: b"ETH-kovan".to_vec(), id: 1 }, owned.clone()),
+        (Trademark{ name: b"ABOS-test".to_vec(), id: 2 }, owned.clone()),
     ]
 }
 
@@ -432,7 +432,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 /// ladder testnet config
 pub fn ladder_testnet_config() -> ChainSpec {
     ChainSpec::from_genesis(
-        "Ladder Testnet v0.4.0",
+        "Ladder Testnet v0.5.0",
         "Ladder Testnet",
         ladder_testnet_genesis,
         vec![],
