@@ -267,12 +267,11 @@ impl<T: Trait> Module<T>
 
         // Coin 0-32
         let mut coin_vec: Vec<_> = messagedrain.drain(0..32).collect();
-        coin_vec.reverse();
+        coin_vec.drain(0..24);
         let mut coin_type = Self::u8array_to_u64(coin_vec.as_slice());
 
         // Who 33-64
         let mut who_vec: Vec<_> = messagedrain.drain(0..32).collect();
-        who_vec.reverse();
         let who: T::AccountId = Decode::decode(&mut &who_vec[..]).unwrap();
 
         //65-96
