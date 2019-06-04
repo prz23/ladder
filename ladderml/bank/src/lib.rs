@@ -16,6 +16,9 @@ use rstd::prelude::*;
 
 #[cfg(feature = "std")]
 pub use std::fmt;
+#[cfg(feature = "std")]
+use runtime_io::with_storage;
+
 
 // use Encode, Decode
 use parity_codec::{Decode, Encode};
@@ -66,7 +69,7 @@ decl_module! {
             }
 
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,true);
-            Self::deposit_statistics_reward(coin_type,T::Balance::sa(amount),true);
+            Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),true);
 
             <DespositingTime<T>>::insert(who.clone(), 0);
 
@@ -108,7 +111,7 @@ decl_module! {
             //ensure!(Self::intentions_withdraw_vec().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
 
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,false);
-            Self::deposit_statistics_reward(coin_type,T::Balance::sa(amount),false);
+            Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),false);
 
             // emit an event
             Self::deposit_event(RawEvent::AddWithdrawQueue(who));
@@ -220,7 +223,7 @@ decl_storage! {
 		/// true -- 领取模式  false -- 自动发放模式
 		EnableRewardRecord get(enable_record) config(): bool;
         ///
-        TotalDespositingBalacne  get(total_despositing_balance) config(): T::Balance;
+        TotalDespositingBalacne  get(total_despositing_balance) : T::Balance;
         /// MAP of cointype => (TotalDeposit , AllReward)
         CoinDeposit get(coin_deposit) : map u64 => T::Balance;
         CoinReward get(coin_reward) : map u64 => T::Balance;
@@ -228,6 +231,14 @@ decl_storage! {
         /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
         DespositExchangeRate get(desposit_exchange_rate) :  u64 = 10000000000000;
 
+    }
+        add_extra_genesis {
+        config(total) : u64;
+        build(|storage: &mut sr_primitives::StorageOverlay, _: &mut sr_primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
+            with_storage(storage, || {
+                <Module<T>>::inilize_deposit_data();
+            })
+        })
     }
 }
 
@@ -362,7 +373,7 @@ impl<T: Trait> Module<T>
             // update the map of the depositing account
             let (balances,coin_type) = <IntentionsDesposit<T>>::get(who.clone());
             Self::depositing_withdraw_record(who.clone(),balances,coin_type,true);
-            Self::deposit_statistics_reward(coin_type,balances,true);
+            Self::calculate_total_deposit(coin_type,balances,true);
 
             <DespositingTime<T>>::insert(who.clone(), 0);
             <IntentionsDesposit<T>>::remove(who);
@@ -376,7 +387,7 @@ impl<T: Trait> Module<T>
             runtime_io::print("withdraw to quit");
             let (balances,coin_type) = <IntentionsWithdraw<T>>::get(who.clone());
             Self::depositing_withdraw_record(who.clone(),balances,coin_type,false);
-            Self::deposit_statistics_reward(coin_type,balances,false);
+            Self::calculate_total_deposit(coin_type,balances,false);
 
             <DespositingTime<T>>::remove(who.clone());
             <IntentionsWithdraw<T>>::remove(who);
@@ -405,6 +416,8 @@ impl<T: Trait> Module<T>
                 let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),balances);
                 let now_reward = <RewardRecord<T>>::get(v);
                 <RewardRecord<T>>::insert(v,reward+now_reward);
+
+                //Self::calculate_total_reward(cointype,balances,true);
             });
         });
     }
@@ -476,34 +489,19 @@ impl<T: Trait> Module<T>
         Ok(())
     }
 
-
-    /// Record all reward statistics . The total deposit amout and reward of various types of coin.
-    pub fn deposit_statistics_reward(coin_type: u64,  reward_amount: T::Balance, add: bool){
-        let mut reward = <CoinReward<T>>::get(coin_type);
-        if add {
-            reward = reward + reward_amount;
-            <CoinReward<T>>::insert(coin_type,reward);
-        }else {
-            //TODO:: 这里要不要判断下是否减成零了？
-            reward = reward - reward_amount;
-            <CoinReward<T>>::insert(coin_type,reward);
-        }
-    }
-
     pub fn initlize(who: T::AccountId){
         //println!("initlizeinitlizeinitlizeinitlizeinitlizeinitlizeinitlize");
         let mut depositing_vec = <DespositingBalance<T>>::get(who.clone());
-        depositing_vec.push((T::Balance::sa(0),0));
-        depositing_vec.push((T::Balance::sa(0),1));
-        depositing_vec.push((T::Balance::sa(0),2));
-        depositing_vec.push((T::Balance::sa(0),3));
-        depositing_vec.push((T::Balance::sa(0),4));
-        depositing_vec.push((T::Balance::sa(0),5));
+        for i in 0u64..5u64{
+            depositing_vec.push((T::Balance::sa(0),i));
+        }
         <DespositingBalance<T>>::insert(who.clone(),depositing_vec);
     }
-    fn uninitializa(who: T::AccountId) {
+
+    fn uninitlize(who: T::AccountId) {
         <DespositingBalance<T>>::remove(who.clone());
     }
+
     /// Adjust deposing_list
     pub fn depositing_withdraw_record(who: T::AccountId, balance:T::Balance, coin_type:u64, d_w: bool){
         if Self::despositing_account().iter().find(|&t| t == &who).is_none() {
@@ -527,8 +525,8 @@ impl<T: Trait> Module<T>
             }
         });
         // change the depositing data vector and put it back to map
-        depositing_vec.remove(mark);
-        depositing_vec.insert(mark,(new_balance,coin_type));
+        depositing_vec[mark] = (new_balance,coin_type);
+        //depositing_vec.insert(mark,(new_balance,coin_type));
         <DespositingBalance<T>>::insert(who.clone(),depositing_vec);
         Self::depositing_access_control(who);
     }
@@ -542,7 +540,7 @@ impl<T: Trait> Module<T>
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
            // println!("bal {:?} ctype {:?}",bal.clone(),ctype.clone());
             if bal != T::Balance::sa(0u64) {
-                deposit_total = deposit_total+1;
+                deposit_total = deposit_total + 1;
             }
         });
         <DepositngAccountTotal<T>>::insert(who.clone(),deposit_total);
@@ -557,7 +555,7 @@ impl<T: Trait> Module<T>
             });
             vec.remove(mark);
             <DespoitingAccount<T>>::put(vec);
-            Self::uninitializa(who.clone());
+            Self::uninitlize(who.clone());
         }else {
             let mut vec = Self::despositing_account();
             if  !vec.contains(&who.clone()){
@@ -566,7 +564,6 @@ impl<T: Trait> Module<T>
             }
         }
     }
-
 
     pub fn u8array_to_u64(arr: &[u8]) -> u64 {
         let mut len = rstd::cmp::min(8, arr.len());
@@ -580,7 +577,6 @@ impl<T: Trait> Module<T>
         ret
     }
 
-
     pub fn u8array_to_u128(arr: &[u8]) -> u128 {
         let mut len = rstd::cmp::min(16, arr.len());
         let mut ret = 0u128;
@@ -593,6 +589,31 @@ impl<T: Trait> Module<T>
         ret
     }
 
+    pub fn inilize_deposit_data() {
+        for i in 0u64..5u64 {
+            <CoinDeposit<T>>::insert(i,T::Balance::sa(0));
+            <CoinReward<T>>::insert(i,T::Balance::sa(0));
+        }
+    }
+    pub fn calculate_total_deposit(coin_type:u64, balance:T::Balance, in_out:bool){
+        let mut money = Self::coin_deposit(coin_type);
+        if in_out {
+            money = money + balance;
+        }else {
+            money = money - balance;
+        }
+        <CoinDeposit<T>>::insert(coin_type,money);
+    }
+
+    pub fn calculate_total_reward(coin_type:u64, balance:T::Balance, in_out:bool){
+        let mut money = Self::coin_reward(coin_type);
+        if in_out {
+            money = money + balance;
+        }else {
+            money = money - balance;
+        }
+        <CoinReward<T>>::insert(coin_type,money);
+    }
 
     // Input coin type , Output the corresponding amount of ladder balance
     pub fn deposit_exchange(coin_type:u64) -> u64 {
@@ -743,8 +764,14 @@ mod tests {
             let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be3".from_hex().unwrap();
             let sign : Vec<u8>= "219901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
             assert_ok!(Bank::withdraw(Origin::signed(5),data,sign));
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (0, 1), (0, 2), (0, 3), (0, 4), (0, 5)].to_vec());
+            assert_eq!(Bank::despositing_banance(0),[].to_vec());
+        });
+    }
 
+    #[test]
+    fn inilize_test() {
+        with_externalities(&mut new_test_ext(), || {
+            //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
         });
     }
 
