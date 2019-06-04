@@ -203,7 +203,7 @@ pub fn testnet_genesis(
 			reward_session_factor: vec![1,2,3,4],
 			reward_balance_value: vec![1000,5000,60000,80000],
 			reward_balance_factor: vec![1,2,3,4],
-			total_despositing_balance:0 ,
+			total:0 ,
 		}),
         brand: Some(BrandConfig {
             brands: get_brands(root_key),
@@ -421,7 +421,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			reward_session_factor: vec![1,2,3,4],
 			reward_balance_value: vec![1000,5000,60000,80000],
 			reward_balance_factor: vec![1,2,3,4],
-			total_despositing_balance:0 ,
+			total:0 ,
 		}),
         brand: Some(BrandConfig {
             brands: get_brands(endowed_accounts[0].clone()),
