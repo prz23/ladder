@@ -163,7 +163,7 @@ where
 
             let function = match message.ty {
                 RelayType::Ingress => {
-                    info!("message: {}, signature: {}", message.raw.to_hex(), signature.to_hex());
+                    info!("listener Ingress message: {}, signature: {}", message.raw.to_hex(), signature.to_hex());
                     Call::Matrix(MatrixCall::ingress(message.raw, signature))
                 },
                 RelayType::Egress => Call::Matrix(MatrixCall::egress(message.raw, signature)),
@@ -233,7 +233,7 @@ fn print_err(err: error::Error) {
         .map(|e| e.to_string())
         .collect::<Vec<_>>()
         .join("\n\nCaused by:\n  ");
-    error!("{}", message);
+    error!("listener: {}", message);
 }
 
 fn is_err_time_out(err: &error::Error) -> bool {
@@ -253,12 +253,13 @@ where
         std::thread::spawn(move || {
             let mut event_loop = Core::new().unwrap();
             loop {
+                info!("Intend to connect node.");
                 let transport = web3::transports::Http::with_event_loop(
                     &self.url,
                     &event_loop.handle(),
                     MAX_PARALLEL_REQUESTS,
                 )
-                .chain_err(|| format!("Cannot connect to ethereum node at {}", self.url))
+                .chain_err(|| format!("Cannot connect to node at {}", self.url))
                 .unwrap();
 
                 if !self.db_file.exists() {
@@ -278,6 +279,7 @@ where
                     Ok(())
                 })
                 .for_each(|_| Ok(()));
+
                 match event_loop.run(vendor) {
                     Ok(s) => {
                         info!("{:?}", s);
@@ -333,7 +335,7 @@ impl SenderProxy for EthProxy {
             value: 0.into(),
             data: payload,
             gas_price: 1000000000.into(),
-            gas: 41000.into(),
+            gas: 200000.into(),
         };
         let data = signer::Eth::sign_transaction(self.pair.privkey(), &transaction);
 
@@ -382,7 +384,7 @@ impl SenderProxy for AbosProxy {
 
         let future = web3::api::Abos::new(&transport).send_raw_transaction(Bytes::from(data));
         let hash = event_loop.run(future).unwrap();
-        info!("send to eth transaction hash: {:?}", hash);
+        info!("send to Abos transaction hash: {:?}", hash);
         self.context.nonce += 1.into();
     }
 }
@@ -595,7 +597,7 @@ where
             events.iter().for_each(|event| {
                 if let Event::matrix(e) = event {
                     match e {
-                        RawEvent::Ingress(signatures, message) => {
+                        RawEvent::Ingress(message, signatures) => {
                             info!("raw event ingress: message: {}, signatures: {}", message.to_hex(), signatures.to_hex());
                             events::IngressEvent::from_bytes(message)
                                 .map(|ie| {
