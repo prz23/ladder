@@ -43,7 +43,8 @@ decl_module! {
         //(origin, message: Vec, signature: Vec)
         pub fn deposit(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
-            runtime_io::print("====================deposit===============");
+            runtime_io::print("====================deposit===prz============");
+            //println!("VEC is {:?}",message );
 /*
             //TODO: 在这里判断 sender 是否有权限提交 后期启动节点时写入
             let validators = <session::Module<T>>::validators();
@@ -58,7 +59,6 @@ decl_module! {
             // ensure no repeat intentions to desposit
             //ensure!(Self::intentions_desposit_vec().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already in queue.");
 
-            runtime_io::print("====================deposit==222222=========");
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
                 Ok(y) =>  runtime_io::print("ok") ,
@@ -105,7 +105,7 @@ decl_module! {
             }
             // ensure no repeat
             ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
-            ensure!(Self::intentions_withdraw_vec().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
+            //ensure!(Self::intentions_withdraw_vec().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
 
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,false);
             Self::deposit_statistics_reward(coin_type,T::Balance::sa(amount),false);
@@ -271,10 +271,11 @@ impl<T: Trait> Module<T>
 
         //65-96
         let mut amount_vec:Vec<u8> = messagedrain.drain(0..32).collect();
-        amount_vec.drain(0..24);
-        let mut amountu64 = Self::u8array_to_u64(amount_vec.as_slice());
-        amountu64 = ((amountu64 as f64)/<DespositExchangeRate<T>>::get() as f64) as u64;
+        amount_vec.drain(0..16);
+        let mut amountu128 = Self::u8array_to_u128(amount_vec.as_slice());
+        amountu128 = ((amountu128 as f64)/<DespositExchangeRate<T>>::get() as f64) as u128;
 
+        let amountu64= amountu128 as u64;
         // Tx_Hash 97-128
         let hash:Vec<u8> = messagedrain.drain(0..32).collect();
         let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
@@ -534,13 +535,14 @@ impl<T: Trait> Module<T>
 
     /// use DepositngAccountTotal to control  DespoitingAccount
     pub fn depositing_access_control(who:T::AccountId){
-        let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
+        //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
+        let mut deposit_total = 0;
         let all_data_vec = <DespositingBalance<T>>::get(who.clone());
         all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
            // println!("bal {:?} ctype {:?}",bal.clone(),ctype.clone());
             if bal != T::Balance::sa(0u64) {
-                deposit_total = deposit_total + 1;
+                deposit_total = deposit_total+1;
             }
         });
         <DepositngAccountTotal<T>>::insert(who.clone(),deposit_total);
@@ -577,6 +579,20 @@ impl<T: Trait> Module<T>
         }
         ret
     }
+
+
+    pub fn u8array_to_u128(arr: &[u8]) -> u128 {
+        let mut len = rstd::cmp::min(16, arr.len());
+        let mut ret = 0u128;
+        let mut i = 0u128;
+        while len > 0 {
+            ret += (arr[len-1] as u128) << (i * 8);
+            len -= 1;
+            i += 1;
+        }
+        ret
+    }
+
 
     // Input coin type , Output the corresponding amount of ladder balance
     pub fn deposit_exchange(coin_type:u64) -> u64 {
