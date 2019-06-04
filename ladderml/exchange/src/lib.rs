@@ -46,8 +46,8 @@ decl_storage! {
         /// Record the number of signatures per transaction got
         NumberOfSignedContract get(num_of_signed): map (u64,u64) => u64;
 
-        // Latest Time Record of other assets' exchangerate type=>(time,rate)
-        LatestTime get(latest_time): map u64 => (u64,u64);
+        // Latest Time Record of other assets' shared latest timestamp!
+        LatestTime get(latest_time):  u64 ;
         LatestExchangeRate get(latest_exrate): map u64 => u64;
         /// 需要这些数量的签名，才发送这个交易通过的事件
         /// These amount of signatures are needed to send the event that the transaction verified.
@@ -66,7 +66,8 @@ decl_storage! {
         /// Transaction records that have been sent prevent duplication of events
         AlreadySentTx get(already_sent) : map (u64,u64) => u64;
 
-       // Nonce: u64;
+        /// History Exchange Data. All Coin share the same time stamp.  timestamp => [(type,rate),(type,rate),....]
+        HistoricalData get(historial_data) : map u64 => Vec<(u64,u64)>;
     }
 }
 
@@ -91,12 +92,13 @@ decl_module! {
         /// 签名并判断如果当前签名数量足够就发送一个事件
         pub  fn check_exchange(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
 
-        let sender = ensure_signed(origin)?;
-        let (exchangerate, time, extype) = Self::parse_tx_data(message);
+            runtime_io::print("汇率！！！！！！！！！！！！！！！！！！！");
+            let sender = ensure_signed(origin)?;
+            let (exchangerate, time, extype) = Self::parse_tx_data(message);
 
-        match Self::check_signature(sender,exchangerate,time,extype) {
-            Ok(()) => return Ok(()),
-            Err(x) => return Err(x),
+            match Self::check_signature(sender,exchangerate,time,extype) {
+                Ok(()) => return Ok(()),
+                Err(x) => return Err(x),
             }
         }
     }
@@ -225,6 +227,7 @@ impl<T: Trait> Module<T> {
         rate_vec.reverse();
         let mut rate_u64 = Self::u8array_to_u64(rate_vec.as_slice());
 
+
         // time of the exchangerate
         let mut time_vec: Vec<_> = messagedrain.drain(0..8).collect();
         time_vec.reverse();
@@ -250,15 +253,16 @@ impl<T: Trait> Module<T> {
         ret
     }
 
-    fn save_lastexchange_data(time:u64, rate:u64, exchangetype:u64) {
-        <LatestTime<T>>::insert(exchangetype,(time,rate));
+    fn save_lastexchange_data(timestamp:u64, rate:u64, exchangetype:u64) {
+        <LatestTime<T>>::put(timestamp);
         <LatestExchangeRate<T>>::insert(exchangetype,rate);
+
+        //Save history record
+        let mut vec = Self::historial_data(&timestamp);
+        vec.push((exchangetype,rate));
+        <HistoricalData<T>>::insert(timestamp,vec);
     }
 
-    // get_the_latest_exchangerate returns rate and time
-    fn get_latest_exchangerate(exchangetype: u64) -> (u64,u64) {
-       <LatestTime<T>>::get(exchangetype)
-    }
 
 }
 

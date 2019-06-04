@@ -14,6 +14,7 @@ use std::sync::{mpsc::{channel, Sender}, Arc, Mutex};
 use transaction_pool::txpool::{self, ExtrinsicFor, Pool as TransactionPool};
 use web3::{api::Namespace, types:: H256};
 use std::str::FromStr;
+use chrono::prelude::*;
 
 #[derive(RustcDecodable, RustcEncodable)]
 pub struct exchange_rate {
@@ -100,15 +101,18 @@ impl<A, B, Q, V> Exchange<A, B, Q, V>
     pub fn start(self) {
         std::thread::spawn(move || {
             loop {
-                self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:BTCUSD?unit=cny",1);
-                self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny",2);
-                // query the exchange rate every 5 seconds
-                thread::sleep(Duration::from_secs(45));
+                let mut timestamp = Utc::now().timestamp() as u64;
+                if timestamp%120 == 0 {
+                    // 在这里获取2个汇率，进行一波操作保存 整数aa 的timestamp 然后发出event
+                    self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny", 1,timestamp);
+                    self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:XRPUSD?unit=cny", 2,timestamp);
+                }
+                thread::sleep(Duration::from_secs(1));
             }
         });
     }
 
-    fn get_exchange_rate(&self, url:&str, extype: u64){
+    fn get_exchange_rate(&self, url:&str, extype: u64,timestamp: u64){
         let mut easy = Easy2::new(Collector(Vec::new()));
         easy.get(true).unwrap();
         easy.url(url).unwrap();
@@ -123,12 +127,12 @@ impl<A, B, Q, V> Exchange<A, B, Q, V>
                 let contents_string = String::from_utf8_lossy(&contents.0).to_string();
                 //println!("exchange_rate <---> {}",contents_string);
                 println!("获取汇率success");
-                let (exchange_rate, time) = parse_exchange_rate(contents_string);
+                let (exchange_rate, _time) = parse_exchange_rate(contents_string);
                 // 以交易形把数据上传到链上
                 let hash = H256::from_str("0000000000000000000000000000000000000000000000000000000000000001", ).unwrap();
                 let message = events::ExchangeRateEvent {
                     pair: extype,
-                    time: time,
+                    time: timestamp,
                     rate: (exchange_rate * 100000.0f64) as u64,
                     tx_hash: hash,
                 };

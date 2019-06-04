@@ -5051,6 +5051,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "vendor"
 version = "0.1.0"
 dependencies = [
+ "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "contracts 0.1.0",
  "curl 0.4.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
