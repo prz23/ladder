@@ -154,7 +154,7 @@ where
                     to_price = 1;
                     from_price = 1;
                 }
-                let to_value = ( ingress.value * to_price ) / from_price;
+                let to_value = ( ingress.value * from_price ) / to_price;
                 ingress.value = to_value;
                 message.raw = ingress.to_bytes();
             }
