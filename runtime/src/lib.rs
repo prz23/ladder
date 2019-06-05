@@ -264,7 +264,7 @@ construct_runtime!(
 		Sudo: sudo,
 		//
 		Matrix: matrix::{Module, Call, Storage, Event<T>},
-		Signcheck: signcheck::{Module, Call, Storage, Event<T>},
+		Signcheck: signcheck::{Module, Call, Storage, Config<T>, Event<T>},
 		Bank: bank::{Module,Call,Storage,Config<T>,Event<T>},
 		Exchange: exchange::{Module,Call,Storage,Event<T>},
 		Brand: brand::{Module, Call, Storage, Config<T>, Event<T>},
