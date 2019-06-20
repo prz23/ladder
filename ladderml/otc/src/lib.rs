@@ -22,7 +22,6 @@ use parity_codec::{Decode, Encode};
 use rstd::ops::Div;
 
 use runtime_io::*;
-//use bank::*;
 
 pub trait Trait: system::Trait + bank::Trait{
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -79,9 +78,7 @@ decl_event!(
         <T as system::Trait>::AccountId,
         <T as system::Trait>::Hash
     {
-
         SetMinRequreSignatures(AccountId,Hash),
-
     }
 );
 
@@ -91,14 +88,13 @@ decl_storage! {
         /// 全部挂出来的卖单信息
         pub OrdersOf get(order_of):map (T::AccountId, OrderPair, u64) => Option<OrderT<T>>;
 
-               /// 链上已经存在的允许的 配对 表
+        /// 链上已经存在的允许的 配对 表
         pub OrderPairList get(pair_list):  Vec<OrderPair>;
 
         /// 某个用户的某种配对的index     在挂出卖单时，分配一个
         pub LastOrderIndexOf get(last_order_index_of): map(T::AccountId,OrderPair)=>Option<u64>;
      }
 }
-
 
 decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
@@ -211,7 +207,6 @@ impl<T: Trait> Module<T> {
     }
 
     fn check_valid_buy(who:T::AccountId,amount:u64,sell_order:OrderT<T>) -> Result {
-
         // 每个btc卖出定价不能为零
         Self::is_price_zero(amount)?;
 
@@ -220,7 +215,6 @@ impl<T: Trait> Module<T> {
         if amount > left_share {
             return Err("cant buy too much!");
         }
-
         //去查看下bank里有没有钱
         let deposit_data = <bank::Module<T>>::despositing_banance(&who);
         if  deposit_data == [].to_vec() { return Err("no data"); }
@@ -406,5 +400,46 @@ mod tests {
         });
     }
 
+    #[test]
+    fn lock_test() {
+        with_externalities(&mut new_test_ext(), || {
+            // 先安排一个 1 ，2  的交易对
+            let pair:OrderPair = OrderPair{ share:1 ,money:2};
+            assert_err!(OTC::is_valid_pair(&pair) , "an invalid orderpair");
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+            assert_ok!(OTC::is_valid_pair(&pair));
+            // 挂2个失败的单子 价格 数量都不能为零
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ) ,"price cann't be 0");
+
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ) ,"no data");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ) ,"no data");
+            // 挂上了
+            // assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
+            //有一个挂那里了
+            //let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
+
+            // 往账户里预先存点
+            Bank::depositing_withdraw_record(1,50,1,true);
+            Bank::depositing_withdraw_record(1,50,2,true);
+            Bank::depositing_withdraw_record(1,50,3,true);
+            assert_eq!(Bank::despositing_account(),vec![1]);
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
+            // 再挂单，挂上了
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
+            let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
+
+            // 再安排个铁子，让他买一下
+            Bank::depositing_withdraw_record(2,50,1,true);
+            Bank::depositing_withdraw_record(2,50,2,true);
+            assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
+
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
+            let aa = OTC::order_of( (1, pair.clone(), 2) ).unwrap();
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 30, 10 ));
+            // 挂单过多，本身只有50块钱，挂出去50，再挂10 就会报错，钱不够
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ),"not_enough_money_error ");
+        });
+    }
 
 }
