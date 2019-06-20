@@ -118,9 +118,9 @@ decl_module! {
             // 判断该这个人在bank上面是否由对应的数量的btc余额,
             Self::check_valid_order(sender.clone(),pair_type.clone(),amount,per_price)?;
 
-            //TODO::锁定bank里面对应的挂出来的pair.share的数量的资产
+            //TODO::锁定bank里面对应的挂出来的pair.share的数量的资产（OK了）
 
-            //生成新卖单，并加入挂单的列表
+            //生成新卖单，并加入挂单的列表 ，同时锁定对应资产
             Self::generate_new_sell_order_and_put_into_list(sender.clone(),pair_type.clone(),amount,per_price);
 
             //TODO::deposit_event
@@ -248,16 +248,16 @@ impl<T: Trait> Module<T> {
             amount: amount,      // pair.share的挂单数量
             price: per_price,    // pair.money的单价
             already_deal:0,      // 已经交易掉的数量
-            status: Status::New,           //TODO 交易当前状态  0 xin 1 half 2 done
+            status: Status::New, //交易当前状态
         };
         <OrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
+        // 锁定挂出的单子的币的数量
+        <bank::Module<T>>::lock(who.clone(),pair_type.share,amount);
         //Self::save_new_order_by_pair(pair_type,new_sell_order.clone());
     }
 
     // buy 的操作 修改各个挂单存储结构，修改bank对应数据，锁定相关资产。
     fn buy_operate(buyer:T::AccountId,mut sell_order: OrderT<T>, amount:u64) -> Result {
-        //todo 锁定 buyer 的 对应pair 的 amount 的资金
-
         // 修改已经交易额
         sell_order.already_deal = sell_order.already_deal+amount;
         // 修改挂单状态
@@ -270,10 +270,9 @@ impl<T: Trait> Module<T> {
         // 把修改挂单数据保存
         <OrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
                               sell_order.clone());
+        //TODO::bank 修改双方pair.money的值
         Ok(())
     }
-
-
 }
 
 
@@ -398,7 +397,12 @@ mod tests {
             // 再挂单，挂上了
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
             let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
-            
+
+            // 再安排个铁子，让他买一下
+            Bank::depositing_withdraw_record(2,50,1,true);
+            Bank::depositing_withdraw_record(2,50,2,true);
+            assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
+            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5));
         });
     }
 

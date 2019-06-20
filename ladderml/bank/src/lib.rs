@@ -183,6 +183,8 @@ decl_storage! {
         /// accountid => (balance , type)
         DespositingBalance get(despositing_banance): map T::AccountId => Vec<(T::Balance,u64)>;
         DespositingTime get(despositing_time): map T::AccountId => u32;
+        // 锁定的bank金额
+        DespositingBalanceReserved get(despositing_banance_reserved): map T::AccountId => Vec<(T::Balance,u64)>;
 
         /// All the accounts with a desire to deposit.  to control one time one deposit.
         IntentionsDespositVec  get(intentions_desposit_vec) :  Vec<T::AccountId>;
@@ -625,6 +627,74 @@ impl<T: Trait> Module<T>
         <T as balances::Trait>::Balance::sa(5);
         x1.checked_add(&x2);
     }
+
+    pub fn init_lock(who :T::AccountId){
+        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+        for i in 0u64..5u64{
+            depositing_vec_lock.push((T::Balance::sa(0),i));
+        }
+        <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
+    }
+
+    pub fn uninit_lock(who :T::AccountId){
+        <DespositingBalanceReserved<T>>::remove(who.clone());
+    }
+
+    // 锁定 coin
+    pub fn lock(who:T::AccountId, coin: u64 , amount: u64){
+        // 判断这个人是否有过表，没的话创建个新的
+        Self::check_lock_exist(who.clone());
+        // 然后 获取这个表
+        let mut new_lock_bal = T::Balance::sa(0);
+        let mut mark = 0usize;
+        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+        depositing_vec_lock.iter().enumerate().for_each( |(i,&(bal,cointype))| {
+            if cointype == coin {
+                new_lock_bal = bal + T::Balance::sa(amount);
+                mark = i;
+            }
+        });
+        depositing_vec_lock[mark]= (new_lock_bal,coin);
+        <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
+        // 此时，已经证明了，非lock必须存在，所以直接用
+        let mut depositing_vec = <DespositingBalance<T>>::get(who.clone());
+        mark = 0usize;
+        let mut new_balance = T::Balance::sa(0);
+        depositing_vec.iter().enumerate().for_each( |(i,&(bal,cointype))| {
+            if  coin == cointype{
+                    new_balance = bal - T::Balance::sa(amount);
+                    mark = i;
+                }
+        });
+        // change the depositing data vector and put it back to map
+        depositing_vec[mark] = (new_balance,coin);
+        //depositing_vec.insert(mark,(new_balance,coin_type));
+        <DespositingBalance<T>>::insert(who.clone(),depositing_vec);
+    }
+
+    // 锁定 coin
+    pub fn unlock(){
+        //
+    }
+
+    // 判断是否要 删除 结构体
+    pub fn check_lock_exist(who:T::AccountId) {
+        let mut is_none = false;
+        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+        if depositing_vec_lock == [].to_vec(){
+            //此时表示这个没表,顺手创建个空表
+            Self::init_lock(who.clone());
+        }
+        /*
+        depositing_vec_lock.iter().enumerate().for_each( |(i,&(bal,cointype))| {
+            if bal != T::Balance::sa(0u64) {
+                is_none = true;
+            }
+        });
+        is_none
+        */
+    }
+
 }
 
 
