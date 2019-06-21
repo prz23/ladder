@@ -79,6 +79,9 @@ decl_event!(
         <T as system::Trait>::Hash
     {
         SetMinRequreSignatures(AccountId,Hash),
+        SellOrder(AccountId,OrderPair,u64,Symbol,Symbol), // seller pair index amount price
+        Buy(AccountId,OrderPair,u64,Symbol), //seller pair index amount
+        CancelsellOrder(AccountId,OrderPair,u64),
     }
 );
 
@@ -141,11 +144,16 @@ decl_module! {
         }
 
 
-        pub fn withdraw_order(origin,pair_type:OrderPair,index:u64) -> Result {
+        pub fn cancel_order(origin,pair_type:OrderPair,index:u64) -> Result {
             let sender = ensure_signed(origin)?;
 
             // 先把这个单子找到，看看是否是已经完成的单子
-           // Self::
+            if let Some(mut sellorder) = Self::order_of((sender.clone(),pair_type,index)){
+                //找到之后对其进行一波安排
+                Self::cancel_order_operate(sender.clone(),sellorder)?;
+            }else{
+                return Err("invalid sell order");
+            }
             Ok(())
         }
 
@@ -246,7 +254,10 @@ impl<T: Trait> Module<T> {
         <OrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
         // 锁定挂出的单子的币的数量
         <bank::Module<T>>::lock(who.clone(),pair_type.share,amount);
-        //Self::save_new_order_by_pair(pair_type,new_sell_order.clone());
+
+        //SellOrder(AccountId,OrderPair,u64,Symbol,Symbol), // seller pair index amount price
+        Self::deposit_event(RawEvent::SellOrder(who.clone(),pair_type.clone(),
+                                                new_last_index,amount,per_price,));
     }
 
     // buy 的操作 修改各个挂单存储结构，修改bank对应数据，锁定相关资产。
@@ -267,6 +278,27 @@ impl<T: Trait> Module<T> {
         <bank::Module<T>>::buy_operate(buyer.clone(),sell_order.who.clone(),sell_order.pair.share.clone(),
                                        sell_order.pair.money.clone(),sell_order.price.clone(),
                                        amount);
+        //Buy(AccountId,OrderPair,u64,Symbol), //seller pair index amount
+        Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.pair.clone(),
+                                          sell_order.index, amount, ));
+        Ok(())
+    }
+
+    //取消挂单
+    pub fn cancel_order_operate(who:T::AccountId,mut sell_order:OrderT<T>) -> Result{
+        //查看这个单子的状态，如果是已经完成了，就直接返回成功
+        if sell_order.status == Status::Done { return Ok(()) ;}
+        //对其他状况进行操作
+        // 算出来还剩下多少没被买掉
+        let left_shares = sell_order.amount - sell_order.already_deal;
+        // 解锁
+        <bank::Module<T>>::unlock(who.clone(),sell_order.pair.share,left_shares);
+        //顺手修改一波sell单子，
+        sell_order.status = Status::Done;
+        <OrdersOf<T>>::insert((who.clone(), sell_order.pair.clone(), sell_order.index), sell_order.clone());
+
+        //CancelsellOrder(AccountId,OrderPair,u64),
+        Self::deposit_event(RawEvent::CancelsellOrder(who.clone(), sell_order.pair.clone(), sell_order.index, ));
         Ok(())
     }
 }
@@ -452,6 +484,12 @@ mod tests {
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 30, 10 ));
             // 挂单过多，本身只有50块钱，挂出去50，再挂10 就会报错，钱不够
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ),"not_enough_money_error ");
+        });
+    }
+    #[test]
+    fn cancel_order_test() {
+        with_externalities(&mut new_test_ext(), || {
+
         });
     }
 }
