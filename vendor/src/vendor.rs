@@ -1,10 +1,10 @@
-use super::error::{self, ResultExt};
-use super::SuperviseClient;
+use crate::error::{self, ResultExt};
 use crate::events;
-use crate::log_stream::{LogStream, LogStreamOptions};
+use crate::label::ChainAlias;
 use crate::message::RelayMessage;
 use crate::state::State;
-use crate::label::ChainAlias;
+use crate::streams::log_stream::{LogStream, LogStreamOptions};
+use crate::supervisor::SuperviseClient;
 use contracts;
 use futures::{Async, Poll, Stream};
 use std::sync::Arc;
@@ -159,7 +159,8 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                 .chain_err(|| "Vendor: Get poll log Failed.",));
             if let Some(ret) = ret {
                 for log in &ret.logs {
-                    let message = events::IngressEvent::from_log(log, self.ingress_stream.chain_alias())?;
+                    let message =
+                        events::IngressEvent::from_log(log, self.ingress_stream.chain_alias())?;
                     self.client.submit(RelayMessage::from(message));
                 }
                 self.state.ingress = ret.to;
@@ -172,7 +173,8 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                 .chain_err(|| "Vendor: Get poll log Failed.",));
             if let Some(ret) = ret {
                 for log in &ret.logs {
-                    let message = events::EgressEvent::from_log(log, self.egress_stream.chain_alias())?;
+                    let message =
+                        events::EgressEvent::from_log(log, self.egress_stream.chain_alias())?;
                     self.client.submit(RelayMessage::from(message));
                 }
                 self.state.egress = ret.to;
@@ -185,7 +187,8 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                 .chain_err(|| "Vendor: Get poll log Failed.",));
             if let Some(ret) = ret {
                 for log in &ret.logs {
-                    let message = events::DepositEvent::from_log(log, self.deposit_stream.chain_alias())?;
+                    let message =
+                        events::DepositEvent::from_log(log, self.deposit_stream.chain_alias())?;
                     self.client.submit(RelayMessage::from(message));
                 }
                 self.state.deposit = ret.to;
@@ -198,7 +201,8 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                 .chain_err(|| "Vendor: Get poll log Failed.",));
             if let Some(ret) = ret {
                 for log in &ret.logs {
-                    let message = events::WithdrawEvent::from_log(log, self.withdraw_stream.chain_alias())?;
+                    let message =
+                        events::WithdrawEvent::from_log(log, self.withdraw_stream.chain_alias())?;
                     self.client.submit(RelayMessage::from(message));
                 }
                 self.state.withdraw = ret.to;
@@ -230,11 +234,11 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock_transport;
     use crate::test::MockClient;
     use contracts;
     use serde_json::json;
     use tokio_core::reactor::Core;
-    use crate::mock_transport;
 
     #[test]
     fn test_vendor_stream() {

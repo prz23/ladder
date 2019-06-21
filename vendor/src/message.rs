@@ -9,6 +9,8 @@ pub enum RelayType {
     Withdraw,
     SetAuthorities,
     ExchangeRate,
+    LockToken,
+    UnlockToken,
 }
 
 #[derive(Debug, Clone)]
@@ -80,3 +82,34 @@ impl From<ExchangeRateEvent> for RelayMessage {
         }
     }
 }
+
+impl From<LockTokenEvent> for RelayMessage {
+    fn from(event: LockTokenEvent) -> Self {
+        RelayMessage {
+            hash: event.tx_hash,
+            raw: event.to_bytes(),
+            ty: RelayType::LockToken,
+        }
+    }
+}
+
+impl From<UnlockTokenEvent> for RelayMessage {
+    fn from(event: UnlockTokenEvent) -> Self {
+        RelayMessage {
+            hash: event.tx_hash,
+            raw: event.to_bytes(),
+            ty: RelayType::UnlockToken,
+        }
+    }
+}
+
+// TODO add macro to simplified code
+/*
+ #[derive(Expand)]
+ pub enum Relay {
+     #[event(IngressEvent)]
+     Ingress,
+ }
+
+ ref structopt
+*/

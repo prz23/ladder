@@ -12,6 +12,8 @@ pub struct State {
     pub deposit: u64,
     pub withdraw: u64,
     pub authority: u64,
+    pub lock_token: u64,
+    pub unlock_token: u64,
 }
 
 pub struct StateStorage {
@@ -75,6 +77,8 @@ mod tests {
             deposit: 10,
             withdraw: 10,
             authority: 10,
+            lock_token: 10,
+            unlock_token: 10,
         };
         ss.save(&state).unwrap();
         drop(tmp_file);

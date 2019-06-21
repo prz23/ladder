@@ -1,5 +1,6 @@
 use crate::error;
 use crate::error::ResultExt;
+use crate::label::ChainAlias;
 use futures::future::FromErr;
 use futures::{try_ready, Async, Future, Poll, Stream};
 use log::debug;
@@ -10,7 +11,6 @@ use web3::api::Namespace;
 use web3::helpers::CallFuture;
 use web3::types::U256;
 use web3::Transport;
-use crate::label::ChainAlias;
 
 /// Block Number Stream state.
 enum State<T: Transport> {
@@ -115,9 +115,9 @@ impl<T: Transport> Stream for BlockNumberStream<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock_transport;
     use serde_json::json;
     use tokio_core::reactor::Core;
-    use crate::mock_transport;
 
     #[test]
     fn test_block_number_stream() {

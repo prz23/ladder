@@ -1,7 +1,8 @@
-use crate::block_number_stream::{BlockNumberStream, BlockNumberStreamOptions};
 use crate::error::{self, ResultExt};
+use crate::streams::block_number_stream::{BlockNumberStream, BlockNumberStreamOptions};
 //use crate::error::ResultExt;
 //use crate::error;
+use crate::label::ChainAlias;
 use ethabi;
 use futures::future::FromErr;
 use futures::{try_ready, Async, Future, Poll, Stream};
@@ -13,7 +14,6 @@ use web3::api::Namespace;
 use web3::helpers::CallFuture;
 use web3::types::{Address, Filter, FilterBuilder, Log, H256};
 use web3::Transport;
-use crate::label::ChainAlias;
 
 pub fn abos_logs<T: Transport>(transport: &T, filter: Filter) -> CallFuture<Vec<Log>, T::Out> {
     let filter = web3::helpers::serialize(&filter);
@@ -189,13 +189,13 @@ impl<T: Transport> Stream for LogStream<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock_transport;
     use contracts;
     use rustc_hex::FromHex;
     use serde_json::json;
     use tokio_core::reactor::Core;
     use web3::types::{Bytes, Log};
-    use crate::mock_transport;
-    
+
     #[test]
     fn test_log_stream_twice_no_logs() {
         let deposit_topic = contracts::bridge::events::ingress::filter().topic0;

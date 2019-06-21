@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Parity-Bridge.  If not, see <http://www.gnu.org/licenses/>.
 use crate::message::RelayMessage;
-use crate::SuperviseClient;
+use crate::supervisor::SuperviseClient;
 use futures;
 /// helpers for testing:
 ///
@@ -129,8 +129,7 @@ macro_rules! mock_transport {
 }
 
 #[derive(Default)]
-pub struct MockClient {
-}
+pub struct MockClient {}
 
 impl SuperviseClient for MockClient {
     fn submit(&self, tx: RelayMessage) {
