@@ -40,7 +40,6 @@ consensus_authorities = { package = "substrate-consensus-authorities", git = "ht
 runtime-io = { package = "sr-io", git = "https://github.com/paritytech/substrate", default-features = false }
 brand = { path = "../ladderml/brand", default_features = false}
 
-
 [dependencies.signcheck]
 default_features = false
 path = '../ladderml/signcheck'
@@ -55,6 +54,11 @@ package = 'ladder-bank'
 default_features = false
 path = '../ladderml/exchange'
 package = 'ladder-exchange'
+
+[dependencies.otc]
+default_features = false
+path = '../ladderml/otc'
+package = 'ladder-otc'
 
 
 [features]
@@ -99,4 +103,5 @@ std = [
     "exchange/std",
     "runtime-io/std",
     "brand/std",
+    "otc/std",
 ]
