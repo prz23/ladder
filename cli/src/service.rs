@@ -95,6 +95,8 @@ construct_service_factory! {
                                 executor.spawn(start_vendor(
                                     VendorServiceConfig { kovan_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
                                                         abos_url: "http://47.99.236.226:1338".to_string(),
+                                                        eth_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+                                                        mapper_address: "cCD3e73667d3e0f93574160eecf2ACe4D31B061A".to_string(),
                                                         kovan_address: "cCD3e73667d3e0f93574160eecf2ACe4D31B061A".to_string(),
                                                         abos_address: "34870eD198f2A3BAc2A0Fa44C12d2DDd97799363".to_string(),
                                                         db_path: db_path,

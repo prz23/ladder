@@ -1,20 +1,25 @@
-use std::thread;
-use std::time::Duration;
 use crate::events;
-use crate::{SuperviseClient,PacketNonce};
 use crate::message::RelayMessage;
+use crate::supervisor::{PacketNonce, SuperviseClient};
+use chrono::prelude::*;
 use client::{blockchain::HeaderBackend, BlockchainEvents};
-use node_runtime::VendorApi;
-use primitives::{ed25519::Public};
-use runtime_primitives::{generic::{BlockId}, traits::{Block, BlockNumberToHash, ProvideRuntimeApi}};
 use curl::easy::{Easy2, Handler, WriteError};
+use node_runtime::VendorApi;
+use primitives::ed25519::Public;
+use runtime_primitives::{
+    generic::BlockId,
+    traits::{Block, BlockNumberToHash, ProvideRuntimeApi},
+};
 use rustc_serialize::json;
 use std::marker::{Send, Sync};
-use std::sync::{mpsc::{channel, Sender}, Arc, Mutex};
-use transaction_pool::txpool::{self, ExtrinsicFor, Pool as TransactionPool};
-use web3::{api::Namespace, types:: H256};
 use std::str::FromStr;
-use chrono::prelude::*;
+use std::sync::{
+    Arc, Mutex,
+};
+use std::thread;
+use std::time::Duration;
+use transaction_pool::txpool::{self, Pool as TransactionPool};
+use web3::{types::H256};
 
 #[derive(RustcDecodable, RustcEncodable)]
 pub struct exchange_rate {
@@ -51,19 +56,22 @@ pub trait ExchangeTrait {
 }
 
 impl<A, B, Q, V> ExchangeTrait for Exchange<A, B, Q, V>
-    where
-        A: txpool::ChainApi<Block = B> + 'static,
-        B: Block,
-        Q: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi + 'static,
-        Q::Api: VendorApi<B>,
-        V: SuperviseClient + Send + Sync + 'static,
+where
+    A: txpool::ChainApi<Block = B> + 'static,
+    B: Block,
+    Q: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi + 'static,
+    Q::Api: VendorApi<B>,
+    V: SuperviseClient + Send + Sync + 'static,
 {
     fn check_validators(&self) -> bool {
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
         let accountid = &self.accountid;
         //println!("验证者！！！accountid is {:?}",accountid);
-        self.client.runtime_api().is_authority(&at, accountid).unwrap()
+        self.client
+            .runtime_api()
+            .is_authority(&at, accountid)
+            .unwrap()
     }
 }
 
@@ -76,10 +84,10 @@ impl Handler for Collector {
 }
 
 pub struct Exchange<A, B, C, V>
-    where
-        A: txpool::ChainApi,
-        B: Block,
-        V: SuperviseClient + Send + Sync + 'static,
+where
+    A: txpool::ChainApi,
+    B: Block,
+    V: SuperviseClient + Send + Sync + 'static,
 {
     pub client: Arc<C>,
     pub pool: Arc<TransactionPool<A>>,
@@ -91,28 +99,36 @@ pub struct Exchange<A, B, C, V>
 
 /// oracle 获取ETHUSD等等的汇率
 impl<A, B, Q, V> Exchange<A, B, Q, V>
-    where
-        A: txpool::ChainApi<Block = B> + 'static,
-        B: Block,
-        Q: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi + 'static,
-        Q::Api: VendorApi<B>,
-        V: SuperviseClient + Send + Sync + 'static,
+where
+    A: txpool::ChainApi<Block = B> + 'static,
+    B: Block,
+    Q: BlockchainEvents<B> + HeaderBackend<B> + BlockNumberToHash + ProvideRuntimeApi + 'static,
+    Q::Api: VendorApi<B>,
+    V: SuperviseClient + Send + Sync + 'static,
 {
     pub fn start(self) {
         std::thread::spawn(move || {
             loop {
                 let mut timestamp = Utc::now().timestamp() as u64;
-                if timestamp%120 == 0 {
+                if timestamp % 120 == 0 {
                     // 在这里获取2个汇率，进行一波操作保存 整数aa 的timestamp 然后发出event
-                    self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny", 1,timestamp);
-                    self.get_exchange_rate("http://api.coindog.com/api/v1/tick/BITFINEX:XRPUSD?unit=cny", 2,timestamp);
+                    self.get_exchange_rate(
+                        "http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny",
+                        1,
+                        timestamp,
+                    );
+                    self.get_exchange_rate(
+                        "http://api.coindog.com/api/v1/tick/BITFINEX:XRPUSD?unit=cny",
+                        2,
+                        timestamp,
+                    );
                 }
                 thread::sleep(Duration::from_secs(1));
             }
         });
     }
 
-    fn get_exchange_rate(&self, url:&str, extype: u64,timestamp: u64){
+    fn get_exchange_rate(&self, url: &str, extype: u64, timestamp: u64) {
         let mut easy = Easy2::new(Collector(Vec::new()));
         easy.get(true).unwrap();
         easy.url(url).unwrap();
@@ -120,7 +136,9 @@ impl<A, B, Q, V> Exchange<A, B, Q, V>
         // 只有validator才有权限去进行oracle获取并上传汇率
         if self.check_validators() {
             // perform the http get method and fetch the responsed
-            if easy.perform().is_err() { println!("err"); }
+            if easy.perform().is_err() {
+                println!("err");
+            }
 
             if easy.response_code().unwrap() == 200 {
                 let contents = easy.get_ref();
@@ -129,7 +147,10 @@ impl<A, B, Q, V> Exchange<A, B, Q, V>
                 println!("获取汇率success");
                 let (exchange_rate, _time) = parse_exchange_rate(contents_string);
                 // 以交易形把数据上传到链上
-                let hash = H256::from_str("0000000000000000000000000000000000000000000000000000000000000001", ).unwrap();
+                let hash = H256::from_str(
+                    "0000000000000000000000000000000000000000000000000000000000000001",
+                )
+                .unwrap();
                 let message = events::ExchangeRateEvent {
                     pair: extype,
                     time: timestamp,

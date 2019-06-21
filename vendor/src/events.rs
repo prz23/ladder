@@ -1,6 +1,6 @@
 use crate::error::Error;
-use crate::utils::IntoRawLog;
 use crate::label::ChainAlias;
+use crate::utils::IntoRawLog;
 use contracts;
 use error_chain::bail;
 use std::str::FromStr;
@@ -12,6 +12,8 @@ pub const MESSAGE_LENGTH: usize = 116;
 pub const BANKER_LENGTH: usize = 128;
 pub const AUTHORITY_MINIMUM_LENGTH: usize = 72;
 pub const ORACLE_LENTH: usize = 116; // 8 8
+pub const LOCKTOKEN_LENGTH: usize = 160;
+pub const UNLOCKTOKEN_LENGTH: usize = 64;
 
 impl ChainAlias {
     // TODO refactor
@@ -374,6 +376,92 @@ pub fn u64_to_array(data: u64) -> [u8; 8] {
 pub fn array_to_u64(arr: [u8; 8]) -> u64 {
     let u = unsafe { std::mem::transmute::<[u8; 8], u64>(arr) };
     u
+}
+
+#[derive(Debug)]
+pub struct LockTokenEvent {
+    pub id: U256,
+    pub beneficiary: H256,
+    pub value: U256,
+    pub cycle: U256,
+    pub tx_hash: H256,
+}
+
+impl LockTokenEvent {
+    pub fn from_log(raw_log: &Log) -> Result<Self, Error> {
+        let hash = raw_log
+            .transaction_hash
+            .ok_or_else(|| "`log` must be mined and contain `transaction_hash`")?;
+        let mut log = contracts::mapper::events::lock_token::parse_log(raw_log.into_raw_log())?;
+        Ok(Self {
+            id: log.id,
+            beneficiary: log.beneficiary,
+            value: log.amount,
+            cycle: log.cycle,
+            tx_hash: hash,
+        })
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut result = vec![0u8; LOCKTOKEN_LENGTH];
+        self.id.to_big_endian(&mut result[0..32]);
+        result[32..64].copy_from_slice(&self.beneficiary.0[..]);
+        self.value.to_big_endian(&mut result[64..96]);
+        self.cycle.to_big_endian(&mut result[96..128]);
+        result[128..LOCKTOKEN_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
+        return result;
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        if bytes.len() != LOCKTOKEN_LENGTH {
+            bail!("`bytes`.len() must be {}", LOCKTOKEN_LENGTH);
+        }
+
+        Ok(Self {
+            id: U256::from_big_endian(&bytes[0..32]),
+            beneficiary: bytes[32..64].into(),
+            value: U256::from_big_endian(&bytes[64..96]),
+            cycle: U256::from_big_endian(&bytes[96..128]),
+            tx_hash: bytes[128..LOCKTOKEN_LENGTH].into(),
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct UnlockTokenEvent {
+    pub id: U256,
+    pub tx_hash: H256,
+}
+
+impl UnlockTokenEvent {
+    pub fn from_log(raw_log: &Log) -> Result<Self, Error> {
+        let hash = raw_log
+            .transaction_hash
+            .ok_or_else(|| "`log` must be mined and contain `transaction_hash`")?;
+        let mut log = contracts::mapper::events::unlock_token::parse_log(raw_log.into_raw_log())?;
+        Ok(Self {
+            id: log.id,
+            tx_hash: hash,
+        })
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut result = vec![0u8; UNLOCKTOKEN_LENGTH];
+        self.id.to_big_endian(&mut result[0..32]);
+        result[32..LOCKTOKEN_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
+        return result;
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        if bytes.len() != UNLOCKTOKEN_LENGTH {
+            bail!("`bytes`.len() must be {}", UNLOCKTOKEN_LENGTH);
+        }
+
+        Ok(Self {
+            id: U256::from_big_endian(&bytes[0..32]),
+            tx_hash: bytes[32..UNLOCKTOKEN_LENGTH].into(),
+        })
+    }
 }
 
 #[cfg(test)]
