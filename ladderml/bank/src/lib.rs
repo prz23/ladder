@@ -504,6 +504,29 @@ impl<T: Trait> Module<T>
         <DespositingBalance<T>>::remove(who.clone());
     }
 
+    /// Adjust lock_money
+    pub fn lock_unlock_record(who: T::AccountId, balance:T::Balance, coin_type:u64, d_w: bool){
+        // 判断这个人是否有过表，没的话创建个新的
+        Self::check_lock_exist(who.clone());
+        // 然后 获取这个表
+        let mut new_lock_bal = T::Balance::sa(0);
+        let mut mark = 0usize;
+        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+        depositing_vec_lock.iter().enumerate().for_each( |(i,&(bal,cointype))| {
+            if cointype == coin_type {
+                if d_w {
+                    new_lock_bal = bal + balance;
+                    mark = i;
+                }else{
+                    new_lock_bal = bal - balance;
+                    mark = i;
+                }
+            }
+        });
+        depositing_vec_lock[mark]= (new_lock_bal,coin_type);
+        <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
+    }
+
     /// Adjust deposing_list
     pub fn depositing_withdraw_record(who: T::AccountId, balance:T::Balance, coin_type:u64, d_w: bool){
         if Self::despositing_account().iter().find(|&t| t == &who).is_none() {
@@ -517,7 +540,6 @@ impl<T: Trait> Module<T>
                 if d_w {
                     //deposit
                     new_balance = oldbalance + balance;
-                   // println!("oldbalance {:?} balance {:?}",oldbalance,balance);
                     mark = i;
                 }else {
                     //withdraw
@@ -628,6 +650,15 @@ impl<T: Trait> Module<T>
         x1.checked_add(&x2);
     }
 
+    // 判断是否要 删除 结构体
+    pub fn check_lock_exist(who:T::AccountId) {
+        //let mut is_none = false;
+        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+        if depositing_vec_lock == [].to_vec(){
+            //此时表示这个没表,顺手创建个空表
+            Self::init_lock(who.clone());
+        }
+    }
     pub fn init_lock(who :T::AccountId){
         let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
         for i in 0u64..5u64{
@@ -635,64 +666,28 @@ impl<T: Trait> Module<T>
         }
         <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
     }
-
     pub fn uninit_lock(who :T::AccountId){
         <DespositingBalanceReserved<T>>::remove(who.clone());
     }
-
     // 锁定 coin
     pub fn lock(who:T::AccountId, coin: u64 , amount: u64){
-        // 判断这个人是否有过表，没的话创建个新的
-        Self::check_lock_exist(who.clone());
-        // 然后 获取这个表
-        let mut new_lock_bal = T::Balance::sa(0);
-        let mut mark = 0usize;
-        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
-        depositing_vec_lock.iter().enumerate().for_each( |(i,&(bal,cointype))| {
-            if cointype == coin {
-                new_lock_bal = bal + T::Balance::sa(amount);
-                mark = i;
-            }
-        });
-        depositing_vec_lock[mark]= (new_lock_bal,coin);
-        <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
-        // 此时，已经证明了，非lock必须存在，所以直接用
-        let mut depositing_vec = <DespositingBalance<T>>::get(who.clone());
-        mark = 0usize;
-        let mut new_balance = T::Balance::sa(0);
-        depositing_vec.iter().enumerate().for_each( |(i,&(bal,cointype))| {
-            if  coin == cointype{
-                    new_balance = bal - T::Balance::sa(amount);
-                    mark = i;
-                }
-        });
-        // change the depositing data vector and put it back to map
-        depositing_vec[mark] = (new_balance,coin);
-        //depositing_vec.insert(mark,(new_balance,coin_type));
-        <DespositingBalance<T>>::insert(who.clone(),depositing_vec);
+        Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,true);
+        Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,false);
     }
 
-    // 锁定 coin
-    pub fn unlock(){
-        //
+    // 解锁 coin   上面的反操作
+    pub fn unlock(who:T::AccountId, coin: u64 , amount: u64){
+        Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,false);
+        Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,true);
     }
 
-    // 判断是否要 删除 结构体
-    pub fn check_lock_exist(who:T::AccountId) {
-        let mut is_none = false;
-        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
-        if depositing_vec_lock == [].to_vec(){
-            //此时表示这个没表,顺手创建个空表
-            Self::init_lock(who.clone());
-        }
-        /*
-        depositing_vec_lock.iter().enumerate().for_each( |(i,&(bal,cointype))| {
-            if bal != T::Balance::sa(0u64) {
-                is_none = true;
-            }
-        });
-        is_none
-        */
+    // 买入操作之后对双方的金额进行修改  买卖人id   2种币种类  挂出价  买入量
+    pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64, type_money:u64 ,price:u64 ,amount:u64 ){
+        // 把卖家锁定金额扣除，同时把买家的钱转入，
+        Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,false);
+        Self::depositing_withdraw_record(seller.clone(),T::Balance::sa(amount*price),type_money,true);
+        // 同时扣除买家的钱
+        Self::depositing_withdraw_record(buyer.clone(),T::Balance::sa(amount*price),type_money,false);
     }
 
 }

@@ -132,7 +132,6 @@ decl_module! {
 
                 // 检测买入操作 与 挂单是否合法
                 Self::check_valid_buy(buyer.clone(),amount,sellorder.clone())?;
-
                 // 进行买入操作，修改状态
                 Self::buy_operate(buyer.clone(),sellorder.clone(),amount);
             }else{
@@ -220,7 +219,7 @@ impl<T: Trait> Module<T> {
         if  deposit_data == [].to_vec() { return Err("no data"); }
         let mut  not_enough_money_error = false;
         deposit_data.iter().enumerate().for_each(|(i,&(balance,coin))|{
-            if coin == sell_order.pair.share {
+            if coin == sell_order.pair.money {
                 if balance < T::Balance::sa(amount*sell_order.price) {
                     not_enough_money_error = true;
                 }
@@ -265,6 +264,9 @@ impl<T: Trait> Module<T> {
         <OrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
                               sell_order.clone());
         //TODO::bank 修改双方pair.money的值
+        <bank::Module<T>>::buy_operate(buyer.clone(),sell_order.who.clone(),sell_order.pair.share.clone(),
+                                       sell_order.pair.money.clone(),sell_order.price.clone(),
+                                       amount);
         Ok(())
     }
 }
@@ -391,12 +393,23 @@ mod tests {
             // 再挂单，挂上了
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
             let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
-
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (50, 2), (50, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
             // 再安排个铁子，让他买一下
             Bank::depositing_withdraw_record(2,50,1,true);
             Bank::depositing_withdraw_record(2,50,2,true);
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
-            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5));
+            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5)); // 买4个币，花了4x10=40块 剩下10块
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (100, 2), (50, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (5, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+            assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+            let bb = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(bb.already_deal,5);
+            // 继续买就会说没钱，
+            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,1),"not_enough_money_error ");
+            //assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,2));  //再买1个 ，剩下0元
+           // assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,7));
         });
     }
 
@@ -441,5 +454,4 @@ mod tests {
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ),"not_enough_money_error ");
         });
     }
-
 }
