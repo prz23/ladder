@@ -304,7 +304,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
     ];
     const MILLICENTS: u128 = 1_000;
     const CENTS: u128 = 1_000 * MILLICENTS; // assume this is worth about a cent.
-    const DOLLARS: u128 = 1000 * CENTS;
+    const DOLLARS: u128 = 1_000 * CENTS;
 
     const SECS_PER_BLOCK: u64 = 8;
     const MINUTES: u64 = 60 / SECS_PER_BLOCK;
@@ -321,16 +321,16 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 		}),
 		system: None,
 		balances: Some(BalancesConfig {
-			transaction_base_fee: 1 * CENTS,
-			transaction_byte_fee: 10 * MILLICENTS,
+			transaction_base_fee: 1 * MILLICENTS,
+			transaction_byte_fee: 100,
 			balances: endowed_accounts.iter().cloned()
 				.map(|k| (k, ENDOWMENT))
 				.chain(initial_authorities.iter().map(|x| (x.0.clone(), STASH)))
 				.chain(initial_authorities.iter().map(|x| (AccountId::unchecked_from(x.2.clone().0), STASH))) // FIX oracle no need fee
 				.collect(),
-			existential_deposit: 1 * DOLLARS,
-			transfer_fee: 1 * CENTS,
-			creation_fee: 1 * CENTS,
+			existential_deposit: 1 * CENTS,
+			transfer_fee: 1 * MILLICENTS,
+			creation_fee: 1 * MILLICENTS,
 			vesting: vec![],
 		}),
 		indices: Some(IndicesConfig {
@@ -347,10 +347,10 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 		staking: Some(StakingConfig {
 			current_era: 0,
 			offline_slash: Perbill::from_billionths(2),
-			session_reward: Perbill::from_billionths(11),
+			session_reward: Perbill::from_billionths(12),
 			current_session_reward: 0,
 			validator_count: 30,
-			sessions_per_era: 4,
+			sessions_per_era: 12,
 			bonding_duration: 12,
 			offline_slash_grace: 10,
 			minimum_validator_count: 4,
