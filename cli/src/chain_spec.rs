@@ -93,8 +93,9 @@ pub fn testnet_genesis(
         ]
     });
 
-    const STASH: u128 = 1 << 20;
-    const ENDOWMENT: u128 = 1 << 20;
+    const LAD: u128 = 1_000_000_000;
+    const STASH: u128 = 100_000_000 * LAD;
+    const ENDOWMENT: u128 = 100_000_000 * LAD;
 
     let mut contract_config = ContractConfig {
         signed_claim_handicap: 2,
@@ -138,17 +139,17 @@ pub fn testnet_genesis(
 		}),
 		session: Some(SessionConfig {
 			validators: initial_authorities.iter().map(|x| x.1.clone()).collect(),
-			session_length: 10,
+			session_length: 5,
 			keys: initial_authorities.iter().map(|x| (x.1.clone(), x.2.clone())).collect::<Vec<_>>(),
 		}),
 		staking: Some(StakingConfig {
 			current_era: 0,
 			minimum_validator_count: 1,
 			validator_count: 2,
-			sessions_per_era: 5,
+			sessions_per_era: 2,
 			bonding_duration: 12,
 			offline_slash: Perbill::zero(),
-			session_reward: Perbill::zero(),
+			session_reward: Perbill::from_billionths(10),
 			current_session_reward: 0,
 			offline_slash_grace: 0,
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
@@ -303,15 +304,15 @@ fn ladder_testnet_genesis() -> GenesisConfig {
     ];
     const MILLICENTS: u128 = 1_000;
     const CENTS: u128 = 1_000 * MILLICENTS; // assume this is worth about a cent.
-    const DOLLARS: u128 = 100 * CENTS;
+    const DOLLARS: u128 = 1000 * CENTS;
 
     const SECS_PER_BLOCK: u64 = 8;
     const MINUTES: u64 = 60 / SECS_PER_BLOCK;
     const HOURS: u64 = MINUTES * 60;
     const DAYS: u64 = HOURS * 24;
 
-    const ENDOWMENT: u128 = 10_000_000 * DOLLARS;
-    const STASH: u128 = 100 * DOLLARS;
+    const ENDOWMENT: u128 = 1_000_000_000 * DOLLARS;
+    const STASH: u128 = 100_000_000 * DOLLARS;
 
     GenesisConfig {
 		consensus: Some(ConsensusConfig {
@@ -345,13 +346,13 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 		}),
 		staking: Some(StakingConfig {
 			current_era: 0,
-			offline_slash: Perbill::from_billionths(1_000_000),
-			session_reward: Perbill::from_billionths(2_065),
+			offline_slash: Perbill::from_billionths(2),
+			session_reward: Perbill::from_billionths(11),
 			current_session_reward: 0,
-			validator_count: 7,
-			sessions_per_era: 12,
+			validator_count: 30,
+			sessions_per_era: 4,
 			bonding_duration: 12,
-			offline_slash_grace: 4,
+			offline_slash_grace: 10,
 			minimum_validator_count: 4,
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
