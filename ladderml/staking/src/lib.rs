@@ -1016,6 +1016,10 @@ impl<T: Trait> Module<T> {
 				}
 				<Stakers<T>>::insert(c.clone(), e.clone());
 			}
+			let min_slot = BalanceOf::<T>::sa(100000000000000000);
+			if slot_stake < min_slot {
+				slot_stake = min_slot;
+			}
 			<SlotStake<T>>::put(&slot_stake);
 
 			// Set the new validator set.
