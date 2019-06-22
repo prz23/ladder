@@ -1527,7 +1527,7 @@ dependencies = [
 
 [[package]]
 name = "ladder"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "ctrlc 3.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "error-chain 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2288,7 +2288,7 @@ dependencies = [
  "sr-primitives 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sr-std 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sr-version 2.0.0 (git+https://github.com/paritytech/substrate)",
- "srml-aura 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-aura 2.0.0",
  "srml-balances 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-consensus 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-contract 2.0.0 (git+https://github.com/paritytech/substrate)",
@@ -2299,7 +2299,7 @@ dependencies = [
  "srml-grandpa 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-indices 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-session 2.0.0 (git+https://github.com/paritytech/substrate)",
- "srml-staking 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-staking 2.0.0",
  "srml-sudo 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-support 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-system 2.0.0 (git+https://github.com/paritytech/substrate)",
@@ -3442,6 +3442,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "srml-aura"
+version = "2.0.0"
+dependencies = [
+ "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sr-primitives 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "sr-std 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-session 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-staking 2.0.0",
+ "srml-support 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-system 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-timestamp 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "substrate-inherents 2.0.0 (git+https://github.com/paritytech/substrate)",
+]
+
+[[package]]
 name = "srml-balances"
 version = "2.0.0"
 source = "git+https://github.com/paritytech/substrate#6e67eff0653677d3d01980ca822c4b8a227914a3"
@@ -3617,6 +3633,23 @@ dependencies = [
 name = "srml-staking"
 version = "2.0.0"
 source = "git+https://github.com/paritytech/substrate#6e67eff0653677d3d01980ca822c4b8a227914a3"
+dependencies = [
+ "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sr-io 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "sr-primitives 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "sr-std 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-consensus 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-session 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-support 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-system 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "substrate-keyring 2.0.0 (git+https://github.com/paritytech/substrate)",
+]
+
+[[package]]
+name = "srml-staking"
+version = "2.0.0"
 dependencies = [
  "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
