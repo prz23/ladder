@@ -12,7 +12,7 @@ pub const MESSAGE_LENGTH: usize = 116;
 pub const BANKER_LENGTH: usize = 128;
 pub const AUTHORITY_MINIMUM_LENGTH: usize = 72;
 pub const ORACLE_LENTH: usize = 116; // 8 8
-pub const LOCKTOKEN_LENGTH: usize = 160;
+pub const LOCKTOKEN_LENGTH: usize = 180;
 pub const UNLOCKTOKEN_LENGTH: usize = 64;
 
 impl ChainAlias {
@@ -381,6 +381,7 @@ pub fn array_to_u64(arr: [u8; 8]) -> u64 {
 #[derive(Debug)]
 pub struct LockTokenEvent {
     pub id: U256,
+    pub sender: Address,
     pub beneficiary: H256,
     pub value: U256,
     pub cycle: U256,
@@ -395,6 +396,7 @@ impl LockTokenEvent {
         let mut log = contracts::mapper::events::lock_token::parse_log(raw_log.into_raw_log())?;
         Ok(Self {
             id: log.id,
+            sender: log.sender,
             beneficiary: log.beneficiary,
             value: log.amount,
             cycle: log.cycle,
@@ -405,10 +407,11 @@ impl LockTokenEvent {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut result = vec![0u8; LOCKTOKEN_LENGTH];
         self.id.to_big_endian(&mut result[0..32]);
-        result[32..64].copy_from_slice(&self.beneficiary.0[..]);
-        self.value.to_big_endian(&mut result[64..96]);
-        self.cycle.to_big_endian(&mut result[96..128]);
-        result[128..LOCKTOKEN_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
+        result[32..52].copy_from_slice(&self.sender.0[..]);
+        result[52..84].copy_from_slice(&self.beneficiary.0[..]);
+        self.value.to_big_endian(&mut result[84..116]);
+        self.cycle.to_big_endian(&mut result[116..148]);
+        result[148..LOCKTOKEN_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
         return result;
     }
 
@@ -419,10 +422,11 @@ impl LockTokenEvent {
 
         Ok(Self {
             id: U256::from_big_endian(&bytes[0..32]),
-            beneficiary: bytes[32..64].into(),
-            value: U256::from_big_endian(&bytes[64..96]),
-            cycle: U256::from_big_endian(&bytes[96..128]),
-            tx_hash: bytes[128..LOCKTOKEN_LENGTH].into(),
+            sender: bytes[32..52].into(),
+            beneficiary: bytes[52..84].into(),
+            value: U256::from_big_endian(&bytes[84..116]),
+            cycle: U256::from_big_endian(&bytes[116..148]),
+            tx_hash: bytes[148..LOCKTOKEN_LENGTH].into(),
         })
     }
 }
