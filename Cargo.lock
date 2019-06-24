@@ -1563,6 +1563,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "ladder-erc"
+version = "0.1.0"
+dependencies = [
+ "ladder-signcheck 0.1.0",
+ "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sr-io 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "sr-primitives 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "sr-std 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "sr-version 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-balances 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-consensus 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-session 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-sudo 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-support 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-system 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-timestamp 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "substrate-primitives 2.0.0 (git+https://github.com/paritytech/substrate)",
+]
+
+[[package]]
 name = "ladder-exchange"
 version = "0.1.0"
 dependencies = [
@@ -2301,6 +2324,7 @@ dependencies = [
  "brand 0.1.0",
  "integer-sqrt 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ladder-bank 0.1.0",
+ "ladder-erc 0.1.0",
  "ladder-exchange 0.1.0",
  "ladder-otc 0.1.0",
  "ladder-signcheck 0.1.0",

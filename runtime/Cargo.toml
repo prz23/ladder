@@ -60,6 +60,10 @@ default_features = false
 path = '../ladderml/otc'
 package = 'ladder-otc'
 
+[dependencies.erc]
+default_features = false
+path = '../ladderml/erc'
+package = 'ladder-erc'
 
 [features]
 default = ["std"]
@@ -104,4 +108,5 @@ std = [
     "runtime-io/std",
     "brand/std",
     "otc/std",
+    "erc/std",
 ]
