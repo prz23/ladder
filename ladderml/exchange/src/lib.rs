@@ -92,7 +92,7 @@ decl_module! {
         /// 签名并判断如果当前签名数量足够就发送一个事件
         pub  fn check_exchange(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
 
-            runtime_io::print("汇率！！！！！！！！！！！！！！！！！！！");
+
             let sender = ensure_signed(origin)?;
             let (exchangerate, time, extype) = Self::parse_tx_data(message);
 

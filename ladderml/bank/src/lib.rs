@@ -49,7 +49,6 @@ decl_module! {
             runtime_io::print("====================deposit===prz============");
             //println!("VEC is {:?}",message );
 /*
-            //TODO: 在这里判断 sender 是否有权限提交 后期启动节点时写入
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
 */

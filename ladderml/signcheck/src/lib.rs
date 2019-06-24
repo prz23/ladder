@@ -122,7 +122,7 @@ impl<T: Trait> Module<T> {
 
     /// determine if the current number of signatures is sufficient to send an event
     pub  fn check_signature(who: T::AccountId, transcation: T::Hash, sign: T::Hash, message: Vec<u8>) -> Result{
-        //TODO： 判断这个信息发送的人是否是validator     不在这里 已经前置了
+
         let sender = who;
 
         // Query whether a transaction already exists
