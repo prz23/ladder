@@ -42,13 +42,13 @@ pub struct OrderPair {
 #[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct OrderContent<pair,AccountID,symbol,status> {
-    pub pair: pair,     // 交易对
-    pub index: u64,          // 编号
-    pub who: AccountID,      // 该交易挂单人 seller
-    pub amount: symbol,      // pair.share的挂单数量
-    pub price: symbol,       // pair.money的单价
-    pub already_deal:symbol, // 已经交易掉的数量
-    pub status: status,         //TODO 交易当前状态
+    pub pair: pair,          // exchange pair
+    pub index: u64,          // sell order index assigned for a specific user
+    pub who: AccountID,      //  seller
+    pub amount: symbol,      // share
+    pub price: symbol,       // price
+    pub already_deal:symbol, // already sold
+    pub status: status,      // sell order status
 }
 
 impl<pair,AccountID,symbol,status> OrderContent<pair,AccountID,symbol,status>{
@@ -88,14 +88,14 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as Signature {
 
-        /// 全部挂出来的卖单信息
-        pub OrdersOf get(order_of):map (T::AccountId, OrderPair, u64) => Option<OrderT<T>>;
+        /// all seller order infomation
+        pub SellOrdersOf get(sell_order_of):map (T::AccountId, OrderPair, u64) => Option<OrderT<T>>;
 
-        /// 链上已经存在的允许的 配对 表
+        /// exist exchange pair list
         pub OrderPairList get(pair_list):  Vec<OrderPair>;
 
-        /// 某个用户的某种配对的index     在挂出卖单时，分配一个
-        pub LastOrderIndexOf get(last_order_index_of): map(T::AccountId,OrderPair)=>Option<u64>;
+        /// sell order index assigned for a specific user
+        pub LastSellOrderIndexOf get(last_sell_order_index_of): map(T::AccountId,OrderPair)=>Option<u64>;
      }
 }
 
@@ -104,38 +104,35 @@ decl_module! {
 
         fn deposit_event<T>() = default;
 
-        /// 增加一个交易对
+        /// add an exchange pair
         pub fn new_pair(origin,pair: OrderPair) -> Result {
             Self::add_pair(pair)?;
             Ok(())
         }
 
-        /// 一个人挂出一个单子，内容是 卖btc 换eth   btc的数量是5  每btc个卖100eth
+        ///  put up a sell order to sell the amount of pair.share for per_price of pair.money
         pub fn put_order(origin, pair_type:OrderPair,amount:u64, per_price:u64) -> Result{
             let sender = ensure_signed(origin)?;
 
-            // 判断该这个人在bank上面是否由对应的数量的btc余额,
+            // make sure the sell order is valid
             Self::check_valid_order(sender.clone(),pair_type.clone(),amount,per_price)?;
 
-            //TODO::锁定bank里面对应的挂出来的pair.share的数量的资产（OK了）
-
-            //生成新卖单，并加入挂单的列表 ，同时锁定对应资产
+            // generate a new sell order , lock the money in bank,deposit_event and put up the order
             Self::generate_new_sell_order_and_put_into_list(sender.clone(),pair_type.clone(),amount,per_price);
 
-            //TODO::deposit_event
             Ok(())
         }
 
-             /// 选择某个交易对的某个挂单进行买入操作， 买入量必须少于挂单上的量，
+        /// chose an sell order to buy the amount of pair.share
         pub fn buy(origin, seller:T::AccountId, pair:OrderPair ,index:u64, amount:u64) -> Result{
             let buyer = ensure_signed(origin)?;
 
-            // 查找这个挂单，
-            if let Some(mut sellorder) = Self::order_of((seller,pair,index)){
+            // find the sell order
+            if let Some(mut sellorder) = Self::sell_order_of((seller,pair,index)){
 
-                // 检测买入操作 与 挂单是否合法
+                // make sure the buy operate is valid
                 Self::check_valid_buy(buyer.clone(),amount,sellorder.clone())?;
-                // 进行买入操作，修改状态
+                // do the buy operate and modify the order's status
                 Self::buy_operate(buyer.clone(),sellorder.clone(),amount);
             }else{
                 return Err("invalid sell order");
@@ -147,9 +144,9 @@ decl_module! {
         pub fn cancel_order(origin,pair_type:OrderPair,index:u64) -> Result {
             let sender = ensure_signed(origin)?;
 
-            // 先把这个单子找到，看看是否是已经完成的单子
-            if let Some(mut sellorder) = Self::order_of((sender.clone(),pair_type,index)){
-                //找到之后对其进行一波安排
+            // find  the order
+            if let Some(mut sellorder) = Self::sell_order_of((sender.clone(),pair_type,index)){
+                // cancel the sell order and return the share not exchanged
                 Self::cancel_order_operate(sender.clone(),sellorder)?;
             }else{
                 return Err("invalid sell order");
@@ -161,7 +158,7 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // 增加交易对
+    // add a new exchange pair
     pub fn add_pair(pair: OrderPair) -> Result {
         if let Err(_) = Self::is_valid_pair(&pair) {
             let mut pair_list: Vec<OrderPair> = <OrderPairList<T>>::get();
@@ -171,6 +168,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
+
     fn is_price_zero(price:u64) -> Result {
         if price == Zero::zero() {
             return Err("price cann't be 0");
@@ -178,7 +176,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    //判定是否存在
+    ///
     fn is_valid_pair(pair: &OrderPair) -> Result {
         let pair_list: Vec<OrderPair> = <OrderPairList<T>>::get();
         if pair_list.contains(pair) {
@@ -188,17 +186,17 @@ impl<T: Trait> Module<T> {
         }
     }
 
-    /// 去Bank模块查询一下子，看看pair里面btc是否有足够的数量安排在那里。
-    /// 顺便检测交易对等信息是否ok
+    /// Query the Bank Module，make sure the seller have enough money to sell
+    /// and check the parmeters is not zero
     fn check_valid_order(who: T::AccountId, pair:OrderPair, amount:u64, price:u64) -> Result {
-        // 交易对正确吗？
+        //
         Self::is_valid_pair(&pair)?;
 
-        // 每个btc卖出定价不能为零
+        //
         Self::is_price_zero(amount)?;
         Self::is_price_zero(price)?;
 
-        //bank---->pair.share 看看数量足够吗
+        //bank---->pair.share  money enough?
         let deposit_data = <bank::Module<T>>::despositing_banance(&who);
         if  deposit_data == [].to_vec() { return Err("no data"); }
         let mut  not_enough_money_error = false;
@@ -214,15 +212,15 @@ impl<T: Trait> Module<T> {
     }
 
     fn check_valid_buy(who:T::AccountId,amount:u64,sell_order:OrderT<T>) -> Result {
-        // 每个btc卖出定价不能为零
+        //
         Self::is_price_zero(amount)?;
 
-        // 不能买的量 超过 卖单余量
+        // cant buy exceed the sell order
         let left_share = sell_order.amount - sell_order.already_deal;
         if amount > left_share {
             return Err("cant buy too much!");
         }
-        //去查看下bank里有没有钱
+        //bank---->pair.share  money enough?
         let deposit_data = <bank::Module<T>>::despositing_banance(&who);
         if  deposit_data == [].to_vec() { return Err("no data"); }
         let mut  not_enough_money_error = false;
@@ -238,10 +236,10 @@ impl<T: Trait> Module<T> {
     }
 
     fn generate_new_sell_order_and_put_into_list(who:T::AccountId, pair_type:OrderPair,amount:u64, per_price:u64 ){
-        // 更新用户的交易对的挂单index
-        let new_last_index = Self::last_order_index_of((who.clone(), pair_type.clone())).unwrap_or_default() + 1;
-        <LastOrderIndexOf<T>>::insert((who.clone(), pair_type.clone()), new_last_index);
-        // 生成挂单并加入挂单列表中
+        // assign a new sell order index
+        let new_last_index = Self::last_sell_order_index_of((who.clone(), pair_type.clone())).unwrap_or_default() + 1;
+        <LastSellOrderIndexOf<T>>::insert((who.clone(), pair_type.clone()), new_last_index);
+        // generate a new sell order
         let mut new_sell_order :OrderT<T> = OrderContent{
             pair:pair_type.clone(),
             index:new_last_index,
@@ -251,53 +249,53 @@ impl<T: Trait> Module<T> {
             already_deal:0,      // 已经交易掉的数量
             status: Status::New, //交易当前状态
         };
-        <OrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
-        // 锁定挂出的单子的币的数量
+        <SellOrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
+        // lock the money in bank with the amount of the sell order
         <bank::Module<T>>::lock(who.clone(),pair_type.share,amount);
 
-        //SellOrder(AccountId,OrderPair,u64,Symbol,Symbol), // seller pair index amount price
+        //deposit_event
         Self::deposit_event(RawEvent::SellOrder(who.clone(),pair_type.clone(),
                                                 new_last_index,amount,per_price,));
     }
 
-    // buy 的操作 修改各个挂单存储结构，修改bank对应数据，锁定相关资产。
+    // buy operate , lock the money and change the status
     fn buy_operate(buyer:T::AccountId,mut sell_order: OrderT<T>, amount:u64) -> Result {
-        // 修改已经交易额
+        // modify the exchanged money
         sell_order.already_deal = sell_order.already_deal+amount;
-        // 修改挂单状态
+        // change sell order status
         if sell_order.already_deal < sell_order.amount {
             sell_order.status = Status::Half;
         }else if sell_order.amount == sell_order.already_deal {
             sell_order.status = Status::Done;
         }else { return  Err("wrong!"); }
 
-        // 把修改挂单数据保存
-        <OrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
+        // save the modified sell order
+        <SellOrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
                               sell_order.clone());
-        //TODO::bank 修改双方pair.money的值
+        //exchange the money in bank
         <bank::Module<T>>::buy_operate(buyer.clone(),sell_order.who.clone(),sell_order.pair.share.clone(),
                                        sell_order.pair.money.clone(),sell_order.price.clone(),
                                        amount);
-        //Buy(AccountId,OrderPair,u64,Symbol), //seller pair index amount
+        //deposit_event
         Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.pair.clone(),
                                           sell_order.index, amount, ));
         Ok(())
     }
 
-    //取消挂单
+    /// cancel the sell order
     pub fn cancel_order_operate(who:T::AccountId,mut sell_order:OrderT<T>) -> Result{
-        //查看这个单子的状态，如果是已经完成了，就直接返回成功
+        // if the order is in Done status ,return directly
         if sell_order.status == Status::Done { return Ok(()) ;}
-        //对其他状况进行操作
-        // 算出来还剩下多少没被买掉
-        let left_shares = sell_order.amount - sell_order.already_deal;
-        // 解锁
-        <bank::Module<T>>::unlock(who.clone(),sell_order.pair.share,left_shares);
-        //顺手修改一波sell单子，
-        sell_order.status = Status::Done;
-        <OrdersOf<T>>::insert((who.clone(), sell_order.pair.clone(), sell_order.index), sell_order.clone());
 
-        //CancelsellOrder(AccountId,OrderPair,u64),
+        // calculate the left money in sell order
+        let left_shares = sell_order.amount - sell_order.already_deal;
+        // unlock the left
+        <bank::Module<T>>::unlock(who.clone(),sell_order.pair.share,left_shares);
+        //modify the status to done
+        sell_order.status = Status::Done;
+        <SellOrdersOf<T>>::insert((who.clone(), sell_order.pair.clone(), sell_order.index), sell_order.clone());
+
+        //deposit_event
         Self::deposit_event(RawEvent::CancelsellOrder(who.clone(), sell_order.pair.clone(), sell_order.index, ));
         Ok(())
     }
@@ -424,7 +422,7 @@ mod tests {
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
             // 再挂单，挂上了
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
-            let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
+            let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (50, 2), (50, 3), (0, 4)].to_vec());
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
             // 再安排个铁子，让他买一下
@@ -436,7 +434,7 @@ mod tests {
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (5, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (0, 2), (0, 3), (0, 4)].to_vec());
-            let bb = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
+            let bb = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(bb.already_deal,5);
             // 继续买就会说没钱，
             assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,1),"not_enough_money_error ");
@@ -472,7 +470,7 @@ mod tests {
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
             // 再挂单，挂上了
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
-            let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
+            let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
 
             // 再安排个铁子，让他买一下
             Bank::depositing_withdraw_record(2,50,1,true);
@@ -480,7 +478,7 @@ mod tests {
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
 
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
-            let aa = OTC::order_of( (1, pair.clone(), 2) ).unwrap();
+            let aa = OTC::sell_order_of( (1, pair.clone(), 2) ).unwrap();
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 30, 10 ));
             // 挂单过多，本身只有50块钱，挂出去50，再挂10 就会报错，钱不够
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ),"not_enough_money_error ");
