@@ -34,8 +34,18 @@ use signcheck;
 pub enum Status {
     Lcoking,
     Unlock,
+    Withdraw,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Debug))]
+enum LockCycle {
+    None,          //0
+    OneMonth,      //1
+    ThreeMonth,    //2
+    SixMonth,      //3
+    OneYear        //4
+}
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
@@ -91,8 +101,8 @@ decl_module! {
                 Ok(y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
-
-            Self::save_erc_info(who.clone(),id,sendervec,T::Balance::sa(amount),cycle,txhash)?;
+            // save the erc info
+            Self::save_erc_info(who.clone(),id,sendervec.clone(),T::Balance::sa(amount),cycle,txhash.clone())?;
 
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),1,true);
             Self::calculate_total_deposit(T::Balance::sa(amount),true);
@@ -100,7 +110,8 @@ decl_module! {
             <DespositingTime<T>>::insert(who.clone(), 0);
 
             // emit an event
-            Self::deposit_event(RawEvent::AddDepositingQueue(who));
+            Self::deposit_event(RawEvent:: LockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
+                Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
             Ok(())
         }
 
@@ -124,7 +135,7 @@ decl_module! {
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
             // resovling message --> hash  tag  id  amount
-            let (_txhash,who,amount,cycle,sendervec,signature_hash,id) = Self::split_message(message.clone(),signature);
+            let (txhash,who,amount,cycle,sendervec,signature_hash,id) = Self::split_message(message.clone(),signature);
             //let message_hash = Decode::decode(&mut &message.encode()[..]).unwrap();
              let tx_hash = Decode::decode(&mut &message[..]).unwrap();
             //check the validity and number of signatures
@@ -139,11 +150,14 @@ decl_module! {
             if Self::is_valid_unlock(who.clone(),id).is_ok(){
                 Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),1,false);
                 Self::calculate_total_deposit(T::Balance::sa(amount),false);
+
+                Self::change_status(who.clone(),id);
             }else{
                 return Err("cant unlock, still locking");
             }
             // emit an event
-            Self::deposit_event(RawEvent::AddWithdrawQueue(who));
+             Self::deposit_event(RawEvent:: UnLockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
+                 Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
             Ok(())
         }
 
@@ -283,6 +297,8 @@ decl_event! {
         /// a new seesion start
         NewRewardSession(BlockNumber),
 
+        LockToken(u64, AccountId,Vec<u8>, Balance, u64,  u64, Hash),
+        UnLockToken(u64,AccountId,Vec<u8>, Balance, u64,  u64, Hash),
     }
 }
 
@@ -385,11 +401,10 @@ impl<T: Trait> Module<T>
             Self::lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
                 //<DespositingTime<T>>::insert(v, Self::despositing_time(v) + 1);
                 if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
-                    r.now_cycle = r.now_cycle  + 1;
-                    //find info
-                    if r.cycle <= r.now_cycle {
+                    let now = <timestamp::Module<T>>::get();
+                    let u64now = T::Moment::as_(now);
+                    if u64now >= r.now_cycle {
                         r.status = Status::Unlock;
-
                     }
                 }
             });
@@ -582,13 +597,26 @@ impl<T: Trait> Module<T>
         <TotalReward<T>>::put(money);
     }
 
+    pub fn unlock_time(cycle:u64) -> u64 {
+        let offset = match cycle {
+            0 => 0u64,
+            1 => 2592000,
+            2 => 7776000,
+            3 => 15552000,
+            4 => 31104000,
+            _ => 0,
+        };
+        let xx =T::Moment::as_(<timestamp::Module<T>>::get())+ offset;
+        xx
+    }
+
     pub fn save_erc_info(beneficiary:T::AccountId,index:u64,sender:Vec<u8>,value:T::Balance,cycle:u64,txhash: Vec<u8>) -> Result{
         // find the infomation
         if let Some(r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
             //  already have
             return Err("duplicate erc lock info");
         }else {
-            //
+
             let new_info = TokenInfo{
                 id:index,
                 sender:sender.clone(),
@@ -598,7 +626,7 @@ impl<T: Trait> Module<T>
                 reward: T::Balance::sa(0),
                 txhash:txhash,
                 status: Status::Lcoking,
-                now_cycle:0,
+                now_cycle:Self::unlock_time(cycle),
             };
             <LockInfoList<T>>::insert((beneficiary.clone(),index),new_info);
         }
@@ -621,13 +649,13 @@ impl<T: Trait> Module<T>
         }
     }
 
-    pub fn change_status(beneficiary:T::AccountId,index:u64,now_cycle:u64) {
+    pub fn change_status(beneficiary:T::AccountId,index:u64) -> Result{
         if let Some(mut r) = <LockInfoList<T>>::get((beneficiary.clone(), index)) {
-            //find info
-            if r.cycle <= now_cycle{
-                r.status = Status::Unlock;
-            }
+            r.status = Status::Withdraw;
             <LockInfoList<T>>::insert((beneficiary.clone(),index),r);
+            return Ok(());
+        }else {
+            return Err("not find record");
         }
     }
 }
@@ -708,70 +736,17 @@ mod tests {
         runtime_io::TestExternalities::new(t)
     }
 
-    type Bank = Module<Test>;
+    type Erc = Module<Test>;
 
     #[test]
     fn resolving_data() {
         with_externalities(&mut new_test_ext(), || {
-            //let coin_vec: Vec<_> = [1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4].to_vec();
-
+            let coin_vec: Vec<_> = [1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4].to_vec();
+            // Self::save_erc_info(who.clone(),id,sendervec,T::Balance::sa(amount),cycle,txhash)?;
+            assert_ok!(Erc::save_erc_info(5,4.clone(),coin_vec.clone(),T::Balance::sa(5),5,coin_vec));
         });
     }
 
-    #[test]
-    fn deposit_test() {
-        with_externalities(&mut new_test_ext(), || {
-            println!("Test");
-            Bank::depositing_withdraw_record(1,50,2,true);
-            Bank::depositing_withdraw_record(1,50,3,true);
-
-            Bank::depositing_withdraw_record(1,50,3,true);
-            assert_eq!(Bank::despositing_account(),vec![1]);
-            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (50, 2), (100, 3), (0, 4), (0, 5)].to_vec());
-            Bank::depositing_withdraw_record(1,55,3,true);
-            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (50, 2), (155, 3), (0, 4), (0, 5)].to_vec());
-        });
-    }
-
-    #[test]
-    fn depositing_test() {
-        with_externalities(&mut new_test_ext(), || {
-
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be2".from_hex().unwrap();
-            let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
-            assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
-           // assert_eq!(Bank::despositing_account(),[5].to_vec());
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (0, 5)].to_vec());
-
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000500000000000000000000000074251db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be2".from_hex().unwrap();
-            let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
-            assert_err!(Bank::deposit(Origin::signed(5),data,sign),"This signature is repeat!");
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (0, 5)].to_vec());
-
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000500000000000000000000000074251db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9b32".from_hex().unwrap();
-            let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
-            assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (1000, 5)].to_vec());
-        });
-    }
-
-    #[test]
-    fn withdraw_test() {
-        with_externalities(&mut new_test_ext(), || {
-
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be2".from_hex().unwrap();
-            let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
-            assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
-            // assert_eq!(Bank::despositing_account(),[5].to_vec());
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (0, 5)].to_vec());
-
-
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be3".from_hex().unwrap();
-            let sign : Vec<u8>= "219901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
-            assert_ok!(Bank::withdraw(Origin::signed(5),data,sign));
-            assert_eq!(Bank::despositing_banance(0),[].to_vec());
-        });
-    }
 
     #[test]
     fn inilize_test() {
