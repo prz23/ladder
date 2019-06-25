@@ -114,26 +114,26 @@ decl_storage! {
         /// These amount of signatures are needed to send the event that the transaction verified.
         MinNumOfSignature get(min_signature): u64 =1;
 
-        //记录每个交易的签名的数量
+
         NumberOfSignedIngressTx get(number_of_signed_ingress): map T::Hash => u64;
-        //已经发送过的交易记录  防止重复发送事件
+
         AlreadySentIngressTx get(already_sent_ingress) : map T::Hash => u64;
-        //已经签名过得人记录一下
+
         IngressSignedSender  get(ingress_signed_sender) : map T::Hash => Vec<T::AccountId>;
-        //保存Ingress的相关内容
+
         IngressList  get(ingress_list) : map T::Hash => Vec<(T::AccountId,T::Hash)>;
-        //
+
         IngressOf  get(ingress_of) :  map T::Hash  => Vec<u8> ;
 
-        //记录每个交易的签名的数量
+
         NumberOfSignedEgressTx get(number_of_signed_egress): map T::Hash => u64;
-        //已经发送过的交易记录  防止重复发送事件
+
         AlreadySentEgressTx get(already_sent_egress) : map T::Hash => u64;
-        //已经签名过得人记录一下
+
         EgressSignedSender  get(egress_signed_sender) : map T::Hash => Vec<T::AccountId>;
-        //保存Egress的相关内容
+
         EgressList  get(egress_list) : map T::Hash => Vec<(T::AccountId,T::Hash)>;
-        //
+
         EgressOf  get(egress_of) : map T::Hash => Vec<u8>;
     }
 }
@@ -148,7 +148,7 @@ decl_event! {
         Ingress(Vec<u8>, Vec<u8>),
         Egress(Vec<u8>, Vec<u8>),
 
-          // 交易 = vec<id，签名>
+
         IngressVerified(Hash,Vec<(AccountId,Hash)>),
         EgressVerified(Hash,Vec<(AccountId,Hash)>),
 
@@ -170,36 +170,36 @@ impl<T: Trait> Module<T>
     /// Data Forwarding Confirmation Message
     fn verify_ingress_message(sender: T::AccountId, message: T::Hash, signature: T::Hash) -> Result{
 
-        //是否在验证者集合中
+
         // TODO validator unequal with sessionkey
         // let validator_set = <session::Module<T>>::validators();
         // println!("#########{:?} sender:{:?}", validator_set, sender);
         // ensure!(validator_set.contains(&sender),"not validator");
 
-        //查看该交易是否存在，没得话添加上去
+        //
         if !<NumberOfSignedIngressTx<T>>::exists(message) {
             <NumberOfSignedIngressTx<T>>::insert(&message,0);
             <AlreadySentIngressTx<T>>::insert(&message,0);
         }
 
-        //查看这个签名的是否重复发送交易 重复发送就
+        // prevent duplicate tx
         let mut repeat_vec = Self::ingress_signed_sender(&message);
         ensure!(!repeat_vec.contains(&sender),"repeat!");
 
-        //查看交易是否已被发送
+
         if 1 == Self::already_sent_ingress(&message){
             return Err("has been sent");
         }
 
-        //增加一条记录 ->  交易 = vec of 验证者 签名
+        // add a new record
         let mut stored_vec = Self::ingress_list(&message);
         stored_vec.push((sender.clone(), signature.clone()));
         <IngressList<T>>::insert(message.clone(), stored_vec.clone());
-        //更新重复记录
+        //update the sender record
         repeat_vec.push(sender.clone());
         <IngressSignedSender<T>>::insert(message.clone(),repeat_vec.clone());
 
-        // 判断签名数量是否达到指定要求
+        // make sure the signature enough
         let numofsigned = Self::number_of_signed_ingress(&message);
         let newnumofsigned = numofsigned.checked_add(1)
             .ok_or("Overflow adding a new sign to Tx")?;
@@ -209,7 +209,7 @@ impl<T: Trait> Module<T>
             return Err("Not enough signature!");
         }
 
-        //记录已经发送过的交易  同时发送事件Event
+        //record and deposit_event
         <AlreadySentIngressTx<T>>::insert(&message,1);
         Self::deposit_event(RawEvent::IngressVerified(message,stored_vec));
         Ok(())
@@ -223,30 +223,30 @@ impl<T: Trait> Module<T>
         // let validator_set = <session::Module<T>>::validators();
         // ensure!(validator_set.contains(&sender),"not validator");
 
-        //查看该交易是否存在，没得话添加上去
+
         if !<NumberOfSignedEgressTx<T>>::exists(message) {
             <NumberOfSignedEgressTx<T>>::insert(&message,0);
             <AlreadySentEgressTx<T>>::insert(&message,0);
         }
 
-        //查看这个签名的是否重复发送交易 重复发送就滚粗
+
         let mut repeat_vec = Self::egress_signed_sender(&message);
         ensure!(!repeat_vec.contains(&sender),"repeat!");
 
-        //查看交易是否已被发送
+
         if 1 == Self::already_sent_egress(&message){
             return Err("has been sent");
         }
 
-        //增加一条记录 ->  交易 = vec of 验证者 签名
+
         let mut stored_vec = Self::egress_list(&message);
         stored_vec.push((sender.clone(), signature.clone()));
         <EgressList<T>>::insert(message.clone(), stored_vec.clone());
-        //更新重复记录
+
         repeat_vec.push(sender.clone());
         <EgressSignedSender<T>>::insert(message.clone(),repeat_vec.clone());
 
-        // 判断签名数量是否达到指定要求
+
         let numofsigned = Self::number_of_signed_ingress(&message);
         let newnumofsigned = numofsigned.checked_add(1)
             .ok_or("Overflow adding a new sign to Tx")?;
@@ -256,7 +256,7 @@ impl<T: Trait> Module<T>
             return Err("Not enough signature!");
         }
 
-        //记录已经发送过的交易  同时发送事件Event
+        
         <AlreadySentEgressTx<T>>::insert(&message,1);
         Self::deposit_event(RawEvent::EgressVerified(message,stored_vec));
         Ok(())
