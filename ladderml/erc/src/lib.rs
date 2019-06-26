@@ -62,9 +62,9 @@ pub struct TokenInfo<AccountId,Balance,Status> {
 }
 
 
-type TokenInfoT<T> = TokenInfo< <T as system::Trait>::AccountId,
-                              <T as balances::Trait>::Balance,
-                              Status>;
+type TokenInfoT<T> = TokenInfo<<T as system::Trait>::AccountId,
+                               <T as balances::Trait>::Balance,
+                               Status>;
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
@@ -85,7 +85,6 @@ decl_module! {
         pub fn lock_erc(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
             runtime_io::print("====================lock_erc===============");
-            //println!("VEC is {:?}",message );
 /*
             //TODO: 在这里判断 sender 是否有权限提交 后期启动节点时写入
             let validators = <session::Module<T>>::validators();
@@ -107,24 +106,10 @@ decl_module! {
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),1,true);
             Self::calculate_total_deposit(T::Balance::sa(amount),true);
 
-            <DespositingTime<T>>::insert(who.clone(), 0);
-
             // emit an event
             Self::deposit_event(RawEvent:: LockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
                 Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
             Ok(())
-        }
-
-        /// Take the initiative to receive awards
-        pub fn draw_reward_all(origin) -> Result {
-             let sender = ensure_signed(origin)?;
-
-             ensure!(!Self::despositing_account().iter().find(|&t| t == &sender).is_none(), "Cannot draw if not depositing.");
-
-             let reward = Self::count_draw_reward(sender.clone());
-             let new_balance = <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(reward));
-             T::Currency::deposit_into_existing(&sender, new_balance).ok();
-             Ok(())
         }
 
         /// withdraw
@@ -161,51 +146,13 @@ decl_module! {
             Ok(())
         }
 
-        /// set reward factor
-        ///   0-5000 5000-50000 50000-500000 500000-->
-        ///      x1         x2         x3      x3
-        ///     y1      y2         y3          y4
-        fn set_session_reward_factor(_origin,session: Vec<u32>, session_factor: Vec<u8>)-> Result{
-            // session
-            ensure!(session.len() >= 3,"not enough session arguments.at least 3");
-            ensure!(session_factor.len() >= 4,"not enough session_factor arguments.at least 4");
-
-            <RewardSessionValue<T>>::put(session);
-            <RewardSessionFactor<T>>::put(session_factor);
-            Ok(())
-            // money
-        }
-
-        /// set reward factor
-        ///   0-5000 5000-50000 50000-500000 500000-->
-        ///      x1         x2         x3      x3
-        ///     y1      y2         y3          y4
-        fn set_balance_reward_factor(_origin, money: Vec<T::Balance>, money_factor: Vec<u8>)-> Result{
-
-            ensure!(money.len() >= 3,"not enough money arguments.at least 3");
-            ensure!(money_factor.len() >= 4,"not enough money_factor arguments.at least 4");
-
-            <RewardBalanceValue<T>>::put(money);
-            <RewardBalanceFactor<T>>::put(money_factor);
-
-            Ok(())
-            // money
-        }
         /// set session lenth
         fn set_session_lenth(session_len: u64 ){
            ensure!(session_len >= 10,"the session lenth must larger than 10");
            <SessionLength<T>>::put(T::BlockNumber::sa(session_len));
         }
 
-        pub fn draw_reward(origin,id: T::AccountId) -> Result{
-             ensure!(!Self::despositing_account().iter().find(|&t| t == &id).is_none(), "Cannot draw if not depositing.");
 
-             let new_balance = <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(Self::count_draw_reward(id.clone())));
-             match T::Currency::deposit_into_existing(&id, new_balance){
-                 Err(x) => Err(x),
-                 _ => Ok(()),
-             }
-        }
 
         /// a new session starts
 		fn on_finalize(n: T::BlockNumber) {
@@ -220,20 +167,6 @@ decl_storage! {
 
         /// record depositing info of balance & session_time
         DespoitingAccount get(despositing_account): Vec<T::AccountId>;
-
-        /// accountid => (balance , type)
-        DespositingBalance get(despositing_banance): map T::AccountId => T::Balance;
-        DespositingTime get(despositing_time): map T::AccountId => u32;
-        // 锁定的bank金额
-        DespositingBalanceReserved get(despositing_banance_reserved): map T::AccountId => Vec<(T::Balance,u64)>;
-
-        /// Bank session reward factor
-        RewardSessionValue  get(reward_session_value) config(): Vec<u32>;
-        RewardSessionFactor  get(reward_session_factor) config(): Vec<u8>;
-        /// Bank balance reward factor
-        RewardBalanceValue  get(reward_balance_value) config(): Vec<T::Balance>;
-        RewardBalanceFactor  get(reward_balance_factor) config(): Vec<u8>;
-
         ///Session module
 		/// Block at which the session length last changed.
 		LastLengthChange: Option<T::BlockNumber>;
@@ -252,20 +185,18 @@ decl_storage! {
 		/// true -- 领取模式  false -- 自动发放模式
 		EnableRewardRecord get(enable_record) config(): bool;
 
-
-
         /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
         DespositExchangeRate get(desposit_exchange_rate) :  u64 = 10000000000000;
-
         // 总锁仓
         TotalLockToken get(total_lock_token) : T::Balance;
+
         // 所有人锁仓记录
         LockTokenList get(lock_token_list) : map T::AccountId => T::Balance;
-        // 总利息
+        // all reward
         TotalReward get(total_reward): T::Balance;
-        // 返回全信息结构体
+        // Lockinfo list
         LockInfoList get(lock_info_list): map (T::AccountId,u64) => Option<TokenInfoT<T>>;
-        // 某个账户记录的笔数
+        // record one user's all index
         LockCount get(lock_count) : map T::AccountId => Vec<u64>;
     }
         add_extra_genesis {
@@ -389,8 +320,8 @@ impl<T: Trait> Module<T>
 
         // 1. Reward directly to account 2. Click to get reward
         match Self::enable_record() {
-            true => Self::reward_deposit_record(),
             _ =>  Self::reward_deposit(),
+            true =>  Self::reward_deposit(),
         }
     }
 
@@ -399,7 +330,6 @@ impl<T: Trait> Module<T>
         // update the session time of the depositing account
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             Self::lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
-                //<DespositingTime<T>>::insert(v, Self::despositing_time(v) + 1);
                 if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
                     let now = <timestamp::Module<T>>::get();
                     let u64now = T::Moment::as_(now);
@@ -411,76 +341,40 @@ impl<T: Trait> Module<T>
         });
     }
 
-    /// Record the reward and click on it to get the money.
-    fn count_draw_reward(accountid: T::AccountId) -> T::Balance {
-        let mut reward= <RewardRecord<T>>::get(accountid.clone());
-        <RewardRecord<T>>::insert(accountid,T::Balance::sa(0));
-        //calculate all reward
-        Self::calculate_total_reward(reward,false);
-        reward
-    }
-
-    /// Record the reward and click on it to get the money.
-    fn reward_deposit_record() {
-        // cont reward of every deposit erc benficiry account
-        Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            let depositing_erc = <DespositingBalance<T>>::get(v);
-            let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),depositing_erc);
-            let now_reward = <RewardRecord<T>>::get(v);
-            <RewardRecord<T>>::insert(v,reward+now_reward);
-            //calculate all reward
-            Self::calculate_total_reward(reward+now_reward,true);
-        });
-    }
 
     /// Money awarded directly to a specified deposit account in each session
+    /// each session calculate each lockerc's reward
     fn reward_deposit() {
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
+            Self::lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
+                if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
+                    if r.status == Status::Withdraw {
+                        //ignore
+                    }else {
+                        //calculate reward
+                        let reward = Self::calculate_reward(r.cycle,r.value);
+                        //accmulate the total reward for all users
+                        Self::calculate_total_reward(reward,true);
+                        // accmulate the total reward for one user
+                        let now_reward = <RewardRecord<T>>::get(v);
+                        <RewardRecord<T>>::insert(v,reward+now_reward);
+                        // reward to user
+                        T::Currency::deposit_into_existing(&v, <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(reward)));
+                    }
+                }
+            });
         });
     }
 
-    // RewardSessionValue  get(reward_session_value): Vec<u64>
-    // RewardSessionFactor  get(reward_session_factor): Vec<u64>
-    fn reward_set(who: T::AccountId, session: u32, money: T::Balance) -> T::Balance {
-
-        let session_value = Self::reward_session_value();
-        let session_factor = Self::reward_session_factor();
-
-        let x1 = session_value[0];  let x2 = session_value[1];  let x3 = session_value[2];
-        let y1 = session_factor[0];  let y2 = session_factor[1];  let y3 = session_factor[2]; let y4 = session_factor[3];
-
-        #[warn(unused_assignments)]
-            let mut final_se = 0;
-        if session <= x1 {
-            final_se = y1;
-        } else if session <= x2 {
-            final_se = y2;
-        } else if session <= x3 {
-            final_se = y3;
-        } else {
-            final_se = y4;
-        }
-
-        let balance_value = Self::reward_balance_value();
-        let balance_factor = Self::reward_balance_factor();
-
-        let xx1 = balance_value[0];  let xx2 = balance_value[1];  let xx3 = balance_value[2];
-        let yy1 = balance_factor[0];  let yy2 = balance_factor[1];  let yy3 = balance_factor[2]; let yy4 = balance_factor[3];
-
-        //let money2 = money as u64;
-        let mut final_ba = 0;
-        if money <= xx1 {
-            final_ba = yy1;
-        } else if money <= xx2 {
-            final_ba = yy2;
-        } else if money <= xx3 {
-            final_ba = yy3;
-        } else {
-            final_ba = yy4;
-        }
-
-        let rate =  (final_se * final_ba);
-        money*T::Balance::sa( rate as u64)/T::Balance::sa(100 as u64)
+    fn calculate_reward(cycle: u64, erc:T::Balance) -> T::Balance {
+        let rewardrate = match cycle {
+            1 => 1,
+            2 => 2,
+            3 => 3,
+            4 => 4,
+            _ => 0,
+        };
+        T::Balance::sa((T::Balance::as_(erc) as f64 * rewardrate as f64/100f64  )as u64)
     }
 
     fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: Vec<u8>) -> Result {
@@ -493,13 +387,13 @@ impl<T: Trait> Module<T>
     }
 
     pub fn initlize(who: T::AccountId){
-        let mut depositing_erc = <DespositingBalance<T>>::get(who.clone());
+        let mut depositing_erc = <LockTokenList<T>>::get(who.clone());
         depositing_erc = T::Balance::sa(0);
-        <DespositingBalance<T>>::insert(who.clone(),depositing_erc);
+        <LockTokenList<T>>::insert(who.clone(),depositing_erc);
     }
 
     fn uninitlize(who: T::AccountId) {
-        <DespositingBalance<T>>::remove(who.clone());
+        <LockTokenList<T>>::remove(who.clone());
     }
 
     /// Adjust deposing_list            beneficiary         value              cycle           in out
@@ -507,7 +401,7 @@ impl<T: Trait> Module<T>
         if Self::despositing_account().iter().find(|&t| t == &who).is_none() {
             Self::initlize(who.clone());
         }
-        let mut depositing_erc = <DespositingBalance<T>>::get(who.clone());
+        let mut depositing_erc = <LockTokenList<T>>::get(who.clone());
         let mut new_balance = T::Balance::sa(0);
          if d_w {
               //deposit
@@ -517,7 +411,7 @@ impl<T: Trait> Module<T>
              new_balance = depositing_erc - balance;
          }
         // change the depositing data vector and put it back to map
-        <DespositingBalance<T>>::insert(who.clone(),new_balance);
+        <LockTokenList<T>>::insert(who.clone(),new_balance);
         Self::depositing_access_control(who);
     }
 
@@ -525,7 +419,7 @@ impl<T: Trait> Module<T>
     pub fn depositing_access_control(who:T::AccountId){
         //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
         let mut deposit_total = 0;
-        let all_data_vec = <DespositingBalance<T>>::get(who.clone());
+        let all_data_vec = <LockTokenList<T>>::get(who.clone());
 
         // if all type of coin is Zero ,  the accountid will be removed from the DepositingVec.
         if all_data_vec == T::Balance::sa(0) {
@@ -616,6 +510,9 @@ impl<T: Trait> Module<T>
             //  already have
             return Err("duplicate erc lock info");
         }else {
+            let mut lock_count_vec = <LockCount<T>>::get(beneficiary.clone());
+            lock_count_vec.push(index);
+            <LockCount<T>>::insert(beneficiary.clone(),lock_count_vec);
 
             let new_info = TokenInfo{
                 id:index,
@@ -656,6 +553,13 @@ impl<T: Trait> Module<T>
             return Ok(());
         }else {
             return Err("not find record");
+        }
+    }
+
+    pub fn get_reward(beneficiary:T::AccountId,index:u64){
+        if let Some(mut r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
+            let old_reward = r.reward;
+
         }
     }
 }

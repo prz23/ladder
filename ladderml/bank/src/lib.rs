@@ -49,6 +49,7 @@ decl_module! {
             runtime_io::print("====================deposit===prz============");
             //println!("VEC is {:?}",message );
 /*
+
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
 */
