@@ -23,7 +23,7 @@ use node_runtime::{
     BalancesConfig, BankConfig, ConsensusConfig, ContractConfig, CouncilSeatsConfig,
     CouncilVotingConfig, DemocracyConfig, GrandpaConfig, IndicesConfig, Perbill, Permill,
     SessionConfig, StakerStatus, StakingConfig, SudoConfig, TimestampConfig, TreasuryConfig,
-    Trademark, BrandConfig, SigncheckConfig,
+    Trademark, BrandConfig, SigncheckConfig,ErcConfig,
 };
 use primitives::{
     crypto::{Ss58Codec, UncheckedInto},
@@ -213,6 +213,11 @@ pub fn testnet_genesis(
         brand: Some(BrandConfig {
             brands: get_brands(root_key),
         }),
+		erc: Some(ErcConfig{
+			session_length:10,
+			enable_record:true,
+			total:0,
+		}),
 	}
 }
 
@@ -437,6 +442,11 @@ fn ladder_testnet_genesis() -> GenesisConfig {
         brand: Some(BrandConfig {
             brands: get_brands(endowed_accounts[0].clone()),
         }),
+		erc: Some(ErcConfig{
+			session_length:10,
+			enable_record:true,
+			total:0,
+		}),
 	}
 }
 

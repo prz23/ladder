@@ -53,6 +53,8 @@ pub use balances::Call as BalancesCall;
 pub use matrix::Call as MatrixCall;
 pub use bank::Call as BankCall;
 pub use exchange::Call as ExchangeCall;
+pub use erc::Call as ErcCall;
+pub use otc::Call as OtcCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use support::StorageValue;
 pub use staking::StakerStatus;
@@ -238,6 +240,14 @@ impl brand::Trait for Runtime {
     type Event = Event;
 }
 
+impl otc::Trait for Runtime {
+	type Event = Event;
+}
+
+impl erc::Trait for Runtime {
+	type Event = Event;
+	type Currency =  Balances;
+}
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, AuthorityId, AuthoritySignature>) where
 		Block = Block,
@@ -268,6 +278,8 @@ construct_runtime!(
 		Bank: bank::{Module,Call,Storage,Config<T>,Event<T>},
 		Exchange: exchange::{Module,Call,Storage,Event<T>},
 		Brand: brand::{Module, Call, Storage, Config<T>, Event<T>},
+		Otc: otc::{Module,Call,Storage,Event<T>},
+		Erc: erc::{Module,Call,Storage,Config<T>,Event<T>},
 	}
 );
 

@@ -256,7 +256,7 @@ impl<T: Trait> Module<T>
             return Err("Not enough signature!");
         }
 
-        
+
         <AlreadySentEgressTx<T>>::insert(&message,1);
         Self::deposit_event(RawEvent::EgressVerified(message,stored_vec));
         Ok(())

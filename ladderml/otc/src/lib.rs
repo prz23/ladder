@@ -49,6 +49,7 @@ pub struct OrderContent<pair,AccountID,symbol,status> {
     pub price: symbol,       // price
     pub already_deal:symbol, // already sold
     pub status: status,      // sell order status
+    pub longindex: u128,     // an unique index for each sell order
 }
 
 impl<pair,AccountID,symbol,status> OrderContent<pair,AccountID,symbol,status>{
@@ -76,12 +77,10 @@ decl_event!(
     pub enum Event<T>
     where
         <T as system::Trait>::AccountId,
-        <T as system::Trait>::Hash
     {
-        SetMinRequreSignatures(AccountId,Hash),
-        SellOrder(AccountId,OrderPair,u64,Symbol,Symbol), // seller pair index amount price
-        Buy(AccountId,OrderPair,u64,Symbol), //seller pair index amount
-        CancelsellOrder(AccountId,OrderPair,u64),
+        SellOrder(AccountId,OrderPair,u64,Symbol,Symbol,u128), // seller pair index amount price uniqueindex
+        Buy(AccountId,AccountId,OrderPair,u64,Symbol,u128), //buyer seller pair index amount uniqueindex
+        CancelsellOrder(AccountId,OrderPair,u64,u128),
     }
 );
 
@@ -96,6 +95,12 @@ decl_storage! {
 
         /// sell order index assigned for a specific user
         pub LastSellOrderIndexOf get(last_sell_order_index_of): map(T::AccountId,OrderPair)=>Option<u64>;
+
+        ///unique index -> all sell orders
+        pub AllSellOrders get(all_sell_orders):map u128 => Option<OrderT<T>>;
+
+        pub AllSellOrdersIndex get(all_sell_orders_index): u128;
+
      }
 }
 
@@ -239,23 +244,29 @@ impl<T: Trait> Module<T> {
         // assign a new sell order index
         let new_last_index = Self::last_sell_order_index_of((who.clone(), pair_type.clone())).unwrap_or_default() + 1;
         <LastSellOrderIndexOf<T>>::insert((who.clone(), pair_type.clone()), new_last_index);
+
+        let new_unique_index = Self::all_sell_orders_index() + 1;
+        <AllSellOrdersIndex<T>>::put(new_unique_index);
+
         // generate a new sell order
         let mut new_sell_order :OrderT<T> = OrderContent{
             pair:pair_type.clone(),
             index:new_last_index,
             who:who.clone(),
-            amount: amount,      // pair.share的挂单数量
-            price: per_price,    // pair.money的单价
-            already_deal:0,      // 已经交易掉的数量
-            status: Status::New, //交易当前状态
+            amount: amount,      // pair.share
+            price: per_price,    // pair.money
+            already_deal:0,
+            status: Status::New,  //Status
+            longindex : new_unique_index,
         };
         <SellOrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
+        <AllSellOrders<T>>::insert(new_unique_index,new_sell_order.clone());
         // lock the money in bank with the amount of the sell order
         <bank::Module<T>>::lock(who.clone(),pair_type.share,amount);
 
         //deposit_event
         Self::deposit_event(RawEvent::SellOrder(who.clone(),pair_type.clone(),
-                                                new_last_index,amount,per_price,));
+                                                new_last_index,amount,per_price,new_unique_index));
     }
 
     // buy operate , lock the money and change the status
@@ -272,13 +283,15 @@ impl<T: Trait> Module<T> {
         // save the modified sell order
         <SellOrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
                               sell_order.clone());
+        <AllSellOrders<T>>::insert(sell_order.longindex,sell_order.clone());
+
         //exchange the money in bank
         <bank::Module<T>>::buy_operate(buyer.clone(),sell_order.who.clone(),sell_order.pair.share.clone(),
                                        sell_order.pair.money.clone(),sell_order.price.clone(),
                                        amount);
         //deposit_event
-        Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.pair.clone(),
-                                          sell_order.index, amount, ));
+        Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.who.clone(),sell_order.pair.clone(),
+                                          sell_order.index, amount, sell_order.longindex));
         Ok(())
     }
 
@@ -294,9 +307,10 @@ impl<T: Trait> Module<T> {
         //modify the status to done
         sell_order.status = Status::Done;
         <SellOrdersOf<T>>::insert((who.clone(), sell_order.pair.clone(), sell_order.index), sell_order.clone());
-
+        <AllSellOrders<T>>::insert(sell_order.longindex, sell_order.clone());
         //deposit_event
-        Self::deposit_event(RawEvent::CancelsellOrder(who.clone(), sell_order.pair.clone(), sell_order.index, ));
+        Self::deposit_event(RawEvent::CancelsellOrder(who.clone(), sell_order.pair.clone(), sell_order.index,
+                                                      sell_order.longindex));
         Ok(())
     }
 }
