@@ -452,7 +452,7 @@ impl UnlockTokenEvent {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut result = vec![0u8; UNLOCKTOKEN_LENGTH];
         self.id.to_big_endian(&mut result[0..32]);
-        result[32..LOCKTOKEN_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
+        result[32..UNLOCKTOKEN_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
         return result;
     }
 

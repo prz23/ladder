@@ -5,7 +5,6 @@
 /// Label must be H256 type, so S and T is u128 type. to make a cross transaction,
 /// we should fill the label in transaction.
 // use restc_hex::{ToHex, FromHex};
-use std::cmp::PartialEq;
 
 /*
 we should wrap it with new type.

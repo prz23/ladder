@@ -1,11 +1,11 @@
 use crate::events;
 use crate::message::{RelayMessage, RelayType};
 use client::{blockchain::HeaderBackend, runtime_api::Core as CoreApi, BlockchainEvents};
-use log::{debug, error, info, trace, warn};
+use log::{info, trace};
 use network::SyncProvider;
 use node_primitives::{AccountId, Nonce as Index};
 use node_runtime::{
-    BankCall, Call, ExchangeCall, MatrixCall, UncheckedExtrinsic,
+    BankCall, Call, ExchangeCall, MatrixCall, ErcCall, UncheckedExtrinsic,
     VendorApi, /*,exchangerate */
 };
 use primitives::{crypto::*, ed25519::Pair, Pair as TraitPair};
@@ -118,7 +118,6 @@ where
                     "@@@@@@@@@@@@@@from price: {}. to price:{}",
                     from_price, to_price
                 );
-                // TODO when can't get price, then set 1:1
                 if to_price == 0 || from_price == 0 {
                     to_price = 1;
                     from_price = 1;
@@ -149,12 +148,20 @@ where
                     Call::Exchange(ExchangeCall::check_exchange(message.raw, signature))
                 },
                 RelayType::LockToken => {
-                    // TODO
-                    Call::Matrix(MatrixCall::ingress(message.raw, signature))
+                    info!(
+                        "listener lock token message: {}, signature: {}",
+                        message.raw.to_hex(),
+                        signature.to_hex()
+                    );
+                    Call::Erc(ErcCall::lock_erc(message.raw, signature))
                 },
                 RelayType::UnlockToken => {
-                    // TODO
-                    Call::Matrix(MatrixCall::ingress(message.raw, signature))
+                    info!(
+                        "listener unlock token message: {}, signature: {}",
+                        message.raw.to_hex(),
+                        signature.to_hex()
+                    );
+                    Call::Erc(ErcCall::unlock_erc(message.raw, signature))
                 }
             };
 

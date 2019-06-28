@@ -32,7 +32,6 @@ network = { package = "substrate-network", git = "https://github.com/paritytech/
 keystore = { package = "substrate-keystore", git = "https://github.com/paritytech/substrate" }
 primitives = { package = "substrate-primitives", git = "https://github.com/paritytech/substrate" }
 transaction_pool = { package = "substrate-transaction-pool", git = "https://github.com/paritytech/substrate" }
-#srml-session = { git = "https://github.com/paritytech/substrate" }
 
 node-primitives = { path = "../primitives"}
 curl = { version = "*"}
