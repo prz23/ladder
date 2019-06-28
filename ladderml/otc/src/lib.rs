@@ -85,7 +85,7 @@ decl_event!(
 );
 
 decl_storage! {
-    trait Store for Module<T: Trait> as Signature {
+    trait Store for Module<T: Trait> as Otc {
 
         /// all seller order infomation
         pub SellOrdersOf get(sell_order_of):map (T::AccountId, OrderPair, u64) => Option<OrderT<T>>;
