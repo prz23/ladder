@@ -477,7 +477,7 @@ impl<T: Trait> Module<T>
         }
 
         let rate =  (final_se * final_ba);
-        money*T::Balance::sa( rate as u64)/T::Balance::sa(100 as u64)
+        money*T::Balance::sa(rate as u64)/T::Balance::sa(100 as u64)
     }
 
     fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: Vec<u8>) -> Result {
@@ -518,7 +518,11 @@ impl<T: Trait> Module<T>
                     new_lock_bal = bal + balance;
                     mark = i;
                 }else{
-                    new_lock_bal = bal - balance;
+                    //new_lock_bal = bal - balance;
+                    new_lock_bal = match bal.checked_sub(&balance) {
+                        Some(a) => a,
+                        None => T::Balance::sa(0),
+                    };
                     mark = i;
                 }
             }
@@ -526,6 +530,23 @@ impl<T: Trait> Module<T>
         depositing_vec_lock[mark]= (new_lock_bal,coin_type);
         <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
     }
+
+    ///
+    pub fn lock_access_control(who:T::AccountId){
+        //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
+        let mut deposit_total = 0;
+        let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
+        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+            // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
+            // println!("bal {:?} ctype {:?}",bal.clone(),ctype.clone());
+            if bal != T::Balance::sa(0u64) {
+                deposit_total = deposit_total + 1;
+            }
+        });
+        if deposit_total == 0{
+            Self::uninit_lock(who.clone());
+        }
+     }
 
     /// Adjust deposing_list
     pub fn depositing_withdraw_record(who: T::AccountId, balance:T::Balance, coin_type:u64, d_w: bool){
@@ -543,7 +564,11 @@ impl<T: Trait> Module<T>
                     mark = i;
                 }else {
                     //withdraw
-                    new_balance = oldbalance - balance;
+                    //new_balance = oldbalance - balance;
+                    new_balance = match oldbalance.checked_sub(&balance) {
+                        Some(a) => a,
+                        None => T::Balance::sa(0),
+                    };
                     mark = i;
                 }
             }
@@ -554,7 +579,6 @@ impl<T: Trait> Module<T>
         <DespositingBalance<T>>::insert(who.clone(),depositing_vec);
         Self::depositing_access_control(who);
     }
-
     /// use DepositngAccountTotal to control  DespoitingAccount
     pub fn depositing_access_control(who:T::AccountId){
         //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
@@ -624,7 +648,11 @@ impl<T: Trait> Module<T>
         if in_out {
             money = money + balance;
         }else {
-            money = money - balance;
+            //money = money - balance;
+            money = match money.checked_sub(&balance) {
+                Some(a) => a,
+                None => T::Balance::sa(0),
+            };
         }
         <CoinDeposit<T>>::insert(coin_type,money);
     }
@@ -634,7 +662,11 @@ impl<T: Trait> Module<T>
         if in_out {
             money = money + balance;
         }else {
-            money = money - balance;
+            //money = money - balance;
+            money = match money.checked_sub(&balance) {
+                Some(a) => a,
+                None => T::Balance::sa(0),
+            };
         }
         <CoinReward<T>>::insert(coin_type,money);
     }
@@ -650,12 +682,12 @@ impl<T: Trait> Module<T>
         x1.checked_add(&x2);
     }
 
-    // 判断是否要 删除 结构体
+    // make sure the lock record exist
     pub fn check_lock_exist(who:T::AccountId) {
         //let mut is_none = false;
         let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
         if depositing_vec_lock == [].to_vec(){
-            //此时表示这个没表,顺手创建个空表
+            // if not make a new lock record
             Self::init_lock(who.clone());
         }
     }
@@ -669,13 +701,13 @@ impl<T: Trait> Module<T>
     pub fn uninit_lock(who :T::AccountId){
         <DespositingBalanceReserved<T>>::remove(who.clone());
     }
-    // 锁定 coin
+    // lock the amount of coin of who
     pub fn lock(who:T::AccountId, coin: u64 , amount: u64){
         Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,true);
         Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,false);
     }
 
-    // 解锁 coin   上面的反操作
+    // unlock the amount of coin of who
     pub fn unlock(who:T::AccountId, coin: u64 , amount: u64){
         Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,false);
         Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,true);

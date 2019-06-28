@@ -368,13 +368,13 @@ impl<T: Trait> Module<T>
 
     fn calculate_reward(cycle: u64, erc:T::Balance) -> T::Balance {
         let rewardrate = match cycle {
-            1 => 1,
-            2 => 2,
-            3 => 3,
-            4 => 4,
-            _ => 0,
+            1 => 1f64,
+            2 => 1.1,
+            3 => 1.2,
+            4 => 1.3,
+            _ => 0.0,
         };
-        T::Balance::sa((T::Balance::as_(erc) as f64 * rewardrate as f64/100f64  )as u64)
+        T::Balance::sa((T::Balance::as_(erc) as f64 * rewardrate/100f64  )as u64)
     }
 
     fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: Vec<u8>) -> Result {
