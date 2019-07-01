@@ -736,6 +736,7 @@ mod tests {
     use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
     use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
     use signcheck;
+    #[cfg(feature = "std")]
     use rustc_hex::*;
 
     impl_outer_origin!{
@@ -819,9 +820,9 @@ mod tests {
 
             Bank::depositing_withdraw_record(1,50,3,true);
             assert_eq!(Bank::despositing_account(),vec![1]);
-            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (50, 2), (100, 3), (0, 4), (0, 5)].to_vec());
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (50, 2), (100, 3), (0, 4)].to_vec());
             Bank::depositing_withdraw_record(1,55,3,true);
-            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (50, 2), (155, 3), (0, 4), (0, 5)].to_vec());
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (50, 2), (155, 3), (0, 4)].to_vec());
         });
     }
 
@@ -833,17 +834,17 @@ mod tests {
             let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
             assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
            // assert_eq!(Bank::despositing_account(),[5].to_vec());
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (0, 5)].to_vec());
+            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
             let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000500000000000000000000000074251db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be2".from_hex().unwrap();
             let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
             assert_err!(Bank::deposit(Origin::signed(5),data,sign),"This signature is repeat!");
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (0, 5)].to_vec());
+            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000500000000000000000000000074251db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9b32".from_hex().unwrap();
+            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000300000000000000000000000074251db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9b32".from_hex().unwrap();
             let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
             assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (1000, 5)].to_vec());
+            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (1000, 3), (0, 4)].to_vec());
         });
     }
 
@@ -855,7 +856,7 @@ mod tests {
             let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
             assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
             // assert_eq!(Bank::despositing_account(),[5].to_vec());
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4), (0, 5)].to_vec());
+            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
 
             let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be3".from_hex().unwrap();

@@ -99,27 +99,29 @@ path = "../signcheck"
 package = 'ladder-signcheck'
 version = '0.1.0'
 
-[dev-dependencies]
-rustc-hex ="*"
+[dependencies.rustc-hex]
+optional = true
+rustc-hex = "*"
 
 [features]
 default = ["std"]
 std = [
-    'parity-codec/std',
-    'primitives/std',
-    'rstd/std',
-    'runtime-io/std',
-    'support/std',
-    'system/std',
-    'timestamp/std',
-    'sudo/std',
-    'consensus/std',
-    'version/std',
-    'serde_derive',
-    'serde',
-    'safe-mix/std',
-    'sr_primitives/std',
+    "parity-codec/std",
+    "primitives/std",
+    "rstd/std",
+    "runtime-io/std",
+    "support/std",
+    "system/std",
+    "timestamp/std",
+    "sudo/std",
+    "consensus/std",
+    "version/std",
+    "serde_derive",
+    "serde",
+    "safe-mix/std",
+    "sr_primitives/std",
     "balances/std",
     "session/std",
     "signcheck/std",
+    "rustc-hex",
 ]

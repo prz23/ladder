@@ -198,6 +198,10 @@ decl_storage! {
         LockInfoList get(lock_info_list): map (T::AccountId,u64) => Option<TokenInfoT<T>>;
         // record one user's all index
         LockCount get(lock_count) : map T::AccountId => Vec<u64>;
+        //
+        UnlockCount get(unlock_count) : map  T::AccountId => Vec<u64>;
+        //accountid who locks their erc
+        AccountLcokList get(account_lock_list): Vec<T::AccountId>;
     }
         add_extra_genesis {
         config(total) : u64;
@@ -236,23 +240,18 @@ decl_event! {
 impl<T: Trait> Module<T>
 {
     fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (Vec<u8>,T::AccountId,u64,u64,Vec<u8>,T::Hash,u64) {
-
         // message
         let mut messagedrain = message.clone();
-
         // Coin 0-32
         let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
         id_vec.drain(0..16);
         let mut id = Self::u8array_to_u128(id_vec.as_slice());
-
         //sender
-        let mut sender_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        let mut sender_vec: Vec<_> = messagedrain.drain(0..20).collect();
         let sender = sender_vec.drain(0..20).collect();
-
         // Who 33-64  beneficiary
         let mut who_vec: Vec<_> = messagedrain.drain(0..32).collect();
         let who: T::AccountId = Decode::decode(&mut &who_vec[..]).unwrap();
-
         //65-96  value
         let mut amount_vec:Vec<u8> = messagedrain.drain(0..32).collect();
         amount_vec.drain(0..16);
@@ -264,17 +263,31 @@ impl<T: Trait> Module<T>
         //65-96  cycle
         let mut cycle_vec:Vec<u8> = messagedrain.drain(0..32).collect();
         cycle_vec.drain(0..16);
-        let mut cycle128 = Self::u8array_to_u128(amount_vec.as_slice());
-
+        let mut cycle128 = Self::u8array_to_u128(cycle_vec.as_slice());
         let hash:Vec<u8> = messagedrain.drain(0..32).collect();
         //let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
-
         // Signature_Hash
         let signature_hash =  Decode::decode(&mut &signature[..]).unwrap();
 
         return (hash, who, amountu64, cycle128 as u64, sender,signature_hash,id as u64);
     }
 
+    fn  split_unlock_message( message: Vec<u8>, signature: Vec<u8>) -> (Vec<u8>,T::Hash,u64) {
+        // message
+        let mut messagedrain = message.clone();
+        // Coin 0-32
+        let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        id_vec.drain(0..16);
+        let mut id = Self::u8array_to_u128(id_vec.as_slice());
+        println!("3 id {}",id);
+        let hash:Vec<u8> = messagedrain.drain(0..32).collect();
+        //let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
+        println!("8 hash {:?}",hash);
+        // Signature_Hash
+        let signature_hash =  Decode::decode(&mut &signature[..]).unwrap();
+
+        return (hash,signature_hash,id as u64);
+    }
 
     /// Hook to be called after transaction processing.
     pub fn check_rotate_session(block_number: T::BlockNumber) {
@@ -500,8 +513,8 @@ impl<T: Trait> Module<T>
             4 => 31104000,
             _ => 0,
         };
-        let xx =T::Moment::as_(<timestamp::Module<T>>::get())+ offset;
-        xx
+        let unlock_time =T::Moment::as_(<timestamp::Module<T>>::get())+ offset;
+        unlock_time
     }
 
     pub fn save_erc_info(beneficiary:T::AccountId,index:u64,sender:Vec<u8>,value:T::Balance,cycle:u64,txhash: Vec<u8>) -> Result{
@@ -559,8 +572,8 @@ impl<T: Trait> Module<T>
     pub fn get_reward(beneficiary:T::AccountId,index:u64){
         if let Some(mut r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
             let old_reward = r.reward;
-
         }
+        //TODO::insert
     }
 }
 
@@ -576,6 +589,7 @@ mod tests {
     use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
     use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
     use signcheck;
+    #[cfg(feature = "std")]
     use rustc_hex::*;
 
     impl_outer_origin!{
@@ -643,20 +657,45 @@ mod tests {
     type Erc = Module<Test>;
 
     #[test]
-    fn resolving_data() {
+    fn save_erc_info() {
         with_externalities(&mut new_test_ext(), || {
             let coin_vec: Vec<_> = [1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4].to_vec();
-            // Self::save_erc_info(who.clone(),id,sendervec,T::Balance::sa(amount),cycle,txhash)?;
-            assert_ok!(Erc::save_erc_info(5,4.clone(),coin_vec.clone(),T::Balance::sa(5),5,coin_vec));
+            assert_ok!(Erc::save_erc_info(5,6,coin_vec.clone(),<Test as balances::Trait>::Balance::sa(5),5,coin_vec.clone()));
+            assert_eq!(Erc::lock_count(5),[6].to_vec());
+            assert_ok!(Erc::save_erc_info(5,2,coin_vec.clone(),<Test as balances::Trait>::Balance::sa(5),5,coin_vec));
+            assert_eq!(Erc::lock_count(5),[6,2].to_vec());
+            if let Some(mut r) = Erc::lock_info_list((5,6)){
+                println!("id is {}",r.id);
+            }
+            if let Some(mut r) = Erc::lock_info_list((5,2)){
+                println!("id is {}",r.id);
+            }
+            assert_eq!(Erc::lock_info_list((8,6)),None);
         });
     }
 
 
     #[test]
-    fn inilize_test() {
+    fn resolving_data() {
         with_externalities(&mut new_test_ext(), || {
-            //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
+            let mut message : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d0000000000000000000000000000000000000000000000056bc75e2d631000000000000000000000000000000000000000000000000000000000000000000000d3cdd588965b030c16ef40d17c52747185e1572b09ae8b2976eb99944eafecc0".from_hex().unwrap();
+            let mut signature : Vec<u8>= "222300ff4e535bda9751fafd08f35569f413bbee222a84f8012a3dd1db9d15eb3dbdd1d55228b44b673957b48e55632e2f703cd817ec5b8170dcf0306debe26e00".from_hex().unwrap();
+            Erc::split_message(message,signature);
+
+            println!("sender {:?}","74241db5f3ebaeecf9506e4ae988186093341604".from_hex().unwrap());
         });
     }
+
+    #[test]
+    fn resolving_unlock_data() {
+        with_externalities(&mut new_test_ext(), || {
+            let mut message : Vec<u8>= "0000000000000000000000000000000000000000000000000000000000000000d2e2bc670731203f44a36b6176917e463bcad741fb16c6ea9f2b31391ec06029".from_hex().unwrap();
+            let mut signature : Vec<u8>= "8468812a1a99924f63186762381d6bae5a021fc6b61797494ec0544cd7808e543bf3d4956e6db8f3e4959bddb427306756a9ee450cd8eeae26f3ac0d7dd0553200".from_hex().unwrap();
+            Erc::split_unlock_message(message,signature);
+
+            println!("sender {:?}","74241db5f3ebaeecf9506e4ae988186093341604".from_hex().unwrap());
+        });
+    }
+
 
 }

@@ -99,8 +99,9 @@ path = "../signcheck"
 package = 'ladder-signcheck'
 version = '0.1.0'
 
-[dev-dependencies]
-rustc-hex ="*"
+[dependencies.rustc-hex]
+optional = true
+rustc-hex = "*"
 
 
 [features]
@@ -123,4 +124,5 @@ std = [
     "balances/std",
     "session/std",
     "signcheck/std",
+    "rustc-hex",
 ]
