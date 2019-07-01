@@ -388,6 +388,9 @@ impl<T: Trait> Module<T>
                         // accmulate the total reward for one user
                         let now_reward = <AccountReward<T>>::get(v);
                         <AccountReward<T>>::insert(v,reward+now_reward);
+                        // modify the struct
+                        r.reward = r.reward + reward;
+                        <LockInfoList<T>>::insert((v.clone(),index),r.clone());
                         // reward to user
                         T::Currency::deposit_into_existing(&v, <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(reward)));
                     }
