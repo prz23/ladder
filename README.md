@@ -130,3 +130,48 @@ cargo run -- --dev
 ## 3. UI
 * visit https://polkadot.js.org/apps/ .
 * Settings => Local Node.
+* Settings => Developer => Manually enter your custom type definitions as valid JSON
+```
+{
+	"Symbol": "u64",
+	"OrderPair": {
+		"share": "Symbol",
+		"money": "Symbol"
+	},
+	"Status": {
+		"_enum": [
+			"Lcoking",
+			"Unlock",
+			"Withdraw"
+		]
+	},
+	"OtcStatus": {
+		"_enum": [
+			"New",
+			"Half",
+			"Done"
+		]
+	},
+	"OrderT": {
+		"pair": "OrderPair",
+		"index": "u64",
+		"who": "AccountId",
+		"amount": "Symbol",
+		"price": "Symbol",
+		"already_deal": "Symbol",
+		"status": "OtcStatus",
+		"longindex": "u128"
+	},
+	"TokenInfoT": {
+		"id": "u64",
+		"sender": "Vec<u8>",
+		"beneficiary": "AccountId",
+		"value": "Balance",
+		"cycle": "u64",
+		"reward": "Balance",
+		"txhash": "Vec<u8>",
+		"status": "Status",
+		"now_cycle": "u64"
+	}
+}
+```
