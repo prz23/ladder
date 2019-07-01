@@ -291,10 +291,10 @@ impl<T: Trait> Module<T>
         let amountu64= amountu128 as u64;
         // Tx_Hash 97-128
         let hash:Vec<u8> = messagedrain.drain(0..32).collect();
-        let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
+        let tx_hash = T::Hashing::hash( &hash[..]);
 
         // Signature_Hash
-        let signature_hash =  Decode::decode(&mut &signature[..]).unwrap();
+        let signature_hash =  T::Hashing::hash( &signature[..]);
 
         return (tx_hash,who,amountu64,signature_hash,coin_type);
     }

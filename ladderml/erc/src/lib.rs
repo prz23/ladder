@@ -94,7 +94,7 @@ decl_module! {
             //                       depositing amount    signature_hash
             let (txhash, who, amount, cycle, sendervec,signature_hash,id) = Self::split_message(message.clone(),signature);
 
-            let tx_hash = Decode::decode(&mut &message[..]).unwrap();
+            let tx_hash = T::Hashing::hash( &message[..]);
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
                 Ok(y) =>  runtime_io::print("ok") ,
@@ -106,6 +106,7 @@ decl_module! {
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),1,true);
             Self::calculate_total_deposit(T::Balance::sa(amount),true);
 
+            <IdwithAccount<T>>::insert(id,who.clone());
             // emit an event
             Self::deposit_event(RawEvent:: LockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
                 Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
@@ -120,29 +121,46 @@ decl_module! {
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
             // resovling message --> hash  tag  id  amount
-            let (txhash,who,amount,cycle,sendervec,signature_hash,id) = Self::split_message(message.clone(),signature);
-            //let message_hash = Decode::decode(&mut &message.encode()[..]).unwrap();
-             let tx_hash = Decode::decode(&mut &message[..]).unwrap();
+            let (txhash,signature_hash,id) = Self::split_unlock_message(message.clone(),signature);
+            let who = <IdwithAccount<T>>::get(id);
+
+            let tx_hash = T::Hashing::hash( &message[..]);
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
                 Ok(y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
             // ensure no repeat
-            ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
+            ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot unlock if not locking.");
             //ensure!(Self::intentions_withdraw_vec().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
 
-            if Self::is_valid_unlock(who.clone(),id).is_ok(){
-                Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),1,false);
-                Self::calculate_total_deposit(T::Balance::sa(amount),false);
+            let r = match <LockInfoList<T>>::get((who.clone(),id)){
+                Some(x) => x,
+                None => return Err("no"),
+            };
 
-                Self::change_status(who.clone(),id);
-            }else{
-                return Err("cant unlock, still locking");
+            match Self::is_valid_unlock(who.clone(),id){
+                Ok(()) => { Self::depositing_withdraw_record(who.clone(),r.value,1,false);
+                           Self::calculate_total_deposit(r.value,false);
+                           Self::change_status(who.clone(),id);},
+                Err(x) => return Err(x),
             }
+
+            let mut vec = <AccountUnlockCount<T>>::get(who.clone());
+            vec.push(id);
+            <AccountUnlockCount<T>>::insert(who.clone(),vec);
+
+            let mut vec2 = <AccountLockCount<T>>::get(who.clone());
+            let mut mark = 0usize;
+            vec2.iter().enumerate().for_each(|(lock_index,&index)|{
+                if index == id { mark = lock_index;}
+            });
+            vec2.remove(mark);
+            <AccountLockCount<T>>::insert(who.clone(),vec2);
+
             // emit an event
-             Self::deposit_event(RawEvent:: UnLockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
-                 Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
+            // Self::deposit_event(RawEvent:: UnLockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
+             //    Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
             Ok(())
         }
 
@@ -180,28 +198,29 @@ decl_storage! {
 		/// Current index of the session.
 		pub CurrentIndex get(current_index) build(|_| T::BlockNumber::sa(0)): T::BlockNumber;
 
-		/// 新功能 => 模拟chainX 把奖励记录下来，点击领取才发钱 的存储
-		RewardRecord get(reward_record):  map T::AccountId => T::Balance;
-		/// true -- 领取模式  false -- 自动发放模式
+        /// true -- 领取模式  false -- 自动发放模式
 		EnableRewardRecord get(enable_record) config(): bool;
 
         /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
         DespositExchangeRate get(desposit_exchange_rate) :  u64 = 10000000000000;
+
+		/// record one's total reward
+		AccountReward get(account_reward):  map T::AccountId => T::Balance;
         // 总锁仓
         TotalLockToken get(total_lock_token) : T::Balance;
-
-        // 所有人锁仓记录
-        LockTokenList get(lock_token_list) : map T::AccountId => T::Balance;
+        //
+        AccountLockToken get(account_lock_token) : map T::AccountId => T::Balance;
         // all reward
         TotalReward get(total_reward): T::Balance;
         // Lockinfo list
         LockInfoList get(lock_info_list): map (T::AccountId,u64) => Option<TokenInfoT<T>>;
         // record one user's all index
-        LockCount get(lock_count) : map T::AccountId => Vec<u64>;
-        //
-        UnlockCount get(unlock_count) : map  T::AccountId => Vec<u64>;
-        //accountid who locks their erc
-        AccountLcokList get(account_lock_list): Vec<T::AccountId>;
+        AccountLockCount get(account_lock_count) : map T::AccountId => Vec<u64>;
+        //record one user's all unlock index
+        AccountUnlockCount get(account_unlock_count) : map  T::AccountId => Vec<u64>;
+
+        // id -> accountID
+        IdwithAccount get(id_with_account): map u64 => T::AccountId;
     }
         add_extra_genesis {
         config(total) : u64;
@@ -279,10 +298,8 @@ impl<T: Trait> Module<T>
         let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
         id_vec.drain(0..16);
         let mut id = Self::u8array_to_u128(id_vec.as_slice());
-        println!("3 id {}",id);
         let hash:Vec<u8> = messagedrain.drain(0..32).collect();
         //let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
-        println!("8 hash {:?}",hash);
         // Signature_Hash
         let signature_hash =  Decode::decode(&mut &signature[..]).unwrap();
 
@@ -342,7 +359,7 @@ impl<T: Trait> Module<T>
         //do_nothing
         // update the session time of the depositing account
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            Self::lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
+            Self::account_lock_count(v).iter().enumerate().for_each(|(lock_index,&index)| {
                 if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
                     let now = <timestamp::Module<T>>::get();
                     let u64now = T::Moment::as_(now);
@@ -359,7 +376,7 @@ impl<T: Trait> Module<T>
     /// each session calculate each lockerc's reward
     fn reward_deposit() {
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            Self::lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
+            Self::account_lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
                 if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
                     if r.status == Status::Withdraw {
                         //ignore
@@ -369,8 +386,8 @@ impl<T: Trait> Module<T>
                         //accmulate the total reward for all users
                         Self::calculate_total_reward(reward,true);
                         // accmulate the total reward for one user
-                        let now_reward = <RewardRecord<T>>::get(v);
-                        <RewardRecord<T>>::insert(v,reward+now_reward);
+                        let now_reward = <AccountReward<T>>::get(v);
+                        <AccountReward<T>>::insert(v,reward+now_reward);
                         // reward to user
                         T::Currency::deposit_into_existing(&v, <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(reward)));
                     }
@@ -392,7 +409,7 @@ impl<T: Trait> Module<T>
 
     fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: Vec<u8>) -> Result {
         //ensure enough signature
-        <signcheck::Module<T>>::check_signature(who,tx,signature ,message_hash)
+        <signcheck::Module<T>>::check_signature(who,tx, signature,message_hash)
     }
 
     pub fn check_secp512(signature: &[u8; 65], tx: &[u8; 32]) -> Result {
@@ -400,13 +417,13 @@ impl<T: Trait> Module<T>
     }
 
     pub fn initlize(who: T::AccountId){
-        let mut depositing_erc = <LockTokenList<T>>::get(who.clone());
+        let mut depositing_erc = <AccountLockToken<T>>::get(who.clone());
         depositing_erc = T::Balance::sa(0);
-        <LockTokenList<T>>::insert(who.clone(),depositing_erc);
+        <AccountLockToken<T>>::insert(who.clone(),depositing_erc);
     }
 
     fn uninitlize(who: T::AccountId) {
-        <LockTokenList<T>>::remove(who.clone());
+        <AccountLockToken<T>>::remove(who.clone());
     }
 
     /// Adjust deposing_list            beneficiary         value              cycle           in out
@@ -414,7 +431,7 @@ impl<T: Trait> Module<T>
         if Self::despositing_account().iter().find(|&t| t == &who).is_none() {
             Self::initlize(who.clone());
         }
-        let mut depositing_erc = <LockTokenList<T>>::get(who.clone());
+        let mut depositing_erc = <AccountLockToken<T>>::get(who.clone());
         let mut new_balance = T::Balance::sa(0);
          if d_w {
               //deposit
@@ -424,7 +441,7 @@ impl<T: Trait> Module<T>
              new_balance = depositing_erc - balance;
          }
         // change the depositing data vector and put it back to map
-        <LockTokenList<T>>::insert(who.clone(),new_balance);
+        <AccountLockToken<T>>::insert(who.clone(),new_balance);
         Self::depositing_access_control(who);
     }
 
@@ -432,7 +449,7 @@ impl<T: Trait> Module<T>
     pub fn depositing_access_control(who:T::AccountId){
         //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
         let mut deposit_total = 0;
-        let all_data_vec = <LockTokenList<T>>::get(who.clone());
+        let all_data_vec = <AccountLockToken<T>>::get(who.clone());
 
         // if all type of coin is Zero ,  the accountid will be removed from the DepositingVec.
         if all_data_vec == T::Balance::sa(0) {
@@ -523,9 +540,9 @@ impl<T: Trait> Module<T>
             //  already have
             return Err("duplicate erc lock info");
         }else {
-            let mut lock_count_vec = <LockCount<T>>::get(beneficiary.clone());
+            let mut lock_count_vec = <AccountLockCount<T>>::get(beneficiary.clone());
             lock_count_vec.push(index);
-            <LockCount<T>>::insert(beneficiary.clone(),lock_count_vec);
+            <AccountLockCount<T>>::insert(beneficiary.clone(),lock_count_vec);
 
             let new_info = TokenInfo{
                 id:index,
@@ -546,7 +563,6 @@ impl<T: Trait> Module<T>
     ///make sure the account lock the Regulations times
     pub fn is_valid_unlock(beneficiary:T::AccountId,index:u64,) -> Result{
         if let Some(mut r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
-            //
             if r.status == Status::Unlock{
                 return Ok(());
             }else {
@@ -661,9 +677,9 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let coin_vec: Vec<_> = [1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4,1,2,3,4].to_vec();
             assert_ok!(Erc::save_erc_info(5,6,coin_vec.clone(),<Test as balances::Trait>::Balance::sa(5),5,coin_vec.clone()));
-            assert_eq!(Erc::lock_count(5),[6].to_vec());
+            assert_eq!(Erc::account_lock_count(5),[6].to_vec());
             assert_ok!(Erc::save_erc_info(5,2,coin_vec.clone(),<Test as balances::Trait>::Balance::sa(5),5,coin_vec));
-            assert_eq!(Erc::lock_count(5),[6,2].to_vec());
+            assert_eq!(Erc::account_lock_count(5),[6,2].to_vec());
             if let Some(mut r) = Erc::lock_info_list((5,6)){
                 println!("id is {}",r.id);
             }
@@ -680,20 +696,37 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let mut message : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d0000000000000000000000000000000000000000000000056bc75e2d631000000000000000000000000000000000000000000000000000000000000000000000d3cdd588965b030c16ef40d17c52747185e1572b09ae8b2976eb99944eafecc0".from_hex().unwrap();
             let mut signature : Vec<u8>= "222300ff4e535bda9751fafd08f35569f413bbee222a84f8012a3dd1db9d15eb3dbdd1d55228b44b673957b48e55632e2f703cd817ec5b8170dcf0306debe26e00".from_hex().unwrap();
-            Erc::split_message(message,signature);
-
-            println!("sender {:?}","74241db5f3ebaeecf9506e4ae988186093341604".from_hex().unwrap());
+            //Erc::split_message(message,signature);
+            Erc::lock_erc(Some(1).into(),message,signature);
+            assert_eq!(Erc::id_with_account(0),2077282123132384724);
+            assert_eq!(Erc::account_lock_count(2077282123132384724),[0].to_vec());
+            if let Some(mut r) = Erc::lock_info_list((2077282123132384724,0)){
+                println!("id is {}",r.id);
+                println!("status is {:?}",r.status);
+            }
         });
     }
 
     #[test]
     fn resolving_unlock_data() {
         with_externalities(&mut new_test_ext(), || {
-            let mut message : Vec<u8>= "0000000000000000000000000000000000000000000000000000000000000000d2e2bc670731203f44a36b6176917e463bcad741fb16c6ea9f2b31391ec06029".from_hex().unwrap();
-            let mut signature : Vec<u8>= "8468812a1a99924f63186762381d6bae5a021fc6b61797494ec0544cd7808e543bf3d4956e6db8f3e4959bddb427306756a9ee450cd8eeae26f3ac0d7dd0553200".from_hex().unwrap();
-            Erc::split_unlock_message(message,signature);
+            let mut message : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d0000000000000000000000000000000000000000000000056bc75e2d631000000000000000000000000000000000000000000000000000000000000000000000d3cdd588965b030c16ef40d17c52747185e1572b09ae8b2976eb99944eafecc2".from_hex().unwrap();
+            let mut signature : Vec<u8>= "222300ff4e535bda9751fafd08f35569f413bbee222a84f8012a3dd1db9d15eb3dbdd1d55228b44b673957b48e55632e2f703cd817ec5b8170dcf0306debe26e00".from_hex().unwrap();
+            //Erc::split_message(message,signature);
+            Erc::lock_erc(Some(1).into(),message.clone(),signature.clone());
+            assert_eq!(Erc::id_with_account(0),2077282123132384724);
+            assert_eq!(Erc::account_lock_count(2077282123132384724),[0].to_vec());
+            if let Some(mut r) = Erc::lock_info_list((2077282123132384724,0)){
+                println!("id is {}",r.id);
+                println!("status is {:?}",r.status);
+            }
 
-            println!("sender {:?}","74241db5f3ebaeecf9506e4ae988186093341604".from_hex().unwrap());
+            let mut mess : Vec<u8>= "0000000000000000000000000000000000000000000000000000000000000000d2e2bc670731203f44a36b6176917e463bcad741fb16c6ea9f2b31391ec06029".from_hex().unwrap();
+            let mut signa : Vec<u8>= "8468812a1a99924f63186762381d6bae5a021fc6b61797494ec0544cd7808e543bf3d4956e6db8f3e4959bddb427306756a9ee450cd8eeae26f3ac0d7dd0553200".from_hex().unwrap();
+            let mut mess2 : Vec<u8>= "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".from_hex().unwrap();
+
+            //Erc::split_unlock_message(message2.clone(),signature2.clone());
+            assert_err!(Erc::unlock_erc(Some(2).into(),mess.clone(),signa),"still locking,cant withdraw");
         });
     }
 
