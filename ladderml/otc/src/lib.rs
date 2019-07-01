@@ -60,7 +60,7 @@ impl<pair,AccountID,symbol,status> OrderContent<pair,AccountID,symbol,status>{
 
 #[derive(PartialEq, Eq, Clone, Copy, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub enum Status {
+pub enum OtcStatus {
     New,
     Half,
     Done,
@@ -70,7 +70,7 @@ pub type OrderT<T> = OrderContent<
     OrderPair,
     <T as system::Trait>::AccountId,
     Symbol,
-    Status,
+    OtcStatus,
 >;
 
 decl_event!(
@@ -100,6 +100,8 @@ decl_storage! {
         pub AllSellOrders get(all_sell_orders):map u128 => Option<OrderT<T>>;
 
         pub AllSellOrdersIndex get(all_sell_orders_index): u128;
+
+        // orderpair --> unique index  Valid
 
      }
 }
@@ -134,7 +136,6 @@ decl_module! {
 
             // find the sell order
             if let Some(mut sellorder) = Self::sell_order_of((seller,pair,index)){
-
                 // make sure the buy operate is valid
                 Self::check_valid_buy(buyer.clone(),amount,sellorder.clone())?;
                 // do the buy operate and modify the order's status
@@ -256,7 +257,7 @@ impl<T: Trait> Module<T> {
             amount: amount,      // pair.share
             price: per_price,    // pair.money
             already_deal:0,
-            status: Status::New,  //Status
+            status: OtcStatus::New,  //Status
             longindex : new_unique_index,
         };
         <SellOrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
@@ -275,9 +276,9 @@ impl<T: Trait> Module<T> {
         sell_order.already_deal = sell_order.already_deal+amount;
         // change sell order status
         if sell_order.already_deal < sell_order.amount {
-            sell_order.status = Status::Half;
+            sell_order.status = OtcStatus::Half;
         }else if sell_order.amount == sell_order.already_deal {
-            sell_order.status = Status::Done;
+            sell_order.status = OtcStatus::Done;
         }else { return  Err("wrong!"); }
 
         // save the modified sell order
@@ -298,14 +299,14 @@ impl<T: Trait> Module<T> {
     /// cancel the sell order
     pub fn cancel_order_operate(who:T::AccountId,mut sell_order:OrderT<T>) -> Result{
         // if the order is in Done status ,return directly
-        if sell_order.status == Status::Done { return Ok(()) ;}
+        if sell_order.status == OtcStatus::Done { return Ok(()) ;}
 
         // calculate the left money in sell order
         let left_shares = sell_order.amount - sell_order.already_deal;
         // unlock the left
         <bank::Module<T>>::unlock(who.clone(),sell_order.pair.share,left_shares);
         //modify the status to done
-        sell_order.status = Status::Done;
+        sell_order.status = OtcStatus::Done;
         <SellOrdersOf<T>>::insert((who.clone(), sell_order.pair.clone(), sell_order.index), sell_order.clone());
         <AllSellOrders<T>>::insert(sell_order.longindex, sell_order.clone());
         //deposit_event

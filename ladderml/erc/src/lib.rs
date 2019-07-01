@@ -109,7 +109,7 @@ decl_module! {
             <IdwithAccount<T>>::insert(id,who.clone());
             // emit an event
             Self::deposit_event(RawEvent:: LockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
-                Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
+                Self::unlock_time(cycle),T::Hashing::hash(&txhash[..])));
             Ok(())
         }
 
@@ -159,8 +159,8 @@ decl_module! {
             <AccountLockCount<T>>::insert(who.clone(),vec2);
 
             // emit an event
-            // Self::deposit_event(RawEvent:: UnLockToken(id,who.clone(),sendervec, T::Balance::sa(amount),cycle,
-             //    Self::unlock_time(cycle),Decode::decode(&mut &txhash[..]).unwrap()),);
+             Self::deposit_event(RawEvent:: UnLockToken(id,r.beneficiary.clone(),r.sender, r.value,r.cycle,
+                Self::unlock_time(r.cycle),T::Hashing::hash(&txhash[..])));
             Ok(())
         }
 
@@ -403,12 +403,12 @@ impl<T: Trait> Module<T>
 
     fn calculate_reward(cycle: u64, erc:T::Balance) -> T::Balance {
         let rewardrate = match cycle {
-            0 => 1.08,
-            1 => 1.1f64,
-            2 => 1.15,
-            3 => 1.18,
-            4 => 1.2,
-            _ => 0.0,
+            0 => 1.010,
+            1 => 1.012,
+            2 => 1.014,
+            3 => 1.016,
+            4 => 1.018,
+            _ => 0.000f64,
         };
         T::Balance::sa((T::Balance::as_(erc) as f64 * rewardrate/100f64  )as u64)
     }
