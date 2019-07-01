@@ -22,7 +22,7 @@ use client::{blockchain::HeaderBackend, BlockchainEvents};
 use exchange::Exchange;
 use futures::{Future, Stream};
 use keystore::Store as Keystore;
-use log::{debug, error, info, trace, warn};
+use log::{error, info, warn};
 use network::SyncProvider;
 use node_runtime::{
     matrix::*, Event, EventRecord,

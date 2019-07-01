@@ -1,4 +1,4 @@
-use log::{debug, error, info, trace, warn};
+use log::{error, info};
 use signer::{AbosTransaction, EthTransaction, KeyPair};
 use tokio_core::reactor::Core;
 use web3::{

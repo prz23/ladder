@@ -1,0 +1,1 @@
+ .\target\debug\ladder.exe build-spec --chain=ladder > ladder_spec.json

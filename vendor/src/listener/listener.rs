@@ -5,7 +5,7 @@ use crate::supervisor::SuperviseClient;
 use crate::vendor::Vendor;
 use crate::mapper::Mapper;
 use futures::{Stream};
-use log::{debug, error, info, trace, warn};
+use log::{error, info};
 use std::marker::{Send, Sync};
 use std::path::{PathBuf};
 use std::sync::{Arc};

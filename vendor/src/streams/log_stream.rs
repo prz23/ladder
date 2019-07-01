@@ -6,7 +6,7 @@ use crate::label::ChainAlias;
 use ethabi;
 use futures::future::FromErr;
 use futures::{try_ready, Async, Future, Poll, Stream};
-use log::{debug, info};
+use log::{debug};
 use std::time::Duration;
 use tokio_timer::{Timeout, Timer};
 use web3;
