@@ -347,7 +347,7 @@ impl<T: Trait> Module<T>
             <LastLengthChange<T>>::put(block_number);
         }
         Self::adjust_deposit_list();
-
+        runtime_io::print("Start adjust_deposit_list");
         // 1. Reward directly to account 2. Click to get reward
         match Self::enable_record() {
             _ =>  Self::reward_deposit(),
@@ -378,9 +378,11 @@ impl<T: Trait> Module<T>
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             Self::account_lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
                 if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
+                    runtime_io::print("reward_deposit");
                     if r.status == Status::Withdraw {
                         //ignore
                     }else {
+                        runtime_io::print("reward_deposit2");
                         //calculate reward
                         let reward = Self::calculate_reward(r.cycle,r.value);
                         //accmulate the total reward for all users
@@ -401,10 +403,11 @@ impl<T: Trait> Module<T>
 
     fn calculate_reward(cycle: u64, erc:T::Balance) -> T::Balance {
         let rewardrate = match cycle {
-            1 => 1f64,
-            2 => 1.1,
-            3 => 1.2,
-            4 => 1.3,
+            0 => 1.08,
+            1 => 1.1f64,
+            2 => 1.15,
+            3 => 1.18,
+            4 => 1.2,
             _ => 0.0,
         };
         T::Balance::sa((T::Balance::as_(erc) as f64 * rewardrate/100f64  )as u64)
@@ -546,7 +549,10 @@ impl<T: Trait> Module<T>
             let mut lock_count_vec = <AccountLockCount<T>>::get(beneficiary.clone());
             lock_count_vec.push(index);
             <AccountLockCount<T>>::insert(beneficiary.clone(),lock_count_vec);
-
+            let status = match cycle{
+                0 => Status::Unlock,
+                _ => Status::Lcoking,
+            };
             let new_info = TokenInfo{
                 id:index,
                 sender:sender.clone(),
@@ -555,7 +561,7 @@ impl<T: Trait> Module<T>
                 cycle:cycle,
                 reward: T::Balance::sa(0),
                 txhash:txhash,
-                status: Status::Lcoking,
+                status: status,
                 now_cycle:Self::unlock_time(cycle),
             };
             <LockInfoList<T>>::insert((beneficiary.clone(),index),new_info);
@@ -690,6 +696,7 @@ mod tests {
                 println!("id is {}",r.id);
             }
             assert_eq!(Erc::lock_info_list((8,6)),None);
+
         });
     }
 
@@ -707,6 +714,7 @@ mod tests {
                 println!("id is {}",r.id);
                 println!("status is {:?}",r.status);
             }
+            assert_eq!(Erc::total_lock_token(),10000000);
         });
     }
 
@@ -726,10 +734,9 @@ mod tests {
 
             let mut mess : Vec<u8>= "0000000000000000000000000000000000000000000000000000000000000000d2e2bc670731203f44a36b6176917e463bcad741fb16c6ea9f2b31391ec06029".from_hex().unwrap();
             let mut signa : Vec<u8>= "8468812a1a99924f63186762381d6bae5a021fc6b61797494ec0544cd7808e543bf3d4956e6db8f3e4959bddb427306756a9ee450cd8eeae26f3ac0d7dd0553200".from_hex().unwrap();
-            let mut mess2 : Vec<u8>= "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".from_hex().unwrap();
 
             //Erc::split_unlock_message(message2.clone(),signature2.clone());
-            assert_err!(Erc::unlock_erc(Some(2).into(),mess.clone(),signa),"still locking,cant withdraw");
+            assert_ok!(Erc::unlock_erc(Some(2).into(),mess.clone(),signa));
         });
     }
 
