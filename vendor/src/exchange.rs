@@ -44,7 +44,6 @@ pub struct exchange_rate {
 
 fn parse_exchange_rate(content: String) -> (f64, u64) {
     // Deserialize using `json::decode`
-    // 将json字符串中的数据转化成Struct对应的数据，相当于初始化
     let decoded: exchange_rate = json::decode(&content).unwrap();
     println!("exchange_rate {:?}", decoded.close);
     println!("exchange_rate time {:?}", decoded.dateTime);
@@ -67,7 +66,6 @@ where
         let info = self.client.info().unwrap();
         let at = BlockId::Hash(info.best_hash);
         let accountid = &self.accountid;
-        //println!("验证者！！！accountid is {:?}",accountid);
         self.client
             .runtime_api()
             .is_authority(&at, accountid)
@@ -97,7 +95,7 @@ where
     pub spv: Arc<V>,
 }
 
-/// oracle 获取ETHUSD等等的汇率
+/// oracle
 impl<A, B, Q, V> Exchange<A, B, Q, V>
 where
     A: txpool::ChainApi<Block = B> + 'static,
@@ -111,7 +109,6 @@ where
             loop {
                 let mut timestamp = Utc::now().timestamp() as u64;
                 if timestamp % 120 == 0 {
-                    // 在这里获取2个汇率，进行一波操作保存 整数aa 的timestamp 然后发出event
                     self.get_exchange_rate(
                         "http://api.coindog.com/api/v1/tick/BITFINEX:ETHUSD?unit=cny",
                         1,
@@ -133,7 +130,6 @@ where
         easy.get(true).unwrap();
         easy.url(url).unwrap();
 
-        // 只有validator才有权限去进行oracle获取并上传汇率
         if self.check_validators() {
             // perform the http get method and fetch the responsed
             if easy.perform().is_err() {
@@ -143,10 +139,7 @@ where
             if easy.response_code().unwrap() == 200 {
                 let contents = easy.get_ref();
                 let contents_string = String::from_utf8_lossy(&contents.0).to_string();
-                //println!("exchange_rate <---> {}",contents_string);
-                println!("获取汇率success");
                 let (exchange_rate, _time) = parse_exchange_rate(contents_string);
-                // 以交易形把数据上传到链上
                 let hash = H256::from_str(
                     "0000000000000000000000000000000000000000000000000000000000000001",
                 )
@@ -159,7 +152,7 @@ where
                 };
                 self.spv.submit(RelayMessage::from(message));
             } else {
-                println!("获取汇率失败");
+                println!("failed get info");
             }
         };
     }
