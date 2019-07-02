@@ -49,11 +49,12 @@ pub struct OrderContent<pair,AccountID,symbol,status> {
     pub already_deal:symbol, // already sold
     pub status: status,      // sell order status
     pub longindex: u128,     // an unique index for each sell order
+    pub reserved: bool,      // send the balance to bank or contract
 }
 
 impl<pair,AccountID,symbol,status> OrderContent<pair,AccountID,symbol,status>{
-    pub fn parse_order_data(&self) {
-
+    pub fn reserved(&self) -> bool {
+        self.reserved
     }
 }
 
@@ -75,11 +76,12 @@ pub type OrderT<T> = OrderContent<
 decl_event!(
     pub enum Event<T>
     where
-        <T as system::Trait>::AccountId,
+        <T as system::Trait>::AccountId
     {
         SellOrder(AccountId,OrderPair,u64,Symbol,Symbol,u128), // seller pair index amount price uniqueindex
-        Buy(AccountId,AccountId,OrderPair,u64,Symbol,u128), //buyer seller pair index amount uniqueindex
+        Buy(AccountId,AccountId,OrderPair,u64,Symbol,u128,bool), //buyer seller pair index amount uniqueindex
         CancelsellOrder(AccountId,OrderPair,u64,u128),
+        MatchOrder(u128, Symbol, AccountId, u64, bool, AccountId, u64, bool),
     }
 );
 
@@ -117,18 +119,18 @@ decl_module! {
         }
 
         ///  put up a sell order to sell the amount of pair.share for per_price of pair.money
-        pub fn put_order(origin, pair_type:OrderPair,amount:u64, per_price:u64) -> Result{
+        pub fn put_order(origin, pair_type:OrderPair,amount:u64, per_price:u64, reserved:bool) -> Result{
             let sender = ensure_signed(origin)?;
             // make sure the sell order is valid
             Self::check_valid_order(sender.clone(),pair_type.clone(),amount,per_price)?;
             // generate a new sell order , lock the money in bank,deposit_event and put up the order
-            Self::generate_new_sell_order_and_put_into_list(sender.clone(),pair_type.clone(),amount,per_price);
+            Self::generate_new_sell_order_and_put_into_list(sender.clone(),pair_type.clone(),amount,per_price,reserved);
 
             Ok(())
         }
 
         /// chose an sell order to buy the amount of pair.share
-        pub fn buy(origin, seller:T::AccountId, pair:OrderPair ,index:u64, amount:u64) -> Result{
+        pub fn buy(origin, seller:T::AccountId, pair:OrderPair ,index:u64, amount:u64, reserved:bool) -> Result{
             let buyer = ensure_signed(origin)?;
 
             // find the sell order
@@ -136,7 +138,7 @@ decl_module! {
                 // make sure the buy operate is valid
                 Self::check_valid_buy(buyer.clone(),amount,sellorder.clone())?;
                 // do the buy operate and modify the order's status
-                Self::buy_operate(buyer.clone(),sellorder.clone(),amount);
+                Self::buy_operate(buyer.clone(),sellorder.clone(),amount,reserved)?;
             }else{
                 return Err("invalid sell order");
             }
@@ -153,6 +155,10 @@ decl_module! {
             }else{
                 return Err("invalid sell order");
             }
+            Ok(())
+        }
+
+        pub fn match_order_verification(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             Ok(())
         }
     }
@@ -231,7 +237,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn generate_new_sell_order_and_put_into_list(who:T::AccountId, pair_type:OrderPair,amount:u64, per_price:u64 ){
+    fn generate_new_sell_order_and_put_into_list(who:T::AccountId,pair_type:OrderPair,amount:u64,per_price:u64,reserved:bool){
         // assign a new sell order index
         let new_last_index = Self::last_sell_order_index_of((who.clone(), pair_type.clone())).unwrap_or_default() + 1;
         <LastSellOrderIndexOf<T>>::insert((who.clone(), pair_type.clone()), new_last_index);
@@ -249,6 +255,7 @@ impl<T: Trait> Module<T> {
             already_deal:0,
             status: OtcStatus::New,  //Status
             longindex : new_unique_index,
+            reserved : reserved,
         };
         <SellOrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
         <AllSellOrders<T>>::insert(new_unique_index,new_sell_order.clone());
@@ -264,7 +271,7 @@ impl<T: Trait> Module<T> {
     }
 
     // buy operate , lock the money and change the status
-    fn buy_operate(buyer:T::AccountId,mut sell_order: OrderT<T>, amount:u64) -> Result {
+    fn buy_operate(buyer:T::AccountId,mut sell_order: OrderT<T>, amount:u64, reserved:bool) -> Result {
         // modify the exchanged money
         sell_order.already_deal = sell_order.already_deal+amount;
         // change sell order status
@@ -289,10 +296,13 @@ impl<T: Trait> Module<T> {
         //exchange the money in bank
         <bank::Module<T>>::buy_operate(buyer.clone(),sell_order.who.clone(),sell_order.pair.share.clone(),
                                        sell_order.pair.money.clone(),sell_order.price.clone(),
-                                       amount);
+                                       amount,sell_order.reserved(),reserved);
         //deposit_event
+        //MatchOrder(id, price, seller, saleAmount, reserved, buyer, purchasingAmount, reserved);
+        Self::deposit_event(RawEvent::MatchOrder(sell_order.longindex,sell_order.price,sell_order.who.clone(),
+                                                 amount,sell_order.reserved(),buyer.clone(),sell_order.price*amount,reserved));
         Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.who.clone(),sell_order.pair.clone(),
-                                          sell_order.index, amount, sell_order.longindex));
+                                          sell_order.index, amount, sell_order.longindex,reserved));
         Ok(())
     }
 
@@ -439,7 +449,7 @@ mod tests {
             Bank::depositing_withdraw_record(2,50,1,true);
             Bank::depositing_withdraw_record(2,50,2,true);
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
-            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5)); // 买4个币，花了4x10=40块 剩下10块
+            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5));
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (100, 2), (50, 3), (0, 4)].to_vec());
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (5, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 

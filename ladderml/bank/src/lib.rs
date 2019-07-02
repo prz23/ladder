@@ -691,12 +691,20 @@ impl<T: Trait> Module<T>
 
     /// After the purchase operation, the amount of the two parties is modified
     /// by modifying the buyer's ID and the buyer's bid amount of two kinds of currencies.
-    pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64, type_money:u64 ,price:u64 ,amount:u64 ){
+    pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64,
+                       type_money:u64 ,price:u64 ,amount:u64, sell_res:bool, buy_res:bool ){
         // Deducting the amount locked in by the seller and transferring the buyer's money.
+        // unlock the reserved token anyway
         Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,false);
-        Self::depositing_withdraw_record(seller.clone(),T::Balance::sa(amount*price),type_money,true);
-        // At the same time deduct the buyer's money
-        Self::depositing_withdraw_record(buyer.clone(),T::Balance::sa(amount*price),type_money,false);
+        if sell_res {
+            Self::depositing_withdraw_record(seller.clone(), T::Balance::sa(amount * price), type_money, true);
+        }
+        // At the same time deduct the buyer's money anyway
+        Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount * price), type_money, false);
+        if buy_res {
+            Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount), type_share, true);
+        }
+
     }
 }
 

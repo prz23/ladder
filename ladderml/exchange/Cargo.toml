@@ -78,16 +78,16 @@ version = '2.0.0'
 [features]
 default = ["std"]
 std = [
-    'parity-codec/std',
-    'primitives/std',
-    'rstd/std',
-    'runtime-io/std',
-    'support/std',
-    'system/std',
-    'version/std',
-    'serde_derive',
-    'serde',
-    'safe-mix/std',
-    'sr_primitives/std',
+    "parity-codec/std",
+    "primitives/std",
+    "rstd/std",
+    "runtime-io/std",
+    "support/std",
+    "system/std",
+    "version/std",
+    "serde_derive",
+    "serde",
+    "safe-mix/std",
+    "sr_primitives/std",
     "session/std",
 ]
