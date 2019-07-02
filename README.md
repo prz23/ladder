@@ -171,7 +171,8 @@ cargo run -- --dev
 		"reward": "Balance",
 		"txhash": "Vec<u8>",
 		"status": "Status",
-		"now_cycle": "u64"
+		"now_cycle": "u64",
+		"reserved": "bool"
 	}
 }
 ```
