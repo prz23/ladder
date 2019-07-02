@@ -27,16 +27,15 @@ pub trait Trait: system::Trait + bank::Trait{
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
-/// 记录不同币种的类型 1 eth   2 btc  等等
 pub type Symbol = u64;
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct OrderPair {
     #[codec(compact)]
-    pub share: Symbol,      // 股票
+    pub share: Symbol,
     #[codec(compact)]
-    pub money: Symbol,      // 钱
+    pub money: Symbol,
 }
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
@@ -120,10 +119,8 @@ decl_module! {
         ///  put up a sell order to sell the amount of pair.share for per_price of pair.money
         pub fn put_order(origin, pair_type:OrderPair,amount:u64, per_price:u64) -> Result{
             let sender = ensure_signed(origin)?;
-
             // make sure the sell order is valid
             Self::check_valid_order(sender.clone(),pair_type.clone(),amount,per_price)?;
-
             // generate a new sell order , lock the money in bank,deposit_event and put up the order
             Self::generate_new_sell_order_and_put_into_list(sender.clone(),pair_type.clone(),amount,per_price);
 
@@ -145,7 +142,6 @@ decl_module! {
             }
             Ok(())
         }
-
 
         pub fn cancel_order(origin,pair_type:OrderPair,index:u64) -> Result {
             let sender = ensure_signed(origin)?;
@@ -174,7 +170,6 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-
     fn is_price_zero(price:u64) -> Result {
         if price == Zero::zero() {
             return Err("price cann't be 0");
@@ -195,10 +190,9 @@ impl<T: Trait> Module<T> {
     /// Query the Bank Module，make sure the seller have enough money to sell
     /// and check the parmeters is not zero
     fn check_valid_order(who: T::AccountId, pair:OrderPair, amount:u64, price:u64) -> Result {
-        //
+
         Self::is_valid_pair(&pair)?;
 
-        //
         Self::is_price_zero(amount)?;
         Self::is_price_zero(price)?;
 
@@ -218,7 +212,7 @@ impl<T: Trait> Module<T> {
     }
 
     fn check_valid_buy(who:T::AccountId,amount:u64,sell_order:OrderT<T>) -> Result {
-        //
+
         Self::is_price_zero(amount)?;
 
         // cant buy exceed the sell order

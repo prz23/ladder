@@ -86,7 +86,6 @@ decl_module! {
             let sender = ensure_signed(origin)?;
             runtime_io::print("====================lock_erc===============");
 /*
-            //TODO: 在这里判断 sender 是否有权限提交 后期启动节点时写入
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
 */
@@ -132,7 +131,6 @@ decl_module! {
             }
             // ensure no repeat
             ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot unlock if not locking.");
-            //ensure!(Self::intentions_withdraw_vec().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
 
             let r = match <LockInfoList<T>>::get((who.clone(),id)){
                 Some(x) => x,
@@ -170,8 +168,6 @@ decl_module! {
            <SessionLength<T>>::put(T::BlockNumber::sa(session_len));
         }
 
-
-
         /// a new session starts
 		fn on_finalize(n: T::BlockNumber) {
 		    Self::check_rotate_session(n);
@@ -198,7 +194,6 @@ decl_storage! {
 		/// Current index of the session.
 		pub CurrentIndex get(current_index) build(|_| T::BlockNumber::sa(0)): T::BlockNumber;
 
-        /// true -- 领取模式  false -- 自动发放模式
 		EnableRewardRecord get(enable_record) config(): bool;
 
         /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
@@ -206,7 +201,7 @@ decl_storage! {
 
 		/// record one's total reward
 		AccountReward get(account_reward):  map T::AccountId => T::Balance;
-        // 总锁仓
+        //
         TotalLockToken get(total_lock_token) : T::Balance;
         //
         AccountLockToken get(account_lock_token) : map T::AccountId => T::Balance;

@@ -183,7 +183,7 @@ decl_storage! {
         /// accountid => (balance , type)
         DespositingBalance get(despositing_banance): map T::AccountId => Vec<(T::Balance,u64)>;
         DespositingTime get(despositing_time): map T::AccountId => u32;
-        // 锁定的bank金额
+        // Locked token
         DespositingBalanceReserved get(despositing_banance_reserved): map T::AccountId => Vec<(T::Balance,u64)>;
 
         /// All the accounts with a desire to deposit.  to control one time one deposit.
@@ -220,9 +220,9 @@ decl_storage! {
 		/// Current index of the session.
 		pub CurrentIndex get(current_index) build(|_| T::BlockNumber::sa(0)): T::BlockNumber;
 
-		/// 新功能 => 模拟chainX 把奖励记录下来，点击领取才发钱 的存储
+		/// record the reward
 		RewardRecord get(reward_record):  map T::AccountId => T::Balance;
-		/// true -- 领取模式  false -- 自动发放模式
+		///
 		EnableRewardRecord get(enable_record) config(): bool;
         ///
         TotalDespositingBalacne  get(total_despositing_balance) : T::Balance;
@@ -270,7 +270,7 @@ impl<T: Trait> Module<T>
 {
     fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash,u64) {
 
-        // 解析message --> hash  tag  id  amount
+        // message --> hash  tag  id  amount
         let mut messagedrain = message.clone();
 
         // Coin 0-32
@@ -328,10 +328,7 @@ impl<T: Trait> Module<T>
     }
 
     /// Move onto next session: register the new authority set.
-    /// 把新的 depositingqueue 加入 实际depositing列表   或者 把不存钱的账户从列表里删除
-    /// 并且根据其存的金额 之后每个session都对列表里的人存的钱发一定比例到他的balance里
     pub fn rotate_session(is_final_block: bool, _apply_rewards: bool) {
-        runtime_io::print("开始调整depositing列表，同时开始给他们发钱");
         let now = <timestamp::Module<T>>::get();
         let _time_elapsed = now.clone() - Self::current_start();
         let session_index = <CurrentIndex<T>>::get() + One::one();
@@ -411,14 +408,12 @@ impl<T: Trait> Module<T>
 
     /// Record the reward and click on it to get the money.
     fn reward_deposit_record() {
-        //循环历遍一下所有deposit列表，分别对每个账户的每种币的抵押的奖励进行记录
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             let depositing_vec = <DespositingBalance<T>>::get(v);
             depositing_vec.iter().enumerate().for_each(|(i,&(balances,cointype))| {
                 let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),balances);
                 let now_reward = <RewardRecord<T>>::get(v);
                 <RewardRecord<T>>::insert(v,reward+now_reward);
-
                 //Self::calculate_total_reward(cointype,balances,true);
             });
         });
@@ -426,13 +421,7 @@ impl<T: Trait> Module<T>
 
     /// Money awarded directly to a specified deposit account in each session
     fn reward_deposit() {
-        //循环历遍一下所有deposit列表，分别对每个账户进行单独的发钱处理
-        //首先判断session 决定一个 时间比率
-        //再判断balance 决定一个 存款比率
-        //两个比率结合起来决定一个 乘积因子Xbalance => 然后往账户发
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            //let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),<DespositingBalance<T>>::get(v));
-           // let _ = <balances::Module<T>>::reward(v, reward);
         });
     }
 
@@ -486,13 +475,10 @@ impl<T: Trait> Module<T>
     }
 
     pub fn check_secp512(signature: &[u8; 65], tx: &[u8; 32]) -> Result {
-        //if runtime_io::secp256k1_ecdsa_recover(signature,tx).is_ok(){ } else {
-        //return Err(()); }
         Ok(())
     }
 
     pub fn initlize(who: T::AccountId){
-        //println!("initlizeinitlizeinitlizeinitlizeinitlizeinitlizeinitlize");
         let mut depositing_vec = <DespositingBalance<T>>::get(who.clone());
         for i in 0u64..5u64{
             depositing_vec.push((T::Balance::sa(0),i));
@@ -506,9 +492,9 @@ impl<T: Trait> Module<T>
 
     /// Adjust lock_money
     pub fn lock_unlock_record(who: T::AccountId, balance:T::Balance, coin_type:u64, d_w: bool){
-        // 判断这个人是否有过表，没的话创建个新的
+        // Determine if the person has a list, create a new one if not
         Self::check_lock_exist(who.clone());
-        // 然后 获取这个表
+        // modify the balance
         let mut new_lock_bal = T::Balance::sa(0);
         let mut mark = 0usize;
         let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
@@ -533,12 +519,10 @@ impl<T: Trait> Module<T>
 
     ///
     pub fn lock_access_control(who:T::AccountId){
-        //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
         let mut deposit_total = 0;
         let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
         all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
-            // println!("bal {:?} ctype {:?}",bal.clone(),ctype.clone());
             if bal != T::Balance::sa(0u64) {
                 deposit_total = deposit_total + 1;
             }
@@ -713,12 +697,13 @@ impl<T: Trait> Module<T>
         Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,true);
     }
 
-    // 买入操作之后对双方的金额进行修改  买卖人id   2种币种类  挂出价  买入量
+    // After the purchase operation, the amount of the two parties is modified
+    // by modifying the buyer's ID and the buyer's bid amount of two kinds of currencies.
     pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64, type_money:u64 ,price:u64 ,amount:u64 ){
-        // 把卖家锁定金额扣除，同时把买家的钱转入，
+        // Deducting the amount locked in by the seller and transferring the buyer's money.
         Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,false);
         Self::depositing_withdraw_record(seller.clone(),T::Balance::sa(amount*price),type_money,true);
-        // 同时扣除买家的钱
+        // At the same time deduct the buyer's money
         Self::depositing_withdraw_record(buyer.clone(),T::Balance::sa(amount*price),type_money,false);
     }
 

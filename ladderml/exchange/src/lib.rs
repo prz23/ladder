@@ -41,15 +41,12 @@ decl_event!(
 
 decl_storage! {
     trait Store for Module<T: Trait> as Exchange {
-
-        /// 记录每个交易的签名的数量
         /// Record the number of signatures per transaction got
         NumberOfSignedContract get(num_of_signed): map (u64,u64) => u64;
 
         // Latest Time Record of other assets' shared latest timestamp!
         LatestTime get(latest_time):  u64 ;
         LatestExchangeRate get(latest_exrate): map u64 => u64;
-        /// 需要这些数量的签名，才发送这个交易通过的事件
         /// These amount of signatures are needed to send the event that the transaction verified.
         MinNumOfSignature get(min_signature): u64;
 
@@ -61,8 +58,6 @@ decl_storage! {
         /// EHT exchangerate    Vec<(time,exchangerate)>
         EthExchangeRate  get(eth_exchange_rate) : Vec<(u64,u64)>;
 
-
-        /// 已经发送过的交易记录  防止重复发送事件
         /// Transaction records that have been sent prevent duplication of events
         AlreadySentTx get(already_sent) : map (u64,u64) => u64;
 
@@ -76,7 +71,6 @@ decl_module! {
 
         fn deposit_event<T>() = default;
 
-        /// 设置最小要求签名数量
         /// Set the minimum required number of signatures
         pub  fn set_min_num(origin,new_num: u64) -> Result{
             let _sender = ensure_signed(origin)?;
@@ -89,10 +83,7 @@ decl_module! {
             Ok(())
         }
 
-        /// 签名并判断如果当前签名数量足够就发送一个事件
         pub  fn check_exchange(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
-
-
             let sender = ensure_signed(origin)?;
             let (exchangerate, time, extype) = Self::parse_tx_data(message);
 
@@ -111,42 +102,32 @@ impl<T: Trait> Module<T> {
     }
 
     pub fn check_validator(accountid: &T::AccountId) -> bool {
-        //判断是否是合法验证者集合中的人
-        //let validators = <session::Module<T>>::validators();
         return false;
     }
 
-    /// 签名并判断如果当前签名数量足够就发送一个事件
     /// Sign and determine if the current number of signatures is sufficient to send an event
     pub fn check_signature(who: T::AccountId, exchangerate: u64, time: u64, extype: u64) -> Result {
         let sender = who;
 
-        //查看该交易是否存在，没得话添加上去
         if !<NumberOfSignedContract<T>>::exists((time,extype)) {
             <NumberOfSignedContract<T>>::insert(&(time,extype), 0);
             <AlreadySentTx<T>>::insert(&(time,extype), 0);
         }
 
-        //查看这个签名的是否重复发送交易 重复发送就滚粗
         let mut repeat_vec = Self::repeat((time,extype));
         ensure!(!repeat_vec.contains(&sender), "repeat!");
 
-        //查看交易是否已被发送
         if 1 == Self::already_sent((time,extype)) {
             return Err("has been sent");
         }
 
-        //增加一条记录 ->  交易 验证者 签名
         <IdSignTxList<T>>::insert(time.clone(), (sender.clone(), exchangerate.clone()));
 
-        //增加一条记录 ->  交易 = vec of 验证者 签名
         let mut stored_vec = Self::all_list_b(time);
         stored_vec.push((sender.clone(), exchangerate.clone()));
         <IdSignTxListB<T>>::insert(time.clone(), stored_vec.clone());
         repeat_vec.push(sender.clone());
         <RepeatPrevent<T>>::insert((time,extype), repeat_vec.clone());
-
-        //Self::_verify(transcation)?;
 
         let numofsigned = Self::num_of_signed(&(time,extype));
         let newnumofsigned = numofsigned
@@ -164,10 +145,6 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    /// 解析message --> hash tag  id  exchangerate time extype
-    ///    bit          32   32   32     8          8    8
-    ///    实现         ok   no   ok     ok         ok   ok
-    ///           解析出   发送者id   汇率  该汇率时间  汇率类型（保留字段）
     fn parse_data(message: Vec<u8>, signature: Vec<u8>) -> (T::AccountId, u64, u64, u64) {
         let mut messagedrain = message.clone();
         let hash: Vec<_> = messagedrain.drain(0..32).collect();
@@ -215,10 +192,7 @@ impl<T: Trait> Module<T> {
         return (who, rate, time, extype);
     }
 
-    /// 解析message --> hash tag  id  exchangerate time extype
-    ///    bit          32   32   32     8          8    8
-    ///    实现         ok   no   ok     ok         ok   ok
-    ///           解析出   发送者id   汇率  该汇率时间  汇率类型（保留字段）
+    /// parse_tx_data
     fn parse_tx_data(message: Vec<u8>) -> (u64, u64, u64) {
         let mut messagedrain = message.clone();
 
