@@ -417,34 +417,29 @@ mod tests {
     #[test]
     fn put_order_test() {
         with_externalities(&mut new_test_ext(), || {
-            // 先安排一个 1 ，2  的交易对
+
             let pair:OrderPair = OrderPair{ share:1 ,money:2};
             assert_err!(OTC::is_valid_pair(&pair) , "an invalid orderpair");
             assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
             assert_ok!(OTC::is_valid_pair(&pair));
-            // 挂2个失败的单子 价格 数量都不能为零
+
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ) ,"price cann't be 0");
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ) ,"price cann't be 0");
 
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ) ,"no data");
             assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ) ,"no data");
-            // 挂上了
-           // assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
-            //有一个挂那里了
-            //let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
 
-            // 往账户里预先存点
             Bank::depositing_withdraw_record(1,50,1,true);
             Bank::depositing_withdraw_record(1,50,2,true);
             Bank::depositing_withdraw_record(1,50,3,true);
             assert_eq!(Bank::despositing_account(),vec![1]);
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
-            // 再挂单，挂上了
+
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
             let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (50, 2), (50, 3), (0, 4)].to_vec());
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
-            // 再安排个铁子，让他买一下
+
             Bank::depositing_withdraw_record(2,50,1,true);
             Bank::depositing_withdraw_record(2,50,2,true);
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
@@ -455,43 +450,37 @@ mod tests {
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (0, 2), (0, 3), (0, 4)].to_vec());
             let bb = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(bb.already_deal,5);
-            // 继续买就会说没钱，
+
             assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,1),"not_enough_money_error ");
-            //assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,2));  //再买1个 ，剩下0元
-           // assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,7));
+
         });
     }
 
     #[test]
     fn lock_test() {
         with_externalities(&mut new_test_ext(), || {
-            // 先安排一个 1 ，2  的交易对
+
             let pair:OrderPair = OrderPair{ share:1 ,money:2};
             assert_err!(OTC::is_valid_pair(&pair) , "an invalid orderpair");
             assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
             assert_ok!(OTC::is_valid_pair(&pair));
-            // 挂2个失败的单子 价格 数量都不能为零
+
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ) ,"price cann't be 0");
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ) ,"price cann't be 0");
 
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ) ,"no data");
             assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ) ,"no data");
-            // 挂上了
-            // assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
-            //有一个挂那里了
-            //let aa = OTC::order_of( (1, pair.clone(), 1) ).unwrap();
 
-            // 往账户里预先存点
             Bank::depositing_withdraw_record(1,50,1,true);
             Bank::depositing_withdraw_record(1,50,2,true);
             Bank::depositing_withdraw_record(1,50,3,true);
             assert_eq!(Bank::despositing_account(),vec![1]);
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
-            // 再挂单，挂上了
+
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
             let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
 
-            // 再安排个铁子，让他买一下
+
             Bank::depositing_withdraw_record(2,50,1,true);
             Bank::depositing_withdraw_record(2,50,2,true);
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
@@ -499,7 +488,7 @@ mod tests {
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
             let aa = OTC::sell_order_of( (1, pair.clone(), 2) ).unwrap();
             assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 30, 10 ));
-            // 挂单过多，本身只有50块钱，挂出去50，再挂10 就会报错，钱不够
+
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ),"not_enough_money_error ");
         });
     }
