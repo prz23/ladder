@@ -81,8 +81,9 @@ git = 'https://github.com/paritytech/substrate.git'
 package = 'sr-primitives'
 version = '2.0.0'
 
-[dev-dependencies]
-rustc-hex ="*"
+[dependencies.rustc-hex]
+optional = true
+rustc-hex = "*"
 
 [features]
 default = ["std"]
@@ -101,6 +102,5 @@ std = [
     'serde',
     'safe-mix/std',
     'sr_primitives/std',
-    #'plasm_primitives/std',
-    #'plasm_merkle/std',
+    "rustc-hex",
 ]

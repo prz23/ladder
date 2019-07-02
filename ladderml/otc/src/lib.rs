@@ -102,7 +102,7 @@ decl_storage! {
         pub AllSellOrdersIndex get(all_sell_orders_index): u128;
 
         // orderpair --> unique index  Valid
-
+        pub ValidOrderIndexByOrderpair get(valid_order_index_by_orderpair) : map OrderPair => Vec<u128>;
      }
 }
 
@@ -262,6 +262,9 @@ impl<T: Trait> Module<T> {
         };
         <SellOrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
         <AllSellOrders<T>>::insert(new_unique_index,new_sell_order.clone());
+        let mut vec = <ValidOrderIndexByOrderpair<T>>::get(pair_type.clone());
+        vec.push(new_unique_index);
+        <ValidOrderIndexByOrderpair<T>>::insert(pair_type.clone(),vec);
         // lock the money in bank with the amount of the sell order
         <bank::Module<T>>::lock(who.clone(),pair_type.share,amount);
 
@@ -279,6 +282,13 @@ impl<T: Trait> Module<T> {
             sell_order.status = OtcStatus::Half;
         }else if sell_order.amount == sell_order.already_deal {
             sell_order.status = OtcStatus::Done;
+            let mut vec = <ValidOrderIndexByOrderpair<T>>::get(sell_order.pair.clone());
+            let mut  mark = 0usize;
+            vec.iter().enumerate().for_each(|(i,&index)|{
+                if index == sell_order.longindex { mark = i ;}
+            });
+            vec.remove(mark);
+            <ValidOrderIndexByOrderpair<T>>::insert(sell_order.pair.clone(),vec);
         }else { return  Err("wrong!"); }
 
         // save the modified sell order
