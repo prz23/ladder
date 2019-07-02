@@ -155,7 +155,6 @@ decl_module! {
             }
             Ok(())
         }
-
     }
 }
 
@@ -190,9 +189,7 @@ impl<T: Trait> Module<T> {
     /// Query the Bank Module，make sure the seller have enough money to sell
     /// and check the parmeters is not zero
     fn check_valid_order(who: T::AccountId, pair:OrderPair, amount:u64, price:u64) -> Result {
-
         Self::is_valid_pair(&pair)?;
-
         Self::is_price_zero(amount)?;
         Self::is_price_zero(price)?;
 
@@ -214,7 +211,6 @@ impl<T: Trait> Module<T> {
     fn check_valid_buy(who:T::AccountId,amount:u64,sell_order:OrderT<T>) -> Result {
 
         Self::is_price_zero(amount)?;
-
         // cant buy exceed the sell order
         let left_share = sell_order.amount - sell_order.already_deal;
         if amount > left_share {

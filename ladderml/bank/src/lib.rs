@@ -43,11 +43,8 @@ decl_module! {
         fn deposit_event<T>() = default;
 
         /// deposit
-        //(origin, message: Vec, signature: Vec)
         pub fn deposit(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
-            runtime_io::print("====================deposit===prz============");
-            //println!("VEC is {:?}",message );
 /*
 
             let validators = <session::Module<T>>::validators();
@@ -99,7 +96,6 @@ decl_module! {
             //ensure!(validators.contains(&sender),"Not validator");
             // resovling message --> hash  tag  id  amount
             let (tx_hash,who,amount,signature_hash,coin_type) = Self::split_message(message.clone(),signature);
-            //let message_hash = Decode::decode(&mut &message.encode()[..]).unwrap();
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
@@ -108,7 +104,6 @@ decl_module! {
             }
             // ensure no repeat
             ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
-            //ensure!(Self::intentions_withdraw_vec().iter().find(|&t| t == &who).is_none(), "Cannot withdraw2 if already in withdraw2 queue.");
 
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,false);
             Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),false);
@@ -148,6 +143,7 @@ decl_module! {
             Ok(())
             // money
         }
+
         /// set session lenth
         fn set_session_lenth(session_len: u64 ){
            ensure!(session_len >= 10,"the session lenth must larger than 10");
@@ -249,10 +245,8 @@ decl_event! {
     pub enum Event<T> where
         <T as balances::Trait>::Balance,
         <T as system::Trait>::AccountId,
-        <T as system::Trait>::Hash,
         <T as system::Trait>::BlockNumber
     {
-        Has(Hash),
         ///bank moduel
 		/// All validators have been rewarded by the given balance.
 		Reward(Balance),
@@ -358,17 +352,16 @@ impl<T: Trait> Module<T>
     }
 
     fn adjust_deposit_list(){
-        //do_nothing
         // update the session time of the depositing account
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             <DespositingTime<T>>::insert(v,Self::despositing_time(v)+1);
         });
     }
+
     fn adjust_deposit_list_old(){
         // Modify depositing part of all tables
         let mut int_des_vec =  Self::intentions_desposit_vec();
         while let  Some(who)=int_des_vec.pop(){
-            runtime_io::print("intentions to depositing");
             // update the map of the depositing account
             let (balances,coin_type) = <IntentionsDesposit<T>>::get(who.clone());
             Self::depositing_withdraw_record(who.clone(),balances,coin_type,true);
@@ -425,8 +418,7 @@ impl<T: Trait> Module<T>
         });
     }
 
-    // RewardSessionValue  get(reward_session_value): Vec<u64>
-    // RewardSessionFactor  get(reward_session_factor): Vec<u64>
+
     fn reward_set(who: T::AccountId, session: u32, money: T::Balance) -> T::Balance {
 
         let session_value = Self::reward_session_value();
@@ -453,7 +445,6 @@ impl<T: Trait> Module<T>
         let xx1 = balance_value[0];  let xx2 = balance_value[1];  let xx3 = balance_value[2];
         let yy1 = balance_factor[0];  let yy2 = balance_factor[1];  let yy3 = balance_factor[2]; let yy4 = balance_factor[3];
 
-        //let money2 = money as u64;
         let mut final_ba = 0;
         if money <= xx1 {
             final_ba = yy1;
@@ -569,8 +560,6 @@ impl<T: Trait> Module<T>
         let mut deposit_total = 0;
         let all_data_vec = <DespositingBalance<T>>::get(who.clone());
         all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
-            // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
-           // println!("bal {:?} ctype {:?}",bal.clone(),ctype.clone());
             if bal != T::Balance::sa(0u64) {
                 deposit_total = deposit_total + 1;
             }
@@ -627,6 +616,7 @@ impl<T: Trait> Module<T>
             <CoinReward<T>>::insert(i,T::Balance::sa(0));
         }
     }
+
     pub fn calculate_total_deposit(coin_type:u64, balance:T::Balance, in_out:bool){
         let mut money = Self::coin_deposit(coin_type);
         if in_out {
@@ -682,23 +672,25 @@ impl<T: Trait> Module<T>
         }
         <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
     }
+
     pub fn uninit_lock(who :T::AccountId){
         <DespositingBalanceReserved<T>>::remove(who.clone());
     }
-    // lock the amount of coin of who
+
+    /// lock the amount of coin of who
     pub fn lock(who:T::AccountId, coin: u64 , amount: u64){
         Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,true);
         Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,false);
     }
 
-    // unlock the amount of coin of who
+    /// unlock the amount of coin of who
     pub fn unlock(who:T::AccountId, coin: u64 , amount: u64){
         Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,false);
         Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,true);
     }
 
-    // After the purchase operation, the amount of the two parties is modified
-    // by modifying the buyer's ID and the buyer's bid amount of two kinds of currencies.
+    /// After the purchase operation, the amount of the two parties is modified
+    /// by modifying the buyer's ID and the buyer's bid amount of two kinds of currencies.
     pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64, type_money:u64 ,price:u64 ,amount:u64 ){
         // Deducting the amount locked in by the seller and transferring the buyer's money.
         Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,false);
@@ -706,7 +698,6 @@ impl<T: Trait> Module<T>
         // At the same time deduct the buyer's money
         Self::depositing_withdraw_record(buyer.clone(),T::Balance::sa(amount*price),type_money,false);
     }
-
 }
 
 

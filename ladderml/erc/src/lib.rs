@@ -84,7 +84,6 @@ decl_module! {
         //(origin, message: Vec, signature: Vec)
         pub fn lock_erc(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
-            runtime_io::print("====================lock_erc===============");
 /*
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
@@ -177,8 +176,6 @@ decl_module! {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Erc {
-        /// bank & session
-
         /// record depositing info of balance & session_time
         DespoitingAccount get(despositing_account): Vec<T::AccountId>;
         ///Session module
@@ -213,7 +210,6 @@ decl_storage! {
         AccountLockCount get(account_lock_count) : map T::AccountId => Vec<u64>;
         //record one user's all unlock index
         AccountUnlockCount get(account_unlock_count) : map  T::AccountId => Vec<u64>;
-
         // id -> accountID
         IdwithAccount get(id_with_account): map u64 => T::AccountId;
     }
@@ -227,7 +223,6 @@ decl_storage! {
     }
 }
 
-
 decl_event! {
     pub enum Event<T> where
         <T as balances::Trait>::Balance,
@@ -235,17 +230,7 @@ decl_event! {
         <T as system::Trait>::Hash,
         <T as system::Trait>::BlockNumber
     {
-        Has(Hash),
-        ///bank moduel
-		/// All validators have been rewarded by the given balance.
-		Reward(Balance),
-		/// accountid added to the intentions to deposit queue
-		AddDepositingQueue(AccountId),
-		/// intentions to withdraw
-		AddWithdrawQueue(AccountId),
-        /// a new seesion start
         NewRewardSession(BlockNumber),
-
         LockToken(u64, AccountId,Vec<u8>, Balance, u64,  u64, Hash),
         UnLockToken(u64,AccountId,Vec<u8>, Balance, u64,  u64, Hash),
     }
@@ -342,8 +327,6 @@ impl<T: Trait> Module<T>
             <LastLengthChange<T>>::put(block_number);
         }
         Self::adjust_deposit_list();
-        runtime_io::print("Start adjust_deposit_list");
-        // 1. Reward directly to account 2. Click to get reward
         match Self::enable_record() {
             _ =>  Self::reward_deposit(),
             true =>  Self::reward_deposit(),
@@ -351,7 +334,6 @@ impl<T: Trait> Module<T>
     }
 
     fn adjust_deposit_list(){
-        //do_nothing
         // update the session time of the depositing account
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             Self::account_lock_count(v).iter().enumerate().for_each(|(lock_index,&index)| {
@@ -373,11 +355,9 @@ impl<T: Trait> Module<T>
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             Self::account_lock_count(v).iter().enumerate().for_each(|(_i,&index)| {
                 if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
-                    runtime_io::print("reward_deposit");
                     if r.status == Status::Withdraw {
                         //ignore
                     }else {
-                        runtime_io::print("reward_deposit2");
                         //calculate reward
                         let reward = Self::calculate_reward(r.cycle,r.value);
                         //accmulate the total reward for all users
@@ -572,7 +552,6 @@ impl<T: Trait> Module<T>
             }else {
                 return Err("still locking,cant withdraw");
             }
-
         }else {
             //  already have
             return Err("no info find");

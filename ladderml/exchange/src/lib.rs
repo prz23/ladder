@@ -28,13 +28,9 @@ pub trait Trait: system::Trait {
 decl_event!(
     pub enum Event<T>
     where
-        <T as system::Trait>::AccountId,
-        <T as system::Trait>::Hash
+        <T as system::Trait>::AccountId
     {
-        Created(AccountId, Hash),
         SetMinRequreSignatures(u64),
-        Txisok(u64),
-        // 交易 = vec<id，签名>
         TranscationVerified(u64,Vec<(AccountId,u64)>),
     }
 );
@@ -43,24 +39,18 @@ decl_storage! {
     trait Store for Module<T: Trait> as Exchange {
         /// Record the number of signatures per transaction got
         NumberOfSignedContract get(num_of_signed): map (u64,u64) => u64;
-
         // Latest Time Record of other assets' shared latest timestamp!
         LatestTime get(latest_time):  u64 ;
         LatestExchangeRate get(latest_exrate): map u64 => u64;
         /// These amount of signatures are needed to send the event that the transaction verified.
         MinNumOfSignature get(min_signature): u64;
-
         //record transaction   Hash => (accountid,sign)
         IdSignTxList  get(all_list) : map u64 => (T::AccountId,u64);
         IdSignTxListB  get(all_list_b) : map u64 => Vec<(T::AccountId,u64)>;
         RepeatPrevent  get(repeat) : map (u64,u64) => Vec<T::AccountId>;
 
-        /// EHT exchangerate    Vec<(time,exchangerate)>
-        EthExchangeRate  get(eth_exchange_rate) : Vec<(u64,u64)>;
-
         /// Transaction records that have been sent prevent duplication of events
         AlreadySentTx get(already_sent) : map (u64,u64) => u64;
-
         /// History Exchange Data. All Coin share the same time stamp.  timestamp => [(type,rate),(type,rate),....]
         HistoricalData get(historial_data) : map u64 => Vec<(u64,u64)>;
     }

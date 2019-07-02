@@ -42,7 +42,6 @@ decl_event!(
 
 decl_storage! {
     trait Store for Module<T: Trait> as Signature {
-
         /// Record the number of signatures per transaction got
         NumberOfSignedContract get(num_of_signed): map T::Hash => u64;
 
@@ -52,6 +51,7 @@ decl_storage! {
         //record transaction   Hash => (accountid,sign)
         Record  get(record) : map T::Hash => Vec<(T::AccountId,T::Hash)>;
         MessageRecord get(message_record) : map T::Hash => Vec<u8>;
+
         /// Preventing duplicate signatures   map txHash => Vec<signatureHash>
         RepeatPrevent  get(repeat_prevent) : map T::Hash => Vec<T::Hash>;
 
@@ -92,22 +92,18 @@ decl_module! {
 
         pub fn bond_pubkey(origin, pubkey: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
-
             if <LadderPubkey<T>>::exists(&sender) {
 				return Err("Pubkey already bonded")
 			}
-
 			<LadderPubkey<T>>::insert(sender.clone(), pubkey);
             Ok(())
         }
 
         pub fn unbond_pubkey(origin) -> Result {
-             let sender = ensure_signed(origin)?;
-
+            let sender = ensure_signed(origin)?;
             if !<LadderPubkey<T>>::exists(&sender) {
 				return Err("Pubkey not bonded")
 			}
-
 			<LadderPubkey<T>>::remove(sender.clone());
             Ok(())
         }
@@ -304,22 +300,18 @@ mod tests {
             // now set the min_sig to 5
             assert_ok!(Signcheck::set_min_num(Origin::signed(2),5));
             assert_eq!(Signcheck::min_signature(),5);
-
             // then only the 5th transcation will success
             assert_err!(Signcheck::check_signature(1,H256::from_low_u64_be(15),
             H256::from_low_u64_be(15),vec![1]),"Not enough signature!");
             assert_err!(Signcheck::check_signature(2,H256::from_low_u64_be(15),
             H256::from_low_u64_be(14),vec![1]),"Not enough signature!");
-
             assert_eq!(Signcheck::already_sent(H256::from_low_u64_be(15)),0);
-
             assert_err!(Signcheck::check_signature(3,H256::from_low_u64_be(15),
             H256::from_low_u64_be(13),vec![1]),"Not enough signature!");
             assert_err!(Signcheck::check_signature(4,H256::from_low_u64_be(15),
             H256::from_low_u64_be(12),vec![1]),"Not enough signature!");
             assert_ok!(Signcheck::check_signature(5,H256::from_low_u64_be(15),
             H256::from_low_u64_be(11),vec![1]));
-
             // already_sent == 1 means the Hash(15) has been accept
             assert_eq!(Signcheck::already_sent(H256::from_low_u64_be(15)),1);
         });
@@ -330,7 +322,6 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let mut data : Vec<u8>= "0000000000000000000000000000000100000000000000000000000000000002d573cade061a4a6e602f30931181805785b9505f000000000000000000000000000000000000000000000000000b1d3108ef2661a0dc7f47061b0b84e4dd3085f57e71c819ed6fb3ecc97fb8c31983c27f598fa6".from_hex().unwrap();
             let sign : Vec<u8>= "1a65da4f362ea2c1f374d22028a09c0587ca097abe2b5ae6c1dd25bae2a0e88a6d494c6da73e159dab4fa927b3d2837514f879253d17bdc274ccfdeea822d53401".from_hex().unwrap();
-
             let pubkey_real : Vec<u8>= "b59fe985fd3c00de38aa1094d7a8a34914771d025a8038238502d07e8b4048ac9afb68d22c77376921a056cf41f6f659f4f70f9b07d2887ffe3b9362d57070b6".from_hex().unwrap();
             assert_ok!(Signcheck::secp256_verification(data.clone(),sign.clone(),pubkey_real.clone()));
             let pubkey_fake : Vec<u8>= "14b59fe985fd3c00de38aa1094d7a8a34914771d025a8038238502d07e8b4048ac9afb68d22c77376921a056cf41f6f659f4f70f9b07d2887ffe3b9362d57070b6".from_hex().unwrap();
@@ -343,13 +334,10 @@ mod tests {
         with_externalities(&mut new_test_ext(), || {
             let mut data : Vec<u8>= "0000000000000000000000000000000100000000000000000000000000000002d573cade061a4a6e602f30931181805785b9505f000000000000000000000000000000000000000000000000000b1d3108ef2661a0dc7f47061b0b84e4dd3085f57e71c819ed6fb3ecc97fb8c31983c27f598fa6".from_hex().unwrap();
             let sign : Vec<u8>= "1a65da4f362ea2c1f374d22028a09c0587ca097abe2b5ae6c1dd25bae2a0e88a6d494c6da73e159dab4fa927b3d2837514f879253d17bdc274ccfdeea822d53401".from_hex().unwrap();
-
             let pubkey_real : Vec<u8>= "b59fe985fd3c00de38aa1094d7a8a34914771d025a8038238502d07e8b4048ac9afb68d22c77376921a056cf41f6f659f4f70f9b07d2887ffe3b9362d57070b6".from_hex().unwrap();
-
             assert_err!(Signcheck::unbond_pubkey(Origin::signed(5)),"Pubkey not bonded");
             assert_ok!(Signcheck::bond_pubkey(Origin::signed(5),pubkey_real.clone()));
             assert_err!(Signcheck::bond_pubkey(Origin::signed(5),pubkey_real.clone()),"Pubkey already bonded");
-
             assert_ok!(Signcheck::secp256_verify(5,data.clone(),sign.clone()));
         });
     }
