@@ -159,6 +159,7 @@ decl_module! {
         }
 
         pub fn match_order_verification(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
+
             Ok(())
         }
     }
@@ -429,11 +430,11 @@ mod tests {
             assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
             assert_ok!(OTC::is_valid_pair(&pair));
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ) ,"price cann't be 0");
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,true) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,true) ,"price cann't be 0");
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ) ,"no data");
-            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ) ,"no data");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,true) ,"no data");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,true) ,"no data");
 
             Bank::depositing_withdraw_record(1,50,1,true);
             Bank::depositing_withdraw_record(1,50,2,true);
@@ -441,7 +442,7 @@ mod tests {
             assert_eq!(Bank::despositing_account(),vec![1]);
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
 
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,true));
             let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (50, 2), (50, 3), (0, 4)].to_vec());
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
@@ -449,15 +450,15 @@ mod tests {
             Bank::depositing_withdraw_record(2,50,1,true);
             Bank::depositing_withdraw_record(2,50,2,true);
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
-            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5));
+            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5 ,true));
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (100, 2), (50, 3), (0, 4)].to_vec());
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (5, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
-            assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance(2),[(0, 0), (55, 1), (0, 2), (0, 3), (0, 4)].to_vec());
             let bb = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(bb.already_deal,5);
 
-            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,1),"not_enough_money_error ");
+            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,1,true),"not_enough_money_error ");
 
         });
     }
@@ -471,11 +472,11 @@ mod tests {
             assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
             assert_ok!(OTC::is_valid_pair(&pair));
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ) ,"price cann't be 0");
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10,true ) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,true) ,"price cann't be 0");
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ) ,"no data");
-            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ) ,"no data");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,true) ,"no data");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,true) ,"no data");
 
             Bank::depositing_withdraw_record(1,50,1,true);
             Bank::depositing_withdraw_record(1,50,2,true);
@@ -483,7 +484,7 @@ mod tests {
             assert_eq!(Bank::despositing_account(),vec![1]);
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
 
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,false));
             let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
 
 
@@ -491,11 +492,11 @@ mod tests {
             Bank::depositing_withdraw_record(2,50,2,true);
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
 
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ));
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,true));
             let aa = OTC::sell_order_of( (1, pair.clone(), 2) ).unwrap();
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 30, 10 ));
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 30, 10 ,true));
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ),"not_enough_money_error ");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,true),"not_enough_money_error ");
         });
     }
     #[test]

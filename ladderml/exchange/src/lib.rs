@@ -226,10 +226,7 @@ impl<T: Trait> Module<T> {
         vec.push((exchangetype,rate));
         <HistoricalData<T>>::insert(timestamp,vec);
     }
-
-
 }
-
 
 #[cfg(test)]
 mod tests {
