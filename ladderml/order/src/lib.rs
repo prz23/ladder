@@ -105,6 +105,7 @@ decl_storage! {
 
         // orderpair --> unique index  Valid
         pub ValidOrderIndexByOrderpair get(valid_order_index_by_orderpair) : map OrderPair => Vec<u128>;
+
      }
 }
 

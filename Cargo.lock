@@ -1543,6 +1543,7 @@ dependencies = [
 name = "ladder-bank"
 version = "0.1.0"
 dependencies = [
+ "ladder-order 0.1.0",
  "ladder-signcheck 0.1.0",
  "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-hex 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",

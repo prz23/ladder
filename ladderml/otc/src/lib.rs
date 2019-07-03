@@ -44,22 +44,6 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as Otc {
 
-        /// all seller order infomation
-        pub SellOrdersOf get(sell_order_of):map (T::AccountId, OrderPair, u64) => Option<OrderT<T>>;
-
-        /// exist exchange pair list
-        pub OrderPairList get(pair_list):  Vec<OrderPair>;
-
-        /// sell order index assigned for a specific user
-        pub LastSellOrderIndexOf get(last_sell_order_index_of): map(T::AccountId,OrderPair)=>Option<u64>;
-
-        ///unique index -> all sell orders
-        pub AllSellOrders get(all_sell_orders):map u128 => Option<OrderT<T>>;
-
-        pub AllSellOrdersIndex get(all_sell_orders_index): u128;
-
-        // orderpair --> unique index  Valid
-        pub ValidOrderIndexByOrderpair get(valid_order_index_by_orderpair) : map OrderPair => Vec<u128>;
      }
 }
 
@@ -237,8 +221,6 @@ mod tests {
         type Log = DigestItem;
     }
 
-
-
     impl balances::Trait for Test {
         type Balance = u64;
         type OnFreeBalanceZero = ();
@@ -300,7 +282,6 @@ mod tests {
             assert_ok!(Order::is_valid_pair(&pair));
         });
     }
-
 
     #[test]
     fn put_order_test() {

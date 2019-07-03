@@ -30,7 +30,7 @@ use signcheck;
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
-pub trait Trait: balances::Trait + session::Trait + signcheck::Trait{
+pub trait Trait: balances::Trait + session::Trait + signcheck::Trait + order::Trait{
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 
@@ -772,6 +772,10 @@ mod tests {
     }
 
     impl signcheck::Trait for Test {
+        type Event = ();
+    }
+
+    impl order::Trait for Test {
         type Event = ();
     }
 
