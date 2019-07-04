@@ -3,8 +3,8 @@ use web3::types::H256;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RelayType {
-    Ingress,
-    Egress,
+    Match,
+    Request,
     Deposit,
     Withdraw,
     SetAuthorities,
@@ -23,22 +23,22 @@ pub struct RelayMessage {
     pub ty: RelayType,
 }
 
-impl From<IngressEvent> for RelayMessage {
-    fn from(event: IngressEvent) -> Self {
+impl From<MatchEvent> for RelayMessage {
+    fn from(event: MatchEvent) -> Self {
         RelayMessage {
-            hash: event.tx_hash,
+            hash: H256::from(0),
             raw: event.to_bytes(),
-            ty: RelayType::Ingress,
+            ty: RelayType::Match,
         }
     }
 }
 
-impl From<EgressEvent> for RelayMessage {
-    fn from(event: EgressEvent) -> Self {
+impl From<RequestEvent> for RelayMessage {
+    fn from(event: RequestEvent) -> Self {
         RelayMessage {
             hash: event.tx_hash,
             raw: event.to_bytes(),
-            ty: RelayType::Egress,
+            ty: RelayType::Request,
         }
     }
 }

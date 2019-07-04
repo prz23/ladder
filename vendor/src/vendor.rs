@@ -16,8 +16,7 @@ use web3::{types::Address, Transport};
 pub struct Vendor<T: Transport, C: SuperviseClient> {
     client: Arc<C>,
     state: State,
-    ingress_stream: LogStream<T>,
-    egress_stream: LogStream<T>,
+    request_stream: LogStream<T>,
     deposit_stream: LogStream<T>,
     withdraw_stream: LogStream<T>,
     authority_stream: LogStream<T>,
@@ -32,24 +31,14 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
         chain: ChainAlias,
     ) -> Self {
         Self {
-            ingress_stream: LogStream::new(LogStreamOptions {
+            request_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(30),
                 poll_interval: Duration::from_secs(10),
                 confirmations: 1,
                 transport: transport.clone(),
                 contract_address: contract_address,
-                last_block_number: state.ingress, //10351660,
-                filter: contracts::bridge::events::ingress::filter(),
-                chain,
-            }),
-            egress_stream: LogStream::new(LogStreamOptions {
-                request_timeout: Duration::from_secs(30),
-                poll_interval: Duration::from_secs(10),
-                confirmations: 1,
-                transport: transport.clone(),
-                contract_address: contract_address,
-                last_block_number: state.egress,
-                filter: contracts::bridge::events::egress::filter(),
+                last_block_number: state.request,
+                filter: contracts::bridge::events::request::filter(),
                 chain,
             }),
             deposit_stream: LogStream::new(LogStreamOptions {
@@ -89,24 +78,14 @@ impl<T: Transport, C: SuperviseClient> Vendor<T, C> {
 
     pub fn mock(transport: &T, client: Arc<C>) -> Self {
         Self {
-            ingress_stream: LogStream::new(LogStreamOptions {
-                request_timeout: Duration::from_secs(1),
-                poll_interval: Duration::from_secs(1),
-                confirmations: 12,
-                transport: transport.clone(),
-                contract_address: "0000000000000000000000000000000000000001".into(),
-                last_block_number: 3,
-                filter: contracts::bridge::events::ingress::filter(),
-                chain: ChainAlias::ETH,
-            }),
-            egress_stream: LogStream::new(LogStreamOptions {
+            request_stream: LogStream::new(LogStreamOptions {
                 request_timeout: Duration::from_secs(1),
                 poll_interval: Duration::from_secs(1),
                 confirmations: 12,
                 transport: transport.clone(),
                 contract_address: "0000000000000000000000000000000000000002".into(),
                 last_block_number: 3,
-                filter: contracts::bridge::events::egress::filter(),
+                filter: contracts::bridge::events::request::filter(),
                 chain: ChainAlias::ETH,
             }),
             deposit_stream: LogStream::new(LogStreamOptions {
@@ -152,32 +131,17 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
     fn poll(&mut self) -> Poll<Option<Self::Item>, Self::Error> {
         loop {
             let mut changed = false;
-            // get ingress logs
             let ret = try_maybe_stream!(self
-                .ingress_stream
+                .request_stream
                 .poll()
                 .chain_err(|| "Vendor: Get poll log Failed.",));
             if let Some(ret) = ret {
                 for log in &ret.logs {
                     let message =
-                        events::IngressEvent::from_log(log, self.ingress_stream.chain_alias())?;
+                        events::RequestEvent::from_log(log, self.request_stream.chain_alias())?;
                     self.client.submit(RelayMessage::from(message));
                 }
-                self.state.ingress = ret.to;
-                changed = true;
-            }
-
-            let ret = try_maybe_stream!(self
-                .egress_stream
-                .poll()
-                .chain_err(|| "Vendor: Get poll log Failed.",));
-            if let Some(ret) = ret {
-                for log in &ret.logs {
-                    let message =
-                        events::EgressEvent::from_log(log, self.egress_stream.chain_alias())?;
-                    self.client.submit(RelayMessage::from(message));
-                }
-                self.state.egress = ret.to;
+                self.state.request = ret.to;
                 changed = true;
             }
 
@@ -215,7 +179,7 @@ impl<T: Transport, C: SuperviseClient> Stream for Vendor<T, C> {
                 .chain_err(|| "Vendor: Get poll log Failed.",));
             if let Some(ret) = ret {
                 for log in &ret.logs {
-                    let message = events::AuthorityEvent::from_log(log)?;
+                    let message = events::AuthorityEvent::from_log(log, self.authority_stream.chain_alias())?;
                     self.client.submit(RelayMessage::from(message));
                 }
                 self.state.authority = ret.to;
@@ -242,8 +206,7 @@ mod tests {
 
     #[test]
     fn test_vendor_stream() {
-        let ingress_topic = contracts::bridge::events::ingress::filter().topic0;
-        let egress_topic = contracts::bridge::events::egress::filter().topic0;
+        let request_topic = contracts::bridge::events::request::filter().topic0;
         let deposit_topic = contracts::bridge::events::deposit::filter().topic0;
         let withdraw_topic = contracts::bridge::events::withdraw::filter().topic0;
         let authority_topic = contracts::bridge::events::replace_auths::filter().topic0;
@@ -258,26 +221,15 @@ mod tests {
                     "address": "0x0000000000000000000000000000000000000001",
                     "fromBlock": "0x4",
                     "toBlock": "0x1005",
-                    "topics": [ingress_topic]
+                    "topics": [request_topic]
                 }]),
                 res => json!([{
                     "address": "0x0000000000000000000000000000000000000001",
-                    "topics": [ingress_topic],
+                    "topics": [request_topic],
                     "data": "0x000000000000000000000000000000000000000000000000000000000000000200000000000000000000000074241db5f3ebaeecf9506e4ae98818609334160400000000000000000000000074241db5f3ebaeecf9506e4ae98818609334160400000000000000000000000000000000000000000000000000000000054c5638",
                     "type": "",
                     "transactionHash": "0x1045bfe274b88120a6b1e5d01b5ec00ab5d01098346e90e7c7a3c9b8f0181c80"
                 }]);
-            "eth_blockNumber" =>
-                req => json!([]),
-                res => json!("0x1011");
-            "eth_getLogs" =>
-                req => json!([{
-                    "address": "0x0000000000000000000000000000000000000002",
-                    "fromBlock": "0x4",
-                    "toBlock": "0x1005",
-                    "topics": [egress_topic]
-                }]),
-                res => json!([]);
             "eth_blockNumber" =>
                 req => json!([]),
                 res => json!("0x1011");
