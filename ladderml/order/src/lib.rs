@@ -119,7 +119,6 @@ decl_module! {
             let sender = ensure_signed(origin)?;
 
            //let (tag, bill, from, from_bond,to,to_bond,value,reserved) = Self::parse_matchdata(message.clone(),signature);
-
             let tx_hash = T::Hashing::hash( &message[..]);
             let signature_hash = T::Hashing::hash( &signature[..]);
             //check the validity and number of signatures

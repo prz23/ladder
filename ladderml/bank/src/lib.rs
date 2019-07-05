@@ -970,10 +970,9 @@ mod tests {
     }
 
     #[test]
-    fn inilize_test() {
+    fn withdraw_request_test() {
         with_externalities(&mut new_test_ext(), || {
             //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
         });
     }
-
 }

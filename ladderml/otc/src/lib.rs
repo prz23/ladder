@@ -200,6 +200,9 @@ mod tests {
     use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
     use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
     use support::{StorageMap,StorageValue};
+    #[cfg(feature = "std")]
+    use rustc_hex::*;
+
 
     impl_outer_origin!{
 		pub enum Origin for Test {}
@@ -433,4 +436,13 @@ mod tests {
         });
     }
 
+    #[test]
+    fn settlement_test() {
+        with_externalities(&mut new_test_ext(), || {
+        let mut message : Vec<u8>= "00000000000000010000000000000002f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adadf499ed0e7a5c28bcf610ff4c866c8e5ea421f63c21a5c6004bc50b4dc4810ff72c81b6161f6bf7f76e635b161a2535f3b221bec1000000000000000000000000000000000000000000000000000000000000000101".from_hex().unwrap();
+        let sign : Vec<u8>= "4625ad0747cc75ab29c97a69ef561c2a7d154e7ec90b180d37df2b7a85ec6fb35588f5b38ca1af1e8e8a469114edecd05689c143e0cdb5ae032c349d0c22ae061b".from_hex().unwrap();
+
+        assert_ok!(Order::match_order_verification(Some(1).into(),message,sign));
+        });
+    }
 }

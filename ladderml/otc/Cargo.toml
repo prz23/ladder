@@ -111,6 +111,11 @@ path = "../order"
 package = 'ladder-order'
 version = '0.1.0'
 
+
+[dependencies.rustc-hex]
+optional = true
+rustc-hex = "*"
+
 [features]
 default = ["std"]
 std = [
@@ -131,4 +136,5 @@ std = [
     "bank/std",
     "balances/std",
     "order/std",
+    "rustc-hex",
 ]

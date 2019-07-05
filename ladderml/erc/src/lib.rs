@@ -194,7 +194,7 @@ decl_storage! {
 		EnableRewardRecord get(enable_record) config(): bool;
 
         /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
-        DespositExchangeRate get(desposit_exchange_rate) :  u64 = 10000000000000;
+        DespositExchangeRate get(desposit_exchange_rate) :  u64 = 1000000000;
 
 		/// record one's total reward
 		AccountReward get(account_reward):  map T::AccountId => T::Balance;
