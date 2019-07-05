@@ -57,7 +57,7 @@ where
                             "ingress message: {:?}, signatures: {:?}",
                             message, signatures
                         );
-                        let payload = contracts::bridge::functions::release::encode_input(
+                        let payload = contracts::bridge::functions::settle::encode_input(
                             message, signatures,
                         );
                         self.proxy.send(&mut event_loop, &transport, payload);

@@ -8,7 +8,7 @@ use node_runtime::{
     BankCall, Call, ExchangeCall, MatrixCall, ErcCall, UncheckedExtrinsic,
     VendorApi, /*,exchangerate */
 };
-use primitives::{crypto::*, ed25519::Pair, Pair as TraitPair};
+use primitives::{crypto::*, ed25519::Pair, Pair as TraitPair, blake2_256};
 use runtime_primitives::{
     codec::{Compact, Decode, Encode},
     generic::{BlockId, Era},
@@ -104,41 +104,20 @@ where
             .unwrap()
         {
             let mut message = relay_message.clone();
-            //TODO refactor ,now just amend value.
-            if message.ty == RelayType::Ingress {
-                let mut ingress = events::IngressEvent::from_bytes(&message.raw).unwrap();
-                let tag = ingress.tag;
-                // H256 1 = [ 0x0, 0x0, ......., 0x1 ]; big endian
-                let from_tag = u64::from_be(get_tag(&tag, 8));
-                let to_tag = u64::from_be(get_tag(&tag, 24));
-                info!("@@@@@@@@@@@@@@from tag: {}, to tag: {}", from_tag, to_tag);
-                let mut from_price = self.client.runtime_api().price_of(&at, from_tag).unwrap();
-                let mut to_price = self.client.runtime_api().price_of(&at, to_tag).unwrap();
-                info!(
-                    "@@@@@@@@@@@@@@from price: {}. to price:{}",
-                    from_price, to_price
-                );
-                if to_price == 0 || from_price == 0 {
-                    to_price = 1;
-                    from_price = 1;
-                }
-                let to_value = (ingress.value * to_price) / from_price;
-                ingress.value = to_value;
-                message.raw = ingress.to_bytes();
-            }
             let nonce = self.get_nonce();
             let signature: Vec<u8> = signer::Eth::sign_message(&self.eth_key, &message.raw).into();
 
             let function = match message.ty {
-                RelayType::Ingress => {
+                RelayType::Match => {
+                    // TODO
                     info!(
-                        "listener Ingress message: {}, signature: {}",
+                        "listener Ingress message: 0x{}, signature: 0x{}",
                         message.raw.to_hex(),
                         signature.to_hex()
                     );
                     Call::Matrix(MatrixCall::ingress(message.raw, signature))
                 },
-                RelayType::Egress => Call::Matrix(MatrixCall::egress(message.raw, signature)),
+                RelayType::Request => Call::Matrix(MatrixCall::egress(message.raw, signature)),
                 RelayType::Deposit => Call::Bank(BankCall::deposit(message.raw, signature)),
                 RelayType::Withdraw => Call::Bank(BankCall::withdraw(message.raw, signature)),
                 RelayType::SetAuthorities => {
@@ -149,7 +128,7 @@ where
                 },
                 RelayType::LockToken => {
                     info!(
-                        "listener lock token message: {}, signature: {}",
+                        "listener lock token message: 0x{}, signature: 0x{}",
                         message.raw.to_hex(),
                         signature.to_hex()
                     );
@@ -157,7 +136,7 @@ where
                 },
                 RelayType::UnlockToken => {
                     info!(
-                        "listener unlock token message: {}, signature: {}",
+                        "listener unlock token message: 0x{}, signature: 0x{}",
                         message.raw.to_hex(),
                         signature.to_hex()
                     );
@@ -165,20 +144,24 @@ where
                 }
             };
 
-            let payload = (
+            let raw_payload = (
                 Compact::<Index>::from(nonce), // index/nonce
                 function,                      //function
                 Era::immortal(),
                 self.client.genesis_hash(),
             );
-
-            let signature = self.key.sign(&payload.encode());
+            let signature = raw_payload.using_encoded(|payload| if payload.len() > 256 {
+                self.key.sign(&blake2_256(payload)[..])
+            } else {
+                self.key.sign(payload)
+            });
+            trace!("########## signature {}", signature.clone().0[..].to_hex());
             let extrinsic = UncheckedExtrinsic::new_signed(
-                payload.0.into(),
-                payload.1,
+                raw_payload.0.into(),
+                raw_payload.1,
                 local_id.into(),
                 signature.into(),
-                payload.2,
+                raw_payload.2,
             );
 
             let xt: ExtrinsicFor<A> = Decode::decode(&mut &extrinsic.encode()[..]).unwrap();

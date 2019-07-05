@@ -239,29 +239,29 @@ where
             events.iter().for_each(|event| {
                 if let Event::matrix(e) = event {
                     match e {
-                        RawEvent::Ingress(message, signatures) => {
-                            info!(
-                                "raw event ingress: message: {}, signatures: {}",
-                                message.to_hex(),
-                                signatures.to_hex()
-                            );
-                            events::IngressEvent::from_bytes(message)
-                                .map(|ie| {
-                                    if ie.tag[24..32] == eth_kovan_tag[24..32] {
-                                        kovan_sender.send(e.clone()).unwrap();
-                                    } else if ie.tag[24..32] == abos_tag[24..32] {
-                                        abos_sender.send(e.clone()).unwrap();
-                                    } else {
-                                        warn!("unknown event tag of ingress: {:?}", ie.tag);
-                                    }
-                                })
-                                .map_err(|_err| {
-                                    warn!(
-                                        "unexpected format of ingress, message {:?}",
-                                        message.to_hex()
-                                    );
-                                });
-                        }
+                        // RawEvent::MatchOrder(message, signatures) => {
+                        //     info!(
+                        //         "raw event ingress: message: {}, signatures: {}",
+                        //         message.to_hex(),
+                        //         signatures.to_hex()
+                        //     );
+                        //     // events::IngressEvent::from_bytes(message)
+                        //     //     .map(|ie| {
+                        //     //         if ie.tag[24..32] == eth_kovan_tag[24..32] {
+                        //     //             kovan_sender.send(e.clone()).unwrap();
+                        //     //         } else if ie.tag[24..32] == abos_tag[24..32] {
+                        //     //             abos_sender.send(e.clone()).unwrap();
+                        //     //         } else {
+                        //     //             warn!("unknown event tag of ingress: {:?}", ie.tag);
+                        //     //         }
+                        //     //     })
+                        //     //     .map_err(|_err| {
+                        //     //         warn!(
+                        //     //             "unexpected format of ingress, message {:?}",
+                        //     //             message.to_hex()
+                        //     //         );
+                        //     //     });
+                        // }
                         _ => {}
                     };
                 }
