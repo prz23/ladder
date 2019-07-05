@@ -327,7 +327,7 @@ impl<T: Trait> Module<T> {
             if pair.share == coin_type {
                 let new_last_index = Self::last_sell_order_index_of((accountid.clone(), pair.clone())).unwrap_or_default();
                 if new_last_index != 0{
-                    for i in 0..new_last_index{
+                    for i in 0..new_last_index+1{
                         if let Some(mut sellorder) = Self::sell_order_of((accountid.clone(),pair.clone(),i)){
                             if sellorder.status != OtcStatus::Done {
                                 sellorder.status = OtcStatus::Done;

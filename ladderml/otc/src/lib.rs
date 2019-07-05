@@ -285,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn put_order_test() {
+    fn put_order_buy_test() {
         with_externalities(&mut new_test_ext(), || {
             let acc : Vec<u8> = [2,3,4,5].to_vec();
             let pair:OrderPair = OrderPair{ share:1 ,money:2};
@@ -362,10 +362,74 @@ mod tests {
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,acc.clone(),true),"not_enough_money_error ");
         });
     }
+
     #[test]
     fn cancel_order_test() {
         with_externalities(&mut new_test_ext(), || {
+            let acc : Vec<u8> = [2,3,4,5].to_vec();
+            let pair:OrderPair = OrderPair{ share:1 ,money:2};
+            assert_err!(Order::is_valid_pair(&pair) , "an invalid orderpair");
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+            assert_ok!(Order::is_valid_pair(&pair));
 
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,acc.clone(),true) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,acc.clone(),true) ,"price cann't be 0");
+
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,acc.clone(),true) ,"no data");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,acc.clone(),true) ,"no data");
+
+            Bank::depositing_withdraw_record(1,50,1,true);
+            Bank::depositing_withdraw_record(1,50,2,true);
+            Bank::depositing_withdraw_record(1,50,3,true);
+            assert_eq!(Bank::despositing_account(),vec![1]);
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
+
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,acc.clone(),true));
+            // a new order's status is new
+            let aa = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(aa.status,order::OtcStatus::New);
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (50, 2), (50, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+            // an order was put up , cancel it, and see the status changes into done
+            assert_ok!(OTC::cancel_order(Some(1).into() , pair.clone(),1));
+            let bb = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(bb.status,order::OtcStatus::Done);
+        });
+    }
+
+    #[test]
+    fn cancel_all_order_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let acc : Vec<u8> = [2,3,4,5].to_vec();
+            let pair:OrderPair = OrderPair{ share:3 ,money:2};
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+
+            let pair2:OrderPair = OrderPair{ share:3 ,money:1};
+            assert_ok!(OTC::new_pair(Some(1).into() , pair2.clone()));
+
+
+            Bank::depositing_withdraw_record(1,55,3,true);
+            assert_eq!(Bank::despositing_account(),vec![1]);
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (0, 2), (55, 3), (0, 4)].to_vec());
+
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 15, 10 ,acc.clone(),true));
+            // a new order's status is new
+            let aa = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(aa.status,order::OtcStatus::New);
+            assert_eq!(Bank::despositing_banance(1),[(0, 0), (0, 1), (0, 2), (40, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (0, 1), (0, 2), (15, 3), (0, 4)].to_vec());
+
+            assert_ok!(OTC::put_order(Some(1).into() , pair2.clone(), 15, 10 ,acc.clone(),true));
+            // an account 1 has type3 token 40 free and 15 locked by put up sell order
+            // now cancel all, the status turn into done
+            assert_ok!(Order::cancel_order_for_bank_withdraw(1,pair.share));
+
+            // all status into done
+            let cc = Order::sell_order_of((1, pair.clone(), 1) ).unwrap();
+            assert_eq!(cc.status,order::OtcStatus::Done);
+            let dd = Order::sell_order_of((1, pair2.clone(), 1) ).unwrap();
+            assert_eq!(dd.status,order::OtcStatus::Done);
         });
     }
 

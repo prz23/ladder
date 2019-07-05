@@ -713,6 +713,4 @@ mod tests {
             assert_ok!(Erc::unlock_erc(Some(2).into(),mess.clone(),signa));
         });
     }
-
-
 }
