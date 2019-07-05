@@ -117,4 +117,5 @@ std = [
     "safe-mix/std",
     "sr_primitives/std",
     "balances/std",
+    "signcheck/std",
 ]

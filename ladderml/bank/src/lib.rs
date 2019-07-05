@@ -167,6 +167,26 @@ decl_module! {
              }
         }
 
+        pub fn withdrawrequest(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
+            let sender = ensure_signed(origin)?;
+
+            //let validators = <session::Module<T>>::validators();
+            //ensure!(validators.contains(&sender),"Not validator");
+            // resovling message --> hash  tag  id  amount
+            let (tx_hash,who,amount,signature_hash,coin_type) = Self::split_message(message.clone(),signature);
+
+            //check the validity and number of signatures
+            match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
+                Ok(y) =>  runtime_io::print("ok") ,
+                Err(x) => return Err(x),
+            }
+            // ensure no repeat
+            ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
+
+            Self::withdraw_request(who.clone(),amount,coin_type)?;
+            Ok(())
+        }
+
         /// a new session starts
 		fn on_finalize(n: T::BlockNumber) {
 		    Self::check_rotate_session(n);
@@ -773,7 +793,7 @@ impl<T: Trait> Module<T>
     /// Insufficient token when withdrawing, it will cancel the sell order to get some free token
     pub fn withdraw_request(who:T::AccountId,cointype:u64,withdraw_amount:u64) -> Result {
         //TODO:: query if the <depositingBalance> exist
-            let free_token = Self::specific_token_free_amount(who.clone(),cointype);
+        let free_token = Self::specific_token_free_amount(who.clone(),cointype);
 
         if free_token >= T::Balance::sa(withdraw_amount) {
             // free token is enough for the withdraw , do the lock/unlock operation
@@ -789,7 +809,7 @@ impl<T: Trait> Module<T>
             return Ok(());
         }else {
             //cancel all sell orders ,  TODO:: Processing only part of sell orders
-            <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone())?;
+            <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone(),cointype)?;
             // retrieve the updated free token
             let new_free_amount = Self::specific_token_free_amount(who.clone(),cointype);
             // lock the The Optimum Range of Lockable token

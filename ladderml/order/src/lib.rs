@@ -23,7 +23,7 @@ use rstd::ops::Div;
 
 use runtime_io::*;
 
-pub trait Trait: system::Trait{
+pub trait Trait: system::Trait + signcheck::Trait{
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
@@ -83,6 +83,7 @@ decl_event!(
         Buy(AccountId,AccountId,OrderPair,u64,Symbol,u128,bool), //buyer seller pair index amount uniqueindex
         CancelsellOrder(AccountId,OrderPair,u64,u128),
         MatchOrder(u128, Symbol, AccountId,Vec<u8>, u64, bool, u64, AccountId,Vec<u8>, u64, bool,u64),
+        Settlement(Vec<u8>,Vec<u8>),
     }
 );
 
@@ -114,11 +115,70 @@ decl_module! {
 
         fn deposit_event<T>() = default;
 
+        pub fn match_order_verification(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
+            let sender = ensure_signed(origin)?;
 
+           //let (tag, bill, from, from_bond,to,to_bond,value,reserved) = Self::parse_matchdata(message.clone(),signature);
+
+            let tx_hash = T::Hashing::hash( &message[..]);
+            let signature_hash = T::Hashing::hash( &signature[..]);
+            //check the validity and number of signatures
+            match   <signcheck::Module<T>>::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
+                Ok(y) =>  runtime_io::print("ok") ,
+                Err(x) => return Err(x),
+            }
+            //deposit_event
+            Self::deposit_event(RawEvent::Settlement(message,signature));
+            Ok(())
+        }
     }
 }
 
 impl<T: Trait> Module<T> {
+    /*
+    pub fn parse_matchdata(message: Vec<u8>, signature: Vec<u8>) -> (u64,u64,Vec<u8>,T::AccountId,
+                                                                      Vec<u8>,T::AccountId,u64,u64) {
+        // message
+        let mut messagedrain = message.clone();
+        // Tag u64
+        let mut tag_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        tag_vec.drain(0..24);
+        let mut tag_u64 = Self::u8array_to_u64(tag_vec.as_slice());
+
+        // Bill u64
+        let mut bill_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        bill_vec.drain(0..24);
+        let mut bill_u64 = Self::u8array_to_u64(bill_vec.as_slice());
+
+        //from
+        let mut from_vec: Vec<_> = messagedrain.drain(0..20).collect();
+        let from = from_vec.drain(0..20).collect();
+
+        // from bond
+        let mut from_bond_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        let from_bond: T::AccountId = Decode::decode(&mut &from_bond_vec[..]).unwrap();
+
+        //to
+        let mut to_vec: Vec<_> = messagedrain.drain(0..20).collect();
+        let to = to_vec.drain(0..20).collect();
+
+        // to bond
+        let mut to_bond_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        let to_bond: T::AccountId = Decode::decode(&mut &to_bond_vec[..]).unwrap();
+
+        // value
+        let mut value_vec:Vec<u8> = messagedrain.drain(0..32).collect();
+        value_vec.drain(0..16);
+        let mut value_u64 = Self::u8array_to_u128(value_vec.as_slice()) as u64;
+
+        // reserved  u8
+        let mut reserved_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        reserved_vec.drain(0..24);
+        let mut reserved_u64 = Self::u8array_to_u64(reserved_vec.as_slice());
+
+        return (tag_u64,bill_u64,from,from_bond,to,to_bond,value_u64,reserved_u64);
+    }
+    */
     // add a new exchange pair
     pub fn add_pair(pair: OrderPair) -> Result {
         if let Err(_) = Self::is_valid_pair(&pair) {
@@ -260,9 +320,27 @@ impl<T: Trait> Module<T> {
     }
 
 
-    pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId) -> Result{
+    pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64) -> Result{
         // find the valid sell order for the account
-
+        let all_pair_vec = Self::pair_list();
+        all_pair_vec.iter().enumerate().for_each(|(i,pair)|{
+            if pair.share == coin_type {
+                let new_last_index = Self::last_sell_order_index_of((accountid.clone(), pair.clone())).unwrap_or_default();
+                if new_last_index != 0{
+                    for i in 0..new_last_index{
+                        if let Some(mut sellorder) = Self::sell_order_of((accountid.clone(),pair.clone(),i)){
+                            if sellorder.status != OtcStatus::Done {
+                                sellorder.status = OtcStatus::Done;
+                                //update the storage
+                                <SellOrdersOf<T>>::insert((accountid.clone(),pair.clone(),i),sellorder.clone());
+                                <AllSellOrders<T>>::insert(sellorder.longindex,sellorder.clone());
+                                Self::delete_from_pair_order_storage(sellorder.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        });
         Ok(())
     }
 }

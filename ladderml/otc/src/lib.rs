@@ -99,6 +99,7 @@ decl_module! {
         }
 
         pub fn match_order_verification(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
+            let sender = ensure_signed(origin)?;
 
             Ok(())
         }

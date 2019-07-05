@@ -241,7 +241,7 @@ impl<T: Trait> Module<T>
     fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (Vec<u8>,T::AccountId,u64,u64,Vec<u8>,T::Hash,u64) {
         // message
         let mut messagedrain = message.clone();
-        // Coin 0-32
+        // Id 0-32
         let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
         id_vec.drain(0..16);
         let mut id = Self::u8array_to_u128(id_vec.as_slice());
