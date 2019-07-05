@@ -258,4 +258,11 @@ impl<T: Trait> Module<T> {
         vec.remove(mark);
         <ValidOrderIndexByOrderpair<T>>::insert(sell_order.pair.clone(),vec);
     }
+
+
+    pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId) -> Result{
+        // find the valid sell order for the account
+
+        Ok(())
+    }
 }

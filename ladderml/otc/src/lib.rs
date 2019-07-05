@@ -153,7 +153,7 @@ impl<T: Trait> Module<T> {
         <order::Module<T>>::generate_new_sell_order_and_put_into_list(who.clone(),pair_type.clone(),amount,per_price,
                                                                       reserved,acc);
         // lock the specific kingd of money of amount in bank Module
-        <bank::Module<T>>::lock(who.clone(),pair_type.share,amount);
+        <bank::Module<T>>::lock(who.clone(),pair_type.share,amount,bank::LockType::OTCLock);
     }
 
     // buy operate , lock the money and change the status
@@ -179,7 +179,7 @@ impl<T: Trait> Module<T> {
             Ok(()) => {
                 // unlock the left share of seller
                 let left_shares = sell_order.amount - sell_order.already_deal;
-                <bank::Module<T>>::unlock(who.clone(),sell_order.pair.share,left_shares);
+                <bank::Module<T>>::unlock(who.clone(),sell_order.pair.share,left_shares,bank::LockType::OTCLock);
             },
             _ => return Err("unknown err"),
         }

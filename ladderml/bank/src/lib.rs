@@ -28,6 +28,13 @@ use support::traits::Currency;
 
 use signcheck;
 
+#[derive(PartialEq, Eq, Clone, Copy, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub enum LockType {
+    OTCLock,
+    WithDrawLock,
+}
+
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
 pub trait Trait: balances::Trait + session::Trait + signcheck::Trait + order::Trait{
@@ -179,8 +186,10 @@ decl_storage! {
         /// accountid => (balance , type)
         DespositingBalance get(despositing_banance): map T::AccountId => Vec<(T::Balance,u64)>;
         DespositingTime get(despositing_time): map T::AccountId => u32;
-        // Locked token
+        /// Locked token for otc
         DespositingBalanceReserved get(despositing_banance_reserved): map T::AccountId => Vec<(T::Balance,u64)>;
+        /// Locked token for withdraw
+        DespositingBalanceWithdraw get(despositing_banance_withdraw): map T::AccountId => Vec<(T::Balance,u64)>;
 
         /// All the accounts with a desire to deposit.  to control one time one deposit.
         IntentionsDespositVec  get(intentions_desposit_vec) :  Vec<T::AccountId>;
@@ -357,7 +366,7 @@ impl<T: Trait> Module<T>
             <DespositingTime<T>>::insert(v,Self::despositing_time(v)+1);
         });
     }
-
+/*
     fn adjust_deposit_list_old(){
         // Modify depositing part of all tables
         let mut int_des_vec =  Self::intentions_desposit_vec();
@@ -391,7 +400,7 @@ impl<T: Trait> Module<T>
             <DespositingTime<T>>::insert(v,Self::despositing_time(v)+1);
         });
     }
-
+*/
     /// Record the reward and click on it to get the money.
     fn count_draw_reward(accountid: T::AccountId) -> T::Balance {
         let mut reward= <RewardRecord<T>>::get(accountid.clone());
@@ -482,13 +491,16 @@ impl<T: Trait> Module<T>
     }
 
     /// Adjust lock_money
-    pub fn lock_unlock_record(who: T::AccountId, balance:T::Balance, coin_type:u64, d_w: bool){
+    pub fn lock_unlock_record(who: T::AccountId, balance:T::Balance, coin_type:u64, lock_type:LockType,d_w: bool){
         // Determine if the person has a list, create a new one if not
-        Self::check_lock_exist(who.clone());
+        Self::check_lock_exist(who.clone(),lock_type);
         // modify the balance
         let mut new_lock_bal = T::Balance::sa(0);
         let mut mark = 0usize;
-        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+        let mut depositing_vec_lock = match lock_type {
+            LockType::OTCLock => <DespositingBalanceReserved<T>>::get(who.clone()) ,
+            LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::get(who.clone())
+        };
         depositing_vec_lock.iter().enumerate().for_each( |(i,&(bal,cointype))| {
             if cointype == coin_type {
                 if d_w {
@@ -505,13 +517,20 @@ impl<T: Trait> Module<T>
             }
         });
         depositing_vec_lock[mark]= (new_lock_bal,coin_type);
-        <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
+        match lock_type {
+            LockType::OTCLock => <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock) ,
+            LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::insert(who.clone(),depositing_vec_lock)
+        };
+        Self::lock_access_control(who.clone(),lock_type);
     }
 
-    ///
-    pub fn lock_access_control(who:T::AccountId){
+    /// Find out if the person has locked token , uninitialization of storage
+    pub fn lock_access_control(who:T::AccountId, lock_type:LockType){
         let mut deposit_total = 0;
-        let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
+        let all_data_vec = match lock_type {
+            LockType::OTCLock => <DespositingBalanceReserved<T>>::get(who.clone()) ,
+            LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::get(who.clone())
+        };
         all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
             if bal != T::Balance::sa(0u64) {
@@ -519,7 +538,7 @@ impl<T: Trait> Module<T>
             }
         });
         if deposit_total == 0{
-            Self::uninit_lock(who.clone());
+            Self::uninit_lock(who.clone(),lock_type);
         }
      }
 
@@ -657,35 +676,47 @@ impl<T: Trait> Module<T>
     }
 
     // make sure the lock record exist
-    pub fn check_lock_exist(who:T::AccountId) {
+    pub fn check_lock_exist(who:T::AccountId,lock_type:LockType) {
         //let mut is_none = false;
-        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+        let mut depositing_vec_lock = match lock_type {
+            LockType::OTCLock => <DespositingBalanceReserved<T>>::get(who.clone()) ,
+            LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::get(who.clone())
+        };
         if depositing_vec_lock == [].to_vec(){
             // if not make a new lock record
-            Self::init_lock(who.clone());
+            Self::init_lock(who.clone(),lock_type);
         }
     }
-    pub fn init_lock(who :T::AccountId){
-        let mut depositing_vec_lock = <DespositingBalanceReserved<T>>::get(who.clone());
+    pub fn init_lock(who :T::AccountId , lock_type: LockType){
+        let mut depositing_vec_lock = match lock_type {
+            LockType::OTCLock => <DespositingBalanceReserved<T>>::get(who.clone()) ,
+            LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::get(who.clone())
+        };
         for i in 0u64..5u64{
             depositing_vec_lock.push((T::Balance::sa(0),i));
         }
-        <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock);
+        match lock_type {
+            LockType::OTCLock => <DespositingBalanceReserved<T>>::insert(who.clone(),depositing_vec_lock) ,
+            LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::insert(who.clone(),depositing_vec_lock)
+        };
     }
 
-    pub fn uninit_lock(who :T::AccountId){
-        <DespositingBalanceReserved<T>>::remove(who.clone());
+    pub fn uninit_lock(who :T::AccountId,lock_type:LockType){
+        match lock_type {
+            LockType::OTCLock => <DespositingBalanceReserved<T>>::remove(who.clone()) ,
+            LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::remove(who.clone())
+        };
     }
 
     /// lock the amount of coin of who
-    pub fn lock(who:T::AccountId, coin: u64 , amount: u64){
-        Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,true);
+    pub fn lock(who:T::AccountId, coin: u64 , amount: u64, lock_type:LockType){
+        Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,lock_type,true);
         Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,false);
     }
 
     /// unlock the amount of coin of who
-    pub fn unlock(who:T::AccountId, coin: u64 , amount: u64){
-        Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,false);
+    pub fn unlock(who:T::AccountId, coin: u64 , amount: u64 , lock_type:LockType){
+        Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin,lock_type,false);
         Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin,true);
     }
 
@@ -695,7 +726,7 @@ impl<T: Trait> Module<T>
                        type_money:u64 ,price:u64 ,amount:u64, sell_res:bool, buy_res:bool ){
         // Deducting the amount locked in by the seller and transferring the buyer's money.
         // unlock the reserved token anyway
-        Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,false);
+        Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,LockType::OTCLock,false);
         if sell_res {
             Self::depositing_withdraw_record(seller.clone(), T::Balance::sa(amount * price), type_money, true);
         }
@@ -704,7 +735,71 @@ impl<T: Trait> Module<T>
         if buy_res {
             Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount), type_share, true);
         }
+    }
 
+    pub fn specific_token_free_amount(who:T::AccountId , cointype: u64) -> T::Balance{
+        let mut deposit_total = 0;
+        let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
+        let mut amount_on_sale = T::Balance::sa(0);
+        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+            // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
+            if ctype == cointype {
+                if bal == T::Balance::sa(0) {
+                }else {
+                    amount_on_sale = bal;
+                }
+            }
+        });
+        amount_on_sale
+    }
+
+    /// Find out if the person(who) has locked token(cointype) ,is true return the amount
+    pub fn is_specific_token_on_sale (who:T::AccountId , cointype: u64 ,lock_type:LockType) -> T::Balance{
+        let mut deposit_total = 0;
+        let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
+        let mut amount_on_sale = T::Balance::sa(0);
+        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+            // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
+            if ctype == cointype {
+                if bal == T::Balance::sa(0) {
+                }else {
+                    amount_on_sale = bal;
+                }
+            }
+        });
+        amount_on_sale
+    }
+
+    /// Insufficient token when withdrawing, it will cancel the sell order to get some free token
+    pub fn withdraw_request(who:T::AccountId,cointype:u64,withdraw_amount:u64) -> Result {
+        //TODO:: query if the <depositingBalance> exist
+            let free_token = Self::specific_token_free_amount(who.clone(),cointype);
+
+        if free_token >= T::Balance::sa(withdraw_amount) {
+            // free token is enough for the withdraw , do the lock/unlock operation
+            Self::depositing_withdraw_record(who.clone(), T::Balance::sa(withdraw_amount), cointype, false);
+            Self::lock_unlock_record(who.clone(),T::Balance::sa(withdraw_amount),cointype,LockType::WithDrawLock,true);
+            return Ok(());
+        }
+        // else  cancel all sell order and do the lock/unlock operation
+        let amount_on_sale = Self::is_specific_token_on_sale(who.clone(),cointype,LockType::OTCLock);
+        if amount_on_sale == T::Balance::sa(0) {
+            //if there is no sell order , directly do the lock/unlock operation
+            Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
+            return Ok(());
+        }else {
+            //cancel all sell orders ,  TODO:: Processing only part of sell orders
+            <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone())?;
+            // retrieve the updated free token
+            let new_free_amount = Self::specific_token_free_amount(who.clone(),cointype);
+            // lock the The Optimum Range of Lockable token
+            if new_free_amount >= T::Balance::sa(withdraw_amount){
+                Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
+            }else {
+                Self::lock(who.clone(),cointype,T::Balance::as_(new_free_amount),LockType::WithDrawLock);
+            }
+        }
+        Ok(())
     }
 }
 
