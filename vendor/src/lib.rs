@@ -17,7 +17,8 @@ mod mapper;
 use crate::label::ChainAlias;
 use crate::listener::{SideListener, ListenerStreamStyle};
 use crate::sender::{AbosProxy, EthProxy, SideSender, SignContext};
-use crate::supervisor::{PacketNonce, Supervisor};
+use crate::supervisor::{PacketNonce, Supervisor, SuperviseClient};
+use crate::message::RelayMessage;
 use client::{blockchain::HeaderBackend, BlockchainEvents};
 use exchange::Exchange;
 use futures::{Future, Stream};
@@ -25,7 +26,7 @@ use keystore::Store as Keystore;
 use log::{error, info, warn};
 use network::SyncProvider;
 use node_runtime::{
-    matrix::*, Event, EventRecord,
+    Event, EventRecord, order::RawEvent,
     VendorApi, /*,exchangerate */
 };
 use primitives::storage::{StorageChangeSet, StorageData, StorageKey};
@@ -212,8 +213,6 @@ where
         .start();
     }
 
-    let eth_kovan_tag = H256::from_str(events::ETH_COIN).unwrap();
-    let abos_tag = H256::from_str(events::ABOS_COIN).unwrap();
     // how to fetch real key?
     let events_key = StorageKey(primitives::twox_128(b"System Events").to_vec());
     let storage_stream = client
@@ -237,31 +236,64 @@ where
                 .collect();
             let events: Vec<Event> = records.concat().iter().cloned().map(|r| r.event).collect();
             events.iter().for_each(|event| {
-                if let Event::matrix(e) = event {
+                if let Event::order(e) = event {
                     match e {
-                        // RawEvent::MatchOrder(message, signatures) => {
-                        //     info!(
-                        //         "raw event ingress: message: {}, signatures: {}",
-                        //         message.to_hex(),
-                        //         signatures.to_hex()
-                        //     );
-                        //     // events::IngressEvent::from_bytes(message)
-                        //     //     .map(|ie| {
-                        //     //         if ie.tag[24..32] == eth_kovan_tag[24..32] {
-                        //     //             kovan_sender.send(e.clone()).unwrap();
-                        //     //         } else if ie.tag[24..32] == abos_tag[24..32] {
-                        //     //             abos_sender.send(e.clone()).unwrap();
-                        //     //         } else {
-                        //     //             warn!("unknown event tag of ingress: {:?}", ie.tag);
-                        //     //         }
-                        //     //     })
-                        //     //     .map_err(|_err| {
-                        //     //         warn!(
-                        //     //             "unexpected format of ingress, message {:?}",
-                        //     //             message.to_hex()
-                        //     //         );
-                        //     //     });
-                        // }
+                        RawEvent::MatchOrder(bill, price, sell_bond, seller, sell_amount, sell_reserved, sell_tag,
+                                buy_bond, buyer, buy_amount, buy_reserved, buy_tag) => {
+                                
+                                // TODO to side chain decimal.
+                                let sell_value: U256 = U256::from(*sell_amount);
+                                let buy_value: U256 = U256::from(*buy_amount);
+
+                                let sell_event = events::MatchEvent {
+                                    tag: *sell_tag,
+                                    bill: *bill as u64,
+                                    from: Address::from_slice(seller.as_ref()),
+                                    from_bond: H256::from_slice(sell_bond.as_ref()),
+                                    to: Address::from_slice(buyer.as_ref()),
+                                    to_bond: H256::from_slice(buy_bond.as_ref()),
+                                    value: sell_value,
+                                    reserved: *sell_reserved as u8,
+                                };
+                                info!("{:?}", sell_event);
+
+                                let buy_event = events::MatchEvent {
+                                    tag: *buy_tag,
+                                    bill: *bill as u64,
+                                    from: Address::from_slice(buyer.as_ref()),
+                                    from_bond: H256::from_slice(buy_bond.as_ref()),
+                                    to: Address::from_slice(seller.as_ref()),
+                                    to_bond: H256::from_slice(sell_bond.as_ref()),
+                                    value: buy_value,
+                                    reserved: *buy_reserved as u8,
+                                };
+                                info!("{:?}", buy_event);
+                                spv.submit(RelayMessage::from(sell_event));
+                                spv.submit(RelayMessage::from(buy_event));
+                        }
+                        RawEvent::Settlement(message, signatures) => {
+                            info!(
+                                "raw event ingress: message: {}, signatures: {}",
+                                message.to_hex(),
+                                signatures.to_hex()
+                            );
+                            events::MatchEvent::from_bytes(message)
+                                .map(|ie| {
+                                    if ie.tag == 1 {
+                                        kovan_sender.send(e.clone()).unwrap();
+                                    } else if ie.tag == 2 {
+                                        abos_sender.send(e.clone()).unwrap();
+                                    } else {
+                                        warn!("unknown event tag of ingress: {:?}", ie.tag);
+                                    }
+                                })
+                                .map_err(|_err| {
+                                    warn!(
+                                        "unexpected format of ingress, message {:?}",
+                                        message.to_hex()
+                                    );
+                                });
+                        }
                         _ => {}
                     };
                 }
