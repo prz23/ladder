@@ -63,6 +63,8 @@ pub use brand::Trademark;
 
 pub use system::EventRecord;
 
+pub use order;
+
 pub mod matrix;
 
 

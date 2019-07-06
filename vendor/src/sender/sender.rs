@@ -3,7 +3,7 @@ use crate::error::ResultExt;
 use log::{info, warn};
 use node_primitives::{AccountId, BlockNumber, Hash};
 use node_runtime::{
-    matrix::*
+    order::RawEvent
 };
 use signer::{KeyPair};
 use std::marker::{Send, Sync};
@@ -30,7 +30,7 @@ impl<P> SideSender<P>
 where
     P: SenderProxy + Send + Sync + 'static,
 {
-    pub fn start(mut self) -> Sender<RawEvent<AccountId, Hash, BlockNumber>> {
+    pub fn start(mut self) -> Sender<RawEvent<AccountId>> {
         let (sender, receiver) = channel();
         std::thread::spawn(move || {
             let mut event_loop = Core::new().unwrap();
@@ -52,7 +52,7 @@ where
                 }
 
                 match event {
-                    RawEvent::Ingress(message, signatures) => {
+                    RawEvent::Settlement(message, signatures) => {
                         info!(
                             "ingress message: {:?}, signatures: {:?}",
                             message, signatures

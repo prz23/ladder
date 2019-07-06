@@ -6,10 +6,6 @@ use error_chain::bail;
 use std::str::FromStr;
 use web3::types::{Address, Log, H256, U256};
 
-pub const ETH_COIN: &str = "0000000000000000000000000000000000000000000000000000000000000001";
-pub const ABOS_COIN: &str = "0000000000000000000000000000000000000000000000000000000000000002";
-
-
 pub const ORACLE_LENTH: usize = 116; // 8 8
 pub const LOCKTOKEN_LENGTH: usize = 180;
 pub const UNLOCKTOKEN_LENGTH: usize = 64;
@@ -162,7 +158,7 @@ pub struct WithdrawEvent {
 }
 
 impl WithdrawEvent {
-    const WITHDRAW_LENGTH:usize = 0;
+    const WITHDRAW_LENGTH:usize = 156;
 
     pub fn from_log(raw_log: &Log, chain: &ChainAlias) -> Result<Self, Error> {
         let hash = raw_log
