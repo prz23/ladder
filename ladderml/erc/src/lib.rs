@@ -688,7 +688,7 @@ mod tests {
                 println!("id is {}",r.id);
                 println!("status is {:?}",r.status);
             }
-            assert_eq!(Erc::total_lock_token(),10000000);
+            assert_eq!(Erc::total_lock_token(),100000000000);
         });
     }
 
