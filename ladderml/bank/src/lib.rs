@@ -757,10 +757,13 @@ impl<T: Trait> Module<T>
         }
     }
 
+    // return the amout of the token of  the cointype of who
     pub fn specific_token_free_amount(who:T::AccountId , cointype: u64) -> T::Balance{
         let mut deposit_total = 0;
-        let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
         let mut amount_on_sale = T::Balance::sa(0);
+        let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
+        if all_data_vec == [].to_vec() { return amount_on_sale;}
+
         all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
             if ctype == cointype {
@@ -792,9 +795,7 @@ impl<T: Trait> Module<T>
 
     /// Insufficient token when withdrawing, it will cancel the sell order to get some free token
     pub fn withdraw_request(who:T::AccountId,cointype:u64,withdraw_amount:u64) -> Result {
-        //TODO:: query if the <depositingBalance> exist
         let free_token = Self::specific_token_free_amount(who.clone(),cointype);
-
         if free_token >= T::Balance::sa(withdraw_amount) {
             // free token is enough for the withdraw , do the lock/unlock operation
             Self::depositing_withdraw_record(who.clone(), T::Balance::sa(withdraw_amount), cointype, false);
