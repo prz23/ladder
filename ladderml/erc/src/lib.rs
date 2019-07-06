@@ -194,7 +194,7 @@ decl_storage! {
 		EnableRewardRecord get(enable_record) config(): bool;
 
         /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
-        DespositExchangeRate get(desposit_exchange_rate) :  u64 = 10000000000000;
+        DespositExchangeRate get(desposit_exchange_rate) :  u64 = 1000000000;
 
 		/// record one's total reward
 		AccountReward get(account_reward):  map T::AccountId => T::Balance;
@@ -385,7 +385,7 @@ impl<T: Trait> Module<T>
             4 => 1.018,
             _ => 0.000f64,
         };
-        T::Balance::sa((T::Balance::as_(erc) as f64 * rewardrate/100f64  )as u64)
+        T::Balance::sa((T::Balance::as_(erc) as f64 * rewardrate/1000000f64)as u64)
     }
 
     fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: Vec<u8>) -> Result {
