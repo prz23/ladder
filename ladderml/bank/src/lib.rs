@@ -78,7 +78,7 @@ decl_module! {
             <DespositingTime<T>>::insert(who.clone(), 0);
 
             // emit an event
-            Self::deposit_event(RawEvent::AddDepositingQueue(who));
+            Self::deposit_event(RawEvent::Depositing(who));
             Ok(())
         }
 
@@ -112,11 +112,12 @@ decl_module! {
             // ensure no repeat
             ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
 
-            Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,false);
+           // Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,false);
+            Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin_type,LockType::WithDrawLock,false);
             Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),false);
 
             // emit an event
-            Self::deposit_event(RawEvent::AddWithdrawQueue(who));
+            Self::deposit_event(RawEvent::Withdraw(who,T::Balance::sa(amount)));
             Ok(())
         }
 
@@ -280,12 +281,14 @@ decl_event! {
 		/// All validators have been rewarded by the given balance.
 		Reward(Balance),
 		/// accountid added to the intentions to deposit queue
-		AddDepositingQueue(AccountId),
-		/// intentions to withdraw
-		AddWithdrawQueue(AccountId),
+		Depositing(AccountId),
+		
+		Withdraw(AccountId,Balance),
+		
+		WithdrawRequest(AccountId,Balance),
+
         /// a new seesion start
         NewRewardSession(BlockNumber),
-
     }
 }
 
@@ -795,29 +798,48 @@ impl<T: Trait> Module<T>
 
     /// Insufficient token when withdrawing, it will cancel the sell order to get some free token
     pub fn withdraw_request(who:T::AccountId,cointype:u64,withdraw_amount:u64) -> Result {
+        // get the current amount of free token , if the data in uninited ,return zero.
         let free_token = Self::specific_token_free_amount(who.clone(),cointype);
+        // if free token is enough to withdraw , withdraw it.
         if free_token >= T::Balance::sa(withdraw_amount) {
             // free token is enough for the withdraw , do the lock/unlock operation
-            Self::depositing_withdraw_record(who.clone(), T::Balance::sa(withdraw_amount), cointype, false);
-            Self::lock_unlock_record(who.clone(),T::Balance::sa(withdraw_amount),cointype,LockType::WithDrawLock,true);
+            Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
+            Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount)));
             return Ok(());
         }
-        // else  cancel all sell order and do the lock/unlock operation
+        // if the free token is less than the requested amount
+        // cancel all sell order and  turn The remaining money in sell orders into free token
+        // calculate the total amount of specified cointype for who in sell orders
         let amount_on_sale = Self::is_specific_token_on_sale(who.clone(),cointype,LockType::OTCLock);
         if amount_on_sale == T::Balance::sa(0) {
             //if there is no sell order , directly do the lock/unlock operation
-            Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
+            // TODO::this situation is't supposed  to happen when free_token is zero.
+            // in another word, when into this case ,  the free_token must not be zero.
+            // so the free token is reachable.
+            Self::lock(who.clone(),cointype,T::Balance::as_(free_token),LockType::WithDrawLock);
+            Self::deposit_event(RawEvent::WithdrawRequest(who,free_token));
             return Ok(());
         }else {
-            //cancel all sell orders ,  TODO:: Processing only part of sell orders
+            //Cancel all sell orders  , TODO:: Processing only part of sell orders
             <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone(),cointype)?;
-            // retrieve the updated free token
+            // if success canceled , Then turn (amount_on_sale) from OTC_lock into free
+            // in this case , if the free token is zero , the unlock will init the data
+            // else , business as usual
+            Self::unlock(who.clone(),cointype,T::Balance::as_(amount_on_sale),LockType::OTCLock);
+            // retrieve the updated free token  notice that [ new_free_amount = amount_on_sale + free_token ]
             let new_free_amount = Self::specific_token_free_amount(who.clone(),cointype);
             // lock the The Optimum Range of Lockable token
             if new_free_amount >= T::Balance::sa(withdraw_amount){
+                // free token is sufficient,  Then turn (withdraw_amount) from free into Withdraw_lock
                 Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
+                // event  after the order been canceled , the
+                Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount)));
             }else {
+                //TODO::this situation is supposed not to happen
+                // free token is not sufficient,  Then turn all(new_free_amount) from free into Withdraw_lock
                 Self::lock(who.clone(),cointype,T::Balance::as_(new_free_amount),LockType::WithDrawLock);
+                // event  after the order been canceled , the
+                Self::deposit_event(RawEvent::WithdrawRequest(who,new_free_amount));
             }
         }
         Ok(())
