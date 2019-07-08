@@ -59,8 +59,9 @@ decl_module! {
 */
             // resolving message --> Ethereum's transcation hash  tx_hash   accountid
             //                       depositing amount    signature_hash
-            let (tx_hash, who, amount, signature_hash,coin_type) = Self::split_message(message.clone(),signature);
+            let (tx_hash, who, amount, signature_hash,coin_type,sendervec) = Self::split_message(message.clone(),signature);
 
+            if amount == 0 { return Err("cant deposit zero")};
             // ensure no repeat desposit
             //ensure!(Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already depositing.");
             // ensure no repeat intentions to desposit
@@ -74,11 +75,9 @@ decl_module! {
 
             Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,true);
             Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),true);
-
             <DespositingTime<T>>::insert(who.clone(), 0);
-
             // emit an event
-            Self::deposit_event(RawEvent::Depositing(who));
+            Self::deposit_event(RawEvent::Depositing(coin_type,who,sendervec,T::Balance::sa(amount),tx_hash));
             Ok(())
         }
 
@@ -102,7 +101,7 @@ decl_module! {
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
             // resovling message --> hash  tag  id  amount
-            let (tx_hash,who,amount,signature_hash,coin_type) = Self::split_message(message.clone(),signature);
+            let (tx_hash,who,amount,signature_hash,coin_type,id,sendervec) = Self::split_message2(message.clone(),signature);
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
@@ -117,7 +116,7 @@ decl_module! {
             Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),false);
 
             // emit an event
-            Self::deposit_event(RawEvent::Withdraw(who,T::Balance::sa(amount)));
+            Self::deposit_event(RawEvent::Withdraw(coin_type,id,who,sendervec,T::Balance::sa(amount),tx_hash));
             Ok(())
         }
 
@@ -174,7 +173,7 @@ decl_module! {
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
             // resovling message --> hash  tag  id  amount
-            let (tx_hash,who,amount,signature_hash,coin_type) = Self::split_message(message.clone(),signature);
+            let (tx_hash,who,amount,signature_hash,coin_type,id,sendervec) = Self::split_message2(message.clone(),signature);
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
@@ -184,7 +183,8 @@ decl_module! {
             // ensure no repeat
             ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
 
-            Self::withdraw_request(who.clone(),amount,coin_type)?;
+            let lock_withdraw_balance = Self::withdraw_request(who.clone(),amount,coin_type);
+            Self::deposit_event(RawEvent::WithdrawRequest(coin_type,id,who,sendervec,lock_withdraw_balance,tx_hash));
             Ok(())
         }
 
@@ -275,17 +275,20 @@ decl_event! {
     pub enum Event<T> where
         <T as balances::Trait>::Balance,
         <T as system::Trait>::AccountId,
-        <T as system::Trait>::BlockNumber
+        <T as system::Trait>::BlockNumber,
+        <T as system::Trait>::Hash
     {
         ///bank moduel
 		/// All validators have been rewarded by the given balance.
 		Reward(Balance),
 		/// accountid added to the intentions to deposit queue
-		Depositing(AccountId),
-		
-		Withdraw(AccountId,Balance),
-		
-		WithdrawRequest(AccountId,Balance),
+		/// Self::deposit_event(RawEvent::Depositing(coin_type,who,senderH160,T::Balance::sa(amount),tx_hash));
+		Depositing(u64,AccountId,Vec<u8>,Balance,Hash),
+
+		//Self::deposit_event(RawEvent::Withdraw(coin_type,who,sendervec,T::Balance::sa(amount),tx_hash));
+		Withdraw(u64,u64,AccountId,Vec<u8>,Balance,Hash),
+		 //Self::deposit_event(RawEvent::WithdrawRequest(coin_type,id,who,sendervec,T::Balance::sa(withdraw_amount),tx_hash));
+		WithdrawRequest(u64,u64,AccountId,Vec<u8>,Balance,Hash),
 
         /// a new seesion start
         NewRewardSession(BlockNumber),
@@ -294,15 +297,17 @@ decl_event! {
 
 impl<T: Trait> Module<T>
 {
-    fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash,u64) {
+    fn  split_message( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash,u64,Vec<u8>) {
 
         // message --> hash  tag  id  amount
         let mut messagedrain = message.clone();
 
         // Coin 0-32
-        let mut coin_vec: Vec<_> = messagedrain.drain(0..32).collect();
-        coin_vec.drain(0..24);
+        let mut coin_vec: Vec<_> = messagedrain.drain(0..8).collect();
         let mut coin_type = Self::u8array_to_u64(coin_vec.as_slice());
+        //sender
+        let mut sender_vec: Vec<_> = messagedrain.drain(0..20).collect();
+        let sender: Vec<u8> = sender_vec.drain(0..20).collect();
 
         // Who 33-64
         let mut who_vec: Vec<_> = messagedrain.drain(0..32).collect();
@@ -322,7 +327,48 @@ impl<T: Trait> Module<T>
         // Signature_Hash
         let signature_hash =  T::Hashing::hash( &signature[..]);
 
-        return (tx_hash,who,amountu64,signature_hash,coin_type);
+        return (tx_hash,who,amountu64,signature_hash,coin_type,sender_vec);
+    }
+
+    fn  split_message2( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash,u64,u64,Vec<u8>) {
+
+        // message --> hash  tag  id  amount
+        let mut messagedrain = message.clone();
+
+        // Coin 0-32
+        let mut coin_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        //coin_vec.drain(0..24);
+        let mut coin_type = Self::u8array_to_u64(coin_vec.as_slice());
+
+        // Id 0-32
+        let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        id_vec.drain(0..16);
+        let mut id = Self::u8array_to_u128(id_vec.as_slice());
+
+
+        //sender
+        let mut sender_vec: Vec<_> = messagedrain.drain(0..20).collect();
+        let sender:Vec<u8> = sender_vec.drain(0..20).collect();
+
+        // Who 33-64
+        let mut who_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        let who: T::AccountId = Decode::decode(&mut &who_vec[..]).unwrap();
+
+        //65-96
+        let mut amount_vec:Vec<u8> = messagedrain.drain(0..32).collect();
+        amount_vec.drain(0..16);
+        let mut amountu128 = Self::u8array_to_u128(amount_vec.as_slice());
+        amountu128 = ((amountu128 as f64)/<DespositExchangeRate<T>>::get() as f64) as u128;
+
+        let amountu64= amountu128 as u64;
+        // Tx_Hash 97-128
+        let hash:Vec<u8> = messagedrain.drain(0..32).collect();
+        let tx_hash = T::Hashing::hash( &hash[..]);
+
+        // Signature_Hash
+        let signature_hash =  T::Hashing::hash( &signature[..]);
+
+        return (tx_hash,who,amountu64,signature_hash,coin_type,id as u64,sender_vec);
     }
 
     pub fn signature521(signature: Vec<u8>, hash: Vec<u8>){
@@ -610,6 +656,7 @@ impl<T: Trait> Module<T>
         // if all type of coin is Zero ,  the accountid will be removed from the DepositingVec.
         if <DepositngAccountTotal<T>>::get(who.clone()) == 0 {
             let mut vec = Self::despositing_account();
+            if vec == [].to_vec() { return ;}
             let mut mark = 0usize;
             vec.iter().enumerate().for_each(|(t,id)|{
                 if id.clone() == who {
@@ -764,7 +811,7 @@ impl<T: Trait> Module<T>
     pub fn specific_token_free_amount(who:T::AccountId , cointype: u64) -> T::Balance{
         let mut deposit_total = 0;
         let mut amount_on_sale = T::Balance::sa(0);
-        let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
+        let all_data_vec = <DespositingBalance<T>>::get(who.clone());
         if all_data_vec == [].to_vec() { return amount_on_sale;}
 
         all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
@@ -797,15 +844,15 @@ impl<T: Trait> Module<T>
     }
 
     /// Insufficient token when withdrawing, it will cancel the sell order to get some free token
-    pub fn withdraw_request(who:T::AccountId,cointype:u64,withdraw_amount:u64) -> Result {
+    pub fn withdraw_request(who:T::AccountId,withdraw_amount:u64,cointype:u64) -> T::Balance {
         // get the current amount of free token , if the data in uninited ,return zero.
         let free_token = Self::specific_token_free_amount(who.clone(),cointype);
         // if free token is enough to withdraw , withdraw it.
         if free_token >= T::Balance::sa(withdraw_amount) {
             // free token is enough for the withdraw , do the lock/unlock operation
             Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
-            Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount)));
-            return Ok(());
+            //Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount),id));
+            return T::Balance::sa(withdraw_amount);
         }
         // if the free token is less than the requested amount
         // cancel all sell order and  turn The remaining money in sell orders into free token
@@ -813,15 +860,15 @@ impl<T: Trait> Module<T>
         let amount_on_sale = Self::is_specific_token_on_sale(who.clone(),cointype,LockType::OTCLock);
         if amount_on_sale == T::Balance::sa(0) {
             //if there is no sell order , directly do the lock/unlock operation
-            // TODO::this situation is't supposed  to happen when free_token is zero.
+            // TODO::this situation isn't supposed  to happen when free_token is zero.
             // in another word, when into this case ,  the free_token must not be zero.
             // so the free token is reachable.
             Self::lock(who.clone(),cointype,T::Balance::as_(free_token),LockType::WithDrawLock);
-            Self::deposit_event(RawEvent::WithdrawRequest(who,free_token));
-            return Ok(());
+            //Self::deposit_event(RawEvent::WithdrawRequest(who,free_token,id));
+            return free_token;
         }else {
             //Cancel all sell orders  , TODO:: Processing only part of sell orders
-            <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone(),cointype)?;
+            <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone(),cointype);
             // if success canceled , Then turn (amount_on_sale) from OTC_lock into free
             // in this case , if the free token is zero , the unlock will init the data
             // else , business as usual
@@ -833,16 +880,17 @@ impl<T: Trait> Module<T>
                 // free token is sufficient,  Then turn (withdraw_amount) from free into Withdraw_lock
                 Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
                 // event  after the order been canceled , the
-                Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount)));
+                //Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount),id));
+                return T::Balance::sa(withdraw_amount);
             }else {
                 //TODO::this situation is supposed not to happen
                 // free token is not sufficient,  Then turn all(new_free_amount) from free into Withdraw_lock
                 Self::lock(who.clone(),cointype,T::Balance::as_(new_free_amount),LockType::WithDrawLock);
                 // event  after the order been canceled , the
-                Self::deposit_event(RawEvent::WithdrawRequest(who,new_free_amount));
+                //Self::deposit_event(RawEvent::WithdrawRequest(who,new_free_amount,id));
+                return new_free_amount;
             }
         }
-        Ok(())
     }
 }
 
@@ -956,21 +1004,27 @@ mod tests {
     fn depositing_test() {
         with_externalities(&mut new_test_ext(), || {
 
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be2".from_hex().unwrap();
-            let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
-            assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
-           // assert_eq!(Bank::despositing_account(),[5].to_vec());
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::despositing_account(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000500000000000000000000000074251db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be2".from_hex().unwrap();
-            let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_err!(Bank::deposit(Origin::signed(5),data,sign),"This signature is repeat!");
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
-            let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000300000000000000000000000074251db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9b32".from_hex().unwrap();
-            let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
+            let mut data : Vec<u8>= "0000000000000002f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad00000000000000000000000000000000000000000000000000000000000000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "99ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf619".from_hex().unwrap();
+            assert_err!(Bank::deposit(Origin::signed(5),data,sign),"cant deposit zero");
+          //  assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (1000, 3), (0, 4)].to_vec());
+
+            let mut data : Vec<u8>= "0000000000000003f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
+            let sign : Vec<u8>= "12ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
-            assert_eq!(Bank::despositing_banance(0),[(0, 0), (1000, 1), (0, 2), (1000, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (10000000, 3), (0, 4)].to_vec());
+
         });
     }
 
@@ -995,7 +1049,20 @@ mod tests {
     #[test]
     fn withdraw_request_test() {
         with_externalities(&mut new_test_ext(), || {
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::despositing_account(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+
             //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
+            let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
+            let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
+            assert_ok!(Bank::withdrawrequest(Origin::signed(5),data2,sign2));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[].to_vec());
+            assert_eq!(Bank::despositing_banance_withdraw(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)]);
+
         });
     }
 }

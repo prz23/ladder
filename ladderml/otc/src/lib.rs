@@ -426,7 +426,7 @@ mod tests {
             assert_ok!(OTC::put_order(Some(1).into() , pair2.clone(), 15, 10 ,acc.clone(),true));
             // an account 1 has type3 token 40 free and 15 locked by put up sell order
             // now cancel all, the status turn into done
-            assert_ok!(Order::cancel_order_for_bank_withdraw(1,pair.share));
+            Order::cancel_order_for_bank_withdraw(1,pair.share);
 
             // all status into done
             let cc = Order::sell_order_of((1, pair.clone(), 1) ).unwrap();
@@ -443,6 +443,54 @@ mod tests {
         let sign : Vec<u8>= "4625ad0747cc75ab29c97a69ef561c2a7d154e7ec90b180d37df2b7a85ec6fb35588f5b38ca1af1e8e8a469114edecd05689c143e0cdb5ae032c349d0c22ae061b".from_hex().unwrap();
 
         assert_ok!(Order::match_order_verification(Some(1).into(),message,sign));
+        });
+    }
+
+    #[test]
+    fn basic_withdraw_request_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::despositing_account(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+
+            //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
+            let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
+            let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
+            assert_ok!(Bank::withdrawrequest(Origin::signed(5),data2,sign2));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[].to_vec());
+            assert_eq!(Bank::despositing_banance_withdraw(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)]);
+        });
+    }
+
+    #[test]
+    fn withdraw_request_withdraw_sell_order_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::despositing_account(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+            // put order
+            let acc : Vec<u8> = [2,3,4,5].to_vec();
+            let pair:OrderPair = OrderPair{ share:1 ,money:2};
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+            assert_ok!(OTC::put_order(Some(11744161374129632607).into() , pair.clone(), 10, 10 ,acc.clone(),true));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (9999990, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance_reserved(11744161374129632607),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+
+            //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
+            let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
+            let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
+            assert_ok!(Bank::withdrawrequest(Origin::signed(5),data2,sign2));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[].to_vec());
+            assert_eq!(Bank::despositing_banance_withdraw(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)]);
+
+
         });
     }
 }

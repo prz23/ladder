@@ -319,7 +319,7 @@ impl<T: Trait> Module<T> {
     }
 
 
-    pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64) -> Result{
+    pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64){
         // find the valid sell order for the account
         let all_pair_vec = Self::pair_list();
         all_pair_vec.iter().enumerate().for_each(|(i,pair)|{
@@ -340,6 +340,5 @@ impl<T: Trait> Module<T> {
                 }
             }
         });
-        Ok(())
     }
 }
