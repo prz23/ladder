@@ -35,6 +35,15 @@ pub enum LockType {
     WithDrawLock,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub enum TokenType {
+    Free,
+    OTC,
+    WithDraw,
+    Reward,
+}
+
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
 pub trait Trait: balances::Trait + session::Trait + signcheck::Trait + order::Trait{
@@ -203,6 +212,17 @@ decl_storage! {
         DespoitingAccount get(despositing_account): Vec<T::AccountId>;
         /// if the map is 0 ,delete the above Vec
         DepositngAccountTotal get(depositing_account_total) : map T::AccountId => u64;
+
+        // Token Record
+        DepositFreeToken get(deposit_free_token) : map (T::AccountId,Vec<u8>,u64) => u64;
+        DepositOtcToken get(deposit_otc_token) : map (T::AccountId,Vec<u8>,u64) => u64;
+        DepositWithdrawToken get(deposit_withdraw_token) : map (T::AccountId,Vec<u8>,u64) => u64;
+        DepositRewardToken get(deposit_reward_token) : map (T::AccountId,Vec<u8>,u64) => u64;
+        // attached record
+        DepositLadderAccountList get(deposit_ladder_account_list) : Vec<T::AccountId>;
+        DepositAccountCoinList get(deposit_account_coin_list) : map T::AccountId => Vec<u64>;
+        DepositSenderList get(deposit_sender_list) : map (T::AccountId,u64) => Vec<Vec<u8>>;
+
 
         /// accountid => (balance , type)
         DespositingBalance get(despositing_banance): map T::AccountId => Vec<(T::Balance,u64)>;
@@ -424,7 +444,8 @@ impl<T: Trait> Module<T>
 
         // 1. Reward directly to account 2. Click to get reward
         match Self::enable_record() {
-            true => Self::reward_deposit_record(),
+            true => {Self::reward_deposit_record();
+                     Self::calculate_reward_and_reward();},
             _ =>  Self::reward_deposit(),
         }
     }
@@ -435,41 +456,7 @@ impl<T: Trait> Module<T>
             <DespositingTime<T>>::insert(v,Self::despositing_time(v)+1);
         });
     }
-/*
-    fn adjust_deposit_list_old(){
-        // Modify depositing part of all tables
-        let mut int_des_vec =  Self::intentions_desposit_vec();
-        while let  Some(who)=int_des_vec.pop(){
-            // update the map of the depositing account
-            let (balances,coin_type) = <IntentionsDesposit<T>>::get(who.clone());
-            Self::depositing_withdraw_record(who.clone(),balances,coin_type,true);
-            Self::calculate_total_deposit(coin_type,balances,true);
 
-            <DespositingTime<T>>::insert(who.clone(), 0);
-            <IntentionsDesposit<T>>::remove(who);
-        }
-        <IntentionsDespositVec<T>>::put(int_des_vec);
-
-        //===================================================================//
-        // update the map of withdraw
-        let mut vec_with =  Self::intentions_withdraw_vec();
-        while let Some(who) = vec_with.pop() {
-            runtime_io::print("withdraw to quit");
-            let (balances,coin_type) = <IntentionsWithdraw<T>>::get(who.clone());
-            Self::depositing_withdraw_record(who.clone(),balances,coin_type,false);
-            Self::calculate_total_deposit(coin_type,balances,false);
-
-            <DespositingTime<T>>::remove(who.clone());
-            <IntentionsWithdraw<T>>::remove(who);
-        }
-        <IntentionsWithdrawVec<T>>::put(vec_with);
-
-        // update the session time of the depositing account
-        Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            <DespositingTime<T>>::insert(v,Self::despositing_time(v)+1);
-        });
-    }
-*/
     /// Record the reward and click on it to get the money.
     fn count_draw_reward(accountid: T::AccountId) -> T::Balance {
         let mut reward= <RewardRecord<T>>::get(accountid.clone());
@@ -892,6 +879,173 @@ impl<T: Trait> Module<T>
             }
         }
     }
+    /*------------new---------------*/
+    fn reward_calcul(total_token:u64,) -> u64 {
+        (total_token as f64 * 0.0001f64) as u64
+    }
+
+    /// with sender
+    pub fn modify_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64,token_type:TokenType,plus_or_minus:bool) -> Result {
+        let mut current_token = match token_type {
+            TokenType::Free => Self::deposit_free_token((who.clone(),sender.clone(),coin_type)),
+            TokenType::OTC => Self::deposit_otc_token((who.clone(),sender.clone(),coin_type)),
+            TokenType::WithDraw => Self::deposit_withdraw_token((who.clone(),sender.clone(),coin_type)),
+            TokenType::Reward => Self::deposit_reward_token((who.clone(),sender.clone(),coin_type)),
+        };
+        if plus_or_minus {
+            current_token = current_token + amount;
+        }else {
+            if  current_token < amount{ return Err("insufficient token"); }
+            current_token = current_token - amount;
+        }
+        match token_type {
+            TokenType::Free => <DepositFreeToken<T>>::insert((who.clone(),sender.clone(),coin_type),current_token),
+            TokenType::OTC => <DepositOtcToken<T>>::insert((who.clone(),sender.clone(),coin_type),current_token),
+            TokenType::WithDraw => <DepositWithdrawToken<T>>::insert((who.clone(),sender.clone(),coin_type),current_token),
+            TokenType::Reward => <DepositRewardToken<T>>::insert((who.clone(),sender.clone(),coin_type),current_token),
+        };
+        Self::modify_the_vec(who.clone(),coin_type,sender.clone());
+        Ok(())
+    }
+
+    /// basic token revise function for Deposit
+    pub fn deposit_to_free(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Free,true)?;
+        Ok(())
+    }
+    /// basic token revise function for Deposit
+    pub fn withdraw_from_free(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Free,false)?;
+        Ok(())
+    }
+
+    ///  free -> otc/withdraw
+    pub fn lock_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64,token_type:TokenType) -> Result{
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Free,false)?;
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,token_type,true)?;
+        Ok(())
+    }
+    ///  otc/withdraw -> free
+    pub fn unlock_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64,token_type:TokenType) -> Result{
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,token_type,false)?;
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Free,true)?;
+        Ok(())
+    }
+    /// reward functions
+    pub fn reward_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Reward,true)?;
+        Ok(())
+    }
+    pub fn take_out_reward_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Reward,false)?;
+        Ok(())
+    }
+
+    pub fn iterator_all_token<F>(mut func: F) -> Result
+        where F: FnMut(T::AccountId,u64,Vec<u8>) -> Result
+    {
+        let all_deposit_account = Self::deposit_ladder_account_list();
+        all_deposit_account.iter().enumerate().for_each(|(ia,accountid)|{
+            let accountid_coin_vec = Self::deposit_account_coin_list(accountid.clone());
+            accountid_coin_vec.iter().enumerate().for_each(|(ib,&coin_type)|{
+                let sender_vec = Self::deposit_sender_list((accountid.clone(),coin_type));
+                sender_vec.iter().enumerate().for_each(|(ic,sender)|{
+                    func(accountid.clone(),coin_type,sender.to_vec());
+                });
+            });
+        });
+        Ok(())
+    }
+    pub fn total_token_for_specific_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64{
+        Self::deposit_free_token((who.clone(),sender.clone(),coin_type))
+            + Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
+            + Self::deposit_withdraw_token((who.clone(),sender.clone(),coin_type))
+    }
+    pub fn calculate_reward_and_reward(){
+        Self::iterator_all_token(|accountid,coin_type,sender|{
+            let total_token_for_this_coin = Self::total_token_for_specific_coin(accountid.clone(),sender.clone(),coin_type);
+            Self::reward_token(accountid.clone(),sender.clone(),coin_type,Self::reward_calcul(total_token_for_this_coin));
+            Ok(())
+        });
+    }
+
+    pub fn modify_the_vec(who:T::AccountId,coin_type:u64,sender:Vec<u8>){
+        // first, deposit some token , it wont do the delete , there must be some token in the map
+        if Self::total_token_for_specific_coin(who.clone(),sender.clone(),coin_type) == 0 {
+            //need to delete sender .
+            let mut sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
+            if sender_vec.iter().find(|&t| t == &sender).is_none(){ println!("is none"); }else{
+                let mut  mark = 0usize;
+                sender_vec.iter().enumerate().for_each(|(i,v)|{
+                    if sender == *v{
+                        mark = i;
+                    }
+                });
+                sender_vec.remove(mark);
+                <DepositSenderList<T>>::insert((who.clone(),coin_type),sender_vec);
+            }
+
+            let mut total_token_for_a_coin_different_sender = 0u64;
+            let mut sender_vec_2 = Self::deposit_sender_list((who.clone(),coin_type));
+            sender_vec_2.iter().enumerate().for_each(|(i,v)|{
+                total_token_for_a_coin_different_sender = total_token_for_a_coin_different_sender
+                    +Self::deposit_free_token((who.clone(),v.clone(),coin_type))
+                    + Self::deposit_otc_token((who.clone(),v.clone(),coin_type))
+                    + Self::deposit_withdraw_token((who.clone(),v.clone(),coin_type));
+            });
+
+            if total_token_for_a_coin_different_sender == 0 {
+                // delete the coin_type
+                let mut coin_type_vec = Self::deposit_account_coin_list(who.clone());
+                let mut mark = 0usize;
+                coin_type_vec.iter().enumerate().for_each(|(i,&v)|{
+                    if v == coin_type{ mark = i ;}
+                });
+                coin_type_vec.remove(mark);
+                <DepositAccountCoinList<T>>::insert(who.clone(),coin_type_vec);
+            }else{ return; }
+
+            let who_coin_type_vec = Self::deposit_account_coin_list(who.clone());
+            if who_coin_type_vec.is_empty(){
+                // delete the accountid
+                let mut accountid_vec = Self::deposit_ladder_account_list();
+                let mut mark = 0usize;
+                accountid_vec.iter().enumerate().for_each(|(i,v)|{
+                    if *v == who.clone(){ mark = i ;}
+                });
+                accountid_vec.remove(mark);
+                <DepositLadderAccountList<T>>::put(accountid_vec);
+            }else{ return;}
+            return;
+        }
+        // then, put the deposit Vec
+        // if not equal to zero, add them, if they do not exist
+        let mut deposit_account_vec = Self::deposit_ladder_account_list();
+        if deposit_account_vec.iter().find(|&t| t == &who).is_none() {
+            // dont have it , add the accountid
+            deposit_account_vec.push(who.clone());
+            <DepositLadderAccountList<T>>::put(deposit_account_vec);
+        }else {
+            //have it , do nothing
+        }
+        let mut coin_type_vec = Self::deposit_account_coin_list(who.clone());
+        if coin_type_vec.iter().find(|&t| t == &coin_type).is_none(){
+            // none , add it
+            coin_type_vec.push(coin_type);
+            <DepositAccountCoinList<T>>::insert(who.clone(),coin_type_vec);
+        }else{
+            // do nothing
+        }
+        let mut sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
+        if sender_vec.iter().find(|&t| t == &sender).is_none(){
+            // none , add it
+            sender_vec.push(sender);
+            <DepositSenderList<T>>::insert((who.clone(),coin_type),sender_vec);
+        }else{
+            // do nothing
+        }
+    }
+    /*----------------------------------------*/
 }
 
 
@@ -1063,6 +1217,48 @@ mod tests {
             assert_eq!(Bank::despositing_banance(11744161374129632607),[].to_vec());
             assert_eq!(Bank::despositing_banance_withdraw(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)]);
 
+        });
+    }
+    #[test]
+    fn new_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let sender = [1,2].to_vec();
+            //deposit
+            Bank::deposit_to_free(1,sender.clone(),2,1000000000);
+            assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),1000000000);
+
+            // lock to otc
+            assert_ok!(Bank::lock_token(1,sender.clone(),2,1000,TokenType::OTC));
+            assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),999999000);
+            assert_eq!(Bank::deposit_otc_token((1,sender.clone(),2)),1000);
+
+            //iter test
+            Bank::calculate_reward_and_reward();
+            assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),100000);
+
+            // withdraw fail test
+            assert_err!(Bank::withdraw_from_free(1,sender.clone(),2,1000000000),"insufficient token");
+            assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),999999000);
+
+            // unlock to free
+            assert_ok!(Bank::unlock_token(1,sender.clone(),2,1000,TokenType::OTC));
+            assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),1000000000);
+            assert_eq!(Bank::deposit_otc_token((1,sender.clone(),2)),0);
+
+            println!("start");
+            // withdraw  success test
+            assert_ok!(Bank::withdraw_from_free(1,sender.clone(),2,1000000000));
+            assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),0);
+            println!("end");
+            //
+            assert_eq!(Bank::deposit_ladder_account_list(),[].to_vec());
+            assert_eq!(Bank::deposit_account_coin_list(1),[].to_vec());
+            println!("deposit_account_coin_list{:?}",Bank::deposit_account_coin_list(1));
+            //assert_eq!(Bank::deposit_sender_list((1,2)),[].to_vec());
+
+            //iter test
+            Bank::calculate_reward_and_reward();
+            assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),100000);
         });
     }
 }
