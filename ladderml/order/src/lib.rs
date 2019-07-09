@@ -319,7 +319,7 @@ impl<T: Trait> Module<T> {
     }
 
 
-    pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64){
+    pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64,acc:Vec<u8>){
         // find the valid sell order for the account
         let all_pair_vec = Self::pair_list();
         all_pair_vec.iter().enumerate().for_each(|(i,pair)|{
@@ -328,12 +328,14 @@ impl<T: Trait> Module<T> {
                 if new_last_index != 0{
                     for i in 0..new_last_index+1{
                         if let Some(mut sellorder) = Self::sell_order_of((accountid.clone(),pair.clone(),i)){
-                            if sellorder.status != OtcStatus::Done {
-                                sellorder.status = OtcStatus::Done;
-                                //update the storage
-                                <SellOrdersOf<T>>::insert((accountid.clone(),pair.clone(),i),sellorder.clone());
-                                <AllSellOrders<T>>::insert(sellorder.longindex,sellorder.clone());
-                                Self::delete_from_pair_order_storage(sellorder.clone());
+                            if sellorder.acc == acc {
+                                if sellorder.status != OtcStatus::Done {
+                                    sellorder.status = OtcStatus::Done;
+                                    //update the storage
+                                    <SellOrdersOf<T>>::insert((accountid.clone(), pair.clone(), i), sellorder.clone());
+                                    <AllSellOrders<T>>::insert(sellorder.longindex, sellorder.clone());
+                                    Self::delete_from_pair_order_storage(sellorder.clone());
+                                }
                             }
                         }
                     }

@@ -82,7 +82,9 @@ decl_module! {
                 Err(x) => return Err(x),
             }
 
-            Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,true);
+            Self::deposit_to_free(who.clone(),sendervec.clone(),coin_type,amount)?;
+
+            //Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,true);
             Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),true);
             <DespositingTime<T>>::insert(who.clone(), 0);
             // emit an event
@@ -118,12 +120,12 @@ decl_module! {
                 Err(x) => return Err(x),
             }
             // ensure no repeat
-            ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
+            //ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
 
-           // Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,false);
-            Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin_type,LockType::WithDrawLock,false);
+            Self::withdraw_from_withdraw(who.clone(),sendervec.clone(),coin_type,amount)?;
+            // Self::depositing_withdraw_record(who.cle(),T::Balance::sa(amount),coin_type,false);
+            //Self::lock_unlock_record(who.clone(),T::Balance::sa(amount),coin_type,LockType::WithDrawLock,false);
             Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),false);
-
             // emit an event
             Self::deposit_event(RawEvent::Withdraw(coin_type,id,who,sendervec,T::Balance::sa(amount),tx_hash));
             Ok(())
@@ -190,9 +192,9 @@ decl_module! {
                 Err(x) => return Err(x),
             }
             // ensure no repeat
-            ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
+            // ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
 
-            let lock_withdraw_balance = Self::withdraw_request(who.clone(),amount,coin_type);
+            let lock_withdraw_balance = Self::withdraw_request(who.clone(),amount,coin_type,sendervec.clone());
             Self::deposit_event(RawEvent::WithdrawRequest(coin_type,id,who,sendervec,lock_withdraw_balance,tx_hash));
             Ok(())
         }
@@ -347,7 +349,7 @@ impl<T: Trait> Module<T>
         // Signature_Hash
         let signature_hash =  T::Hashing::hash( &signature[..]);
 
-        return (tx_hash,who,amountu64,signature_hash,coin_type,sender_vec);
+        return (tx_hash,who,amountu64,signature_hash,coin_type,sender);
     }
 
     fn  split_message2( message: Vec<u8>, signature: Vec<u8>) -> (T::Hash,T::AccountId,u64,T::Hash,u64,u64,Vec<u8>) {
@@ -388,7 +390,7 @@ impl<T: Trait> Module<T>
         // Signature_Hash
         let signature_hash =  T::Hashing::hash( &signature[..]);
 
-        return (tx_hash,who,amountu64,signature_hash,coin_type,id as u64,sender_vec);
+        return (tx_hash,who,amountu64,signature_hash,coin_type,id as u64,sender);
     }
 
     pub fn signature521(signature: Vec<u8>, hash: Vec<u8>){
@@ -780,17 +782,22 @@ impl<T: Trait> Module<T>
     /// After the purchase operation, the amount of the two parties is modified
     /// by modifying the buyer's ID and the buyer's bid amount of two kinds of currencies.
     pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64,
-                       type_money:u64 ,price:u64 ,amount:u64, sell_res:bool, buy_res:bool ){
+                       type_money:u64 ,price:u64 ,amount:u64, sell_res:bool, buy_res:bool ,
+                       sellsender:Vec<u8> , buyersender:Vec<u8>){
         // Deducting the amount locked in by the seller and transferring the buyer's money.
         // unlock the reserved token anyway
-        Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,LockType::OTCLock,false);
+        Self::modify_token(seller.clone(),sellsender.clone(),type_share,amount,TokenType::OTC,false);
+        //Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,LockType::OTCLock,false);
         if sell_res {
-            Self::depositing_withdraw_record(seller.clone(), T::Balance::sa(amount * price), type_money, true);
+            Self::modify_token(seller.clone(),sellsender.clone(),type_money,amount * price,TokenType::Free,true);
+            //Self::depositing_withdraw_record(seller.clone(), T::Balance::sa(amount * price), type_money, true);
         }
         // At the same time deduct the buyer's money anyway
-        Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount * price), type_money, false);
+        Self::modify_token(buyer.clone(),buyersender.clone(),type_money,amount * price,TokenType::Free,false);
+        //Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount * price), type_money, false);
         if buy_res {
-            Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount), type_share, true);
+            Self::modify_token(buyer.clone(),buyersender.clone(),type_share,amount,TokenType::Free,true);
+            //Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount), type_share, true);
         }
     }
 
@@ -831,51 +838,54 @@ impl<T: Trait> Module<T>
     }
 
     /// Insufficient token when withdrawing, it will cancel the sell order to get some free token
-    pub fn withdraw_request(who:T::AccountId,withdraw_amount:u64,cointype:u64) -> T::Balance {
+    pub fn withdraw_request(who:T::AccountId,withdraw_amount:u64,cointype:u64,sender:Vec<u8>) -> T::Balance {
         // get the current amount of free token , if the data in uninited ,return zero.
-        let free_token = Self::specific_token_free_amount(who.clone(),cointype);
+        let free_token = Self::free_token_for_specific_coin(who.clone(),sender.clone(),cointype);
         // if free token is enough to withdraw , withdraw it.
-        if free_token >= T::Balance::sa(withdraw_amount) {
+        if free_token >= withdraw_amount {
             // free token is enough for the withdraw , do the lock/unlock operation
-            Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
+            Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw);
+           // Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
             //Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount),id));
             return T::Balance::sa(withdraw_amount);
         }
         // if the free token is less than the requested amount
         // cancel all sell order and  turn The remaining money in sell orders into free token
         // calculate the total amount of specified cointype for who in sell orders
-        let amount_on_sale = Self::is_specific_token_on_sale(who.clone(),cointype,LockType::OTCLock);
-        if amount_on_sale == T::Balance::sa(0) {
+        let amount_on_sale = Self::selling_token_for_specific_coin(who.clone(),sender.clone(),cointype);
+       // let amount_on_sale = Self::is_specific_token_on_sale(who.clone(),cointype,LockType::OTCLock);
+        if amount_on_sale == 0 {
             //if there is no sell order , directly do the lock/unlock operation
             // TODO::this situation isn't supposed  to happen when free_token is zero.
             // in another word, when into this case ,  the free_token must not be zero.
             // so the free token is reachable.
-            Self::lock(who.clone(),cointype,T::Balance::as_(free_token),LockType::WithDrawLock);
+            Self::lock_token(who.clone(),sender.clone(),cointype,free_token,TokenType::WithDraw);
+           // Self::lock(who.clone(),cointype,T::Balance::as_(free_token),LockType::WithDrawLock);
             //Self::deposit_event(RawEvent::WithdrawRequest(who,free_token,id));
-            return free_token;
+            return T::Balance::sa(free_token);
         }else {
             //Cancel all sell orders  , TODO:: Processing only part of sell orders
-            <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone(),cointype);
+            <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone(),cointype,sender.clone());
             // if success canceled , Then turn (amount_on_sale) from OTC_lock into free
             // in this case , if the free token is zero , the unlock will init the data
             // else , business as usual
-            Self::unlock(who.clone(),cointype,T::Balance::as_(amount_on_sale),LockType::OTCLock);
+            Self::unlock_token(who.clone(),sender.clone(),cointype,amount_on_sale,TokenType::OTC);
             // retrieve the updated free token  notice that [ new_free_amount = amount_on_sale + free_token ]
-            let new_free_amount = Self::specific_token_free_amount(who.clone(),cointype);
+            let new_free_amount = Self::free_token_for_specific_coin(who.clone(),sender.clone(),cointype);
             // lock the The Optimum Range of Lockable token
-            if new_free_amount >= T::Balance::sa(withdraw_amount){
+            if new_free_amount >= withdraw_amount{
                 // free token is sufficient,  Then turn (withdraw_amount) from free into Withdraw_lock
-                Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
+                Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw);
                 // event  after the order been canceled , the
                 //Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount),id));
                 return T::Balance::sa(withdraw_amount);
             }else {
                 //TODO::this situation is supposed not to happen
                 // free token is not sufficient,  Then turn all(new_free_amount) from free into Withdraw_lock
-                Self::lock(who.clone(),cointype,T::Balance::as_(new_free_amount),LockType::WithDrawLock);
+                Self::lock_token(who.clone(),sender.clone(),cointype,new_free_amount,TokenType::WithDraw);
                 // event  after the order been canceled , the
                 //Self::deposit_event(RawEvent::WithdrawRequest(who,new_free_amount,id));
-                return new_free_amount;
+                return T::Balance::sa(new_free_amount);
             }
         }
     }
@@ -914,8 +924,8 @@ impl<T: Trait> Module<T>
         Ok(())
     }
     /// basic token revise function for Deposit
-    pub fn withdraw_from_free(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
-        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Free,false)?;
+    pub fn withdraw_from_withdraw(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
+        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::WithDraw,false)?;
         Ok(())
     }
 
@@ -956,6 +966,15 @@ impl<T: Trait> Module<T>
         });
         Ok(())
     }
+
+    pub fn free_token_for_specific_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64{
+        Self::deposit_free_token((who.clone(),sender.clone(),coin_type))
+    }
+
+    pub fn selling_token_for_specific_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64{
+        Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
+    }
+
     pub fn total_token_for_specific_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64{
         Self::deposit_free_token((who.clone(),sender.clone(),coin_type))
             + Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
@@ -974,7 +993,7 @@ impl<T: Trait> Module<T>
         if Self::total_token_for_specific_coin(who.clone(),sender.clone(),coin_type) == 0 {
             //need to delete sender .
             let mut sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
-            if sender_vec.iter().find(|&t| t == &sender).is_none(){ println!("is none"); }else{
+            if sender_vec.iter().find(|&t| t == &sender).is_none(){ }else{
                 let mut  mark = 0usize;
                 sender_vec.iter().enumerate().for_each(|(i,v)|{
                     if sender == *v{
@@ -1045,7 +1064,7 @@ impl<T: Trait> Module<T>
             // do nothing
         }
     }
-    /*----------------------------------------*/
+    /*------------new---------------*/
 }
 
 
@@ -1157,7 +1176,7 @@ mod tests {
     #[test]
     fn depositing_test() {
         with_externalities(&mut new_test_ext(), || {
-
+/*
             let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
             let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_ok!(Bank::deposit(Some(1).into(),data,sign));
@@ -1178,14 +1197,14 @@ mod tests {
             let sign : Vec<u8>= "12ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
             assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (10000000, 3), (0, 4)].to_vec());
-
+*/
         });
     }
 
     #[test]
     fn withdraw_test() {
         with_externalities(&mut new_test_ext(), || {
-
+/*
             let mut data : Vec<u8>= "000000000000000000000000000000000000000000000000000000000000000100000000000000000000000074241db5f3ebaeecf9506e4ae988186093341604000000000000000000000000000000000000000000000000002386f26fc10000aba050dcf46dd539049458d8c25b29433b4ce2f194191d4e438c49e2db3a9be2".from_hex().unwrap();
             let sign : Vec<u8>= "c19901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
             assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
@@ -1197,6 +1216,7 @@ mod tests {
             let sign : Vec<u8>= "219901eae9150cea37f443c82319e1b656616f59fd0e810cdc9ea0667d81988b59b3292a8fc6100702c7d9a1e700a9f204156e32e44219af992933a3fbd6ff6701".from_hex().unwrap();
             assert_ok!(Bank::withdraw(Origin::signed(5),data,sign));
             assert_eq!(Bank::despositing_banance(0),[].to_vec());
+            */
         });
     }
 
@@ -1206,17 +1226,16 @@ mod tests {
             let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
             let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_ok!(Bank::deposit(Some(1).into(),data,sign));
-            assert_eq!(Bank::despositing_account(),[11744161374129632607].to_vec());
-            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
+                       ,10000000);
 
-
-            //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
             let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
             let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
             assert_ok!(Bank::withdrawrequest(Origin::signed(5),data2,sign2));
-            assert_eq!(Bank::despositing_banance(11744161374129632607),[].to_vec());
-            assert_eq!(Bank::despositing_banance_withdraw(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)]);
-
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
+                       ,0);
+            assert_eq!(Bank::deposit_withdraw_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
+                       ,10000000);
         });
     }
     #[test]
@@ -1237,7 +1256,7 @@ mod tests {
             assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),100000);
 
             // withdraw fail test
-            assert_err!(Bank::withdraw_from_free(1,sender.clone(),2,1000000000),"insufficient token");
+            //assert_err!(Bank::withdraw_from_free(1,sender.clone(),2,1000000000),"insufficient token");
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),999999000);
 
             // unlock to free
@@ -1247,8 +1266,8 @@ mod tests {
 
             println!("start");
             // withdraw  success test
-            assert_ok!(Bank::withdraw_from_free(1,sender.clone(),2,1000000000));
-            assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),0);
+           // assert_ok!(Bank::withdraw_from_free(1,sender.clone(),2,1000000000));
+            //assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),0);
             println!("end");
             //
             assert_eq!(Bank::deposit_ladder_account_list(),[].to_vec());
@@ -1261,4 +1280,37 @@ mod tests {
             assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),100000);
         });
     }
+
+    #[test]
+    fn new_depositing_test() {
+        with_externalities(&mut new_test_ext(), || {
+
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::deposit_ladder_account_list(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::deposit_account_coin_list(11744161374129632607),[1].to_vec());
+            println!(" {:?}", Bank::deposit_sender_list((11744161374129632607,1)));
+            assert_eq!(Bank::deposit_sender_list((11744161374129632607,1)),[[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec()].to_vec());
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1)),10000000);
+
+/*
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_err!(Bank::deposit(Origin::signed(5),data,sign),"This signature is repeat!");
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+            let mut data : Vec<u8>= "0000000000000002f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad00000000000000000000000000000000000000000000000000000000000000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "99ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf619".from_hex().unwrap();
+            assert_err!(Bank::deposit(Origin::signed(5),data,sign),"cant deposit zero");
+            //  assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (1000, 3), (0, 4)].to_vec());
+
+            let mut data : Vec<u8>= "0000000000000003f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
+            let sign : Vec<u8>= "12ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (10000000, 3), (0, 4)].to_vec());
+*/
+        });
+    }
+
 }
