@@ -168,11 +168,19 @@ decl_module! {
            <SessionLength<T>>::put(T::BlockNumber::sa(session_len));
         }
 
-        pub fn draw_reward(origin,id: T::AccountId) -> Result{
-             ensure!(!Self::despositing_account().iter().find(|&t| t == &id).is_none(), "Cannot draw if not depositing.");
 
-             let new_balance = <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(Self::count_draw_reward(id.clone())));
-             match T::Currency::deposit_into_existing(&id, new_balance){
+        pub fn draw_reward(origin) -> Result{
+             //ensure!(!Self::despositing_account().iter().find(|&t| t == &id).is_none(), "Cannot draw if not depositing.");
+
+            let who = ensure_signed(origin)?;
+            let mut reward = 0u64;
+            Self::iterator_all_token_for_who(who.clone(),|coin_type,sender|{
+                reward = reward + Self::deposit_reward_token((who.clone(),sender.clone(),coin_type));
+                Ok(())
+            });
+            let new_balance = <BalanceOf<T> as As<u64>>::sa(reward);
+             //let new_balance = <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(Self::count_draw_reward(id.clone())));
+             match T::Currency::deposit_into_existing(&who, new_balance){
                  Err(x) => Err(x),
                  _ => Ok(()),
              }
@@ -948,6 +956,19 @@ impl<T: Trait> Module<T>
     }
     pub fn take_out_reward_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
         Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Reward,false)?;
+        Ok(())
+    }
+
+    pub fn iterator_all_token_for_who<F>(who:T::AccountId,mut func: F) -> Result
+        where F: FnMut(u64,Vec<u8>) -> Result
+    {
+        let accountid_coin_vec = Self::deposit_account_coin_list(who.clone());
+        accountid_coin_vec.iter().enumerate().for_each(|(ib,&coin_type)|{
+            let sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
+            sender_vec.iter().enumerate().for_each(|(ic,sender)|{
+                func(coin_type,sender.to_vec());
+            });
+        });
         Ok(())
     }
 
