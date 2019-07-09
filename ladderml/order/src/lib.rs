@@ -32,9 +32,7 @@ pub type Symbol = u64;
 #[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct OrderPair {
-    #[codec(compact)]
     pub share: Symbol,
-    #[codec(compact)]
     pub money: Symbol,
 }
 
