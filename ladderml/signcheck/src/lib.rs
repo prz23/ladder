@@ -23,7 +23,7 @@ use rstd::ops::Div;
 
 use runtime_io::*;
 
-pub trait Trait: system::Trait {
+pub trait Trait: system::Trait + session::Trait{
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
@@ -67,7 +67,7 @@ decl_storage! {
         build(|storage: &mut sr_primitives::StorageOverlay, _: &mut sr_primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
             with_storage(storage, || {
                 let (a,b) = config.pubkey.clone();
-                <Module<T>>::inilize_secp256(a, b);
+                <Module<T>>::inilize_secp256(a,b);
             })
         })
     }
@@ -114,6 +114,14 @@ impl<T: Trait> Module<T> {
     fn _verify(_tx : T::Hash) -> Result{
         //TODO:verify signature or others
         Ok(())
+    }
+
+    pub fn is_validators(who: T::AccountId) -> bool{
+        <session::Module<T>>::validators().contains(&who)
+    }
+
+    pub fn is_sessionkey(who: T::SessionKey) -> bool{
+        <consensus::Module<T>>::authorities().contains(&who)
     }
 
     /// determine if the current number of signatures is sufficient to send an event
