@@ -185,7 +185,7 @@ decl_module! {
              }
         }
 
-        pub fn withdrawrequest(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
+        pub fn request(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
             let sender = ensure_signed(origin)?;
 
             //let validators = <session::Module<T>>::validators();
