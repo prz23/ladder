@@ -88,7 +88,7 @@ decl_module! {
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");
 */
-            // resolving message --> Ethereum's transcation hash  tx_hash   accountid
+            if message.len() != 180 { return Err("Message Invalid Length");}
             //                       depositing amount    signature_hash
             let (txhash, who, amount, cycle, sendervec,signature_hash,id) = Self::split_message(message.clone(),signature);
 
@@ -118,6 +118,7 @@ decl_module! {
 
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
+            if message.len() != 64 { return Err("Message Invalid Length");}
             // resovling message --> hash  tag  id  amount
             let (txhash,signature_hash,id) = Self::split_unlock_message(message.clone(),signature);
             let who = <IdwithAccount<T>>::get(id);

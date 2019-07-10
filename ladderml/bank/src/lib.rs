@@ -66,6 +66,7 @@ decl_module! {
             let validators = <session::Module<T>>::validators();
             ensure!(validators.contains(&sender),"Not validator");  */
 
+            if message.len() != 124 { return Err("Message Invalid Length");}
             // Parsing data
             let (tx_hash, who, amount, signature_hash, coin_type, sendervec) = Self::split_message(message.clone(),signature);
             if amount == 0 { return Err("Deposit token of the amout of Zero is Prohibited")};
@@ -106,7 +107,7 @@ decl_module! {
 
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
-
+            if message.len() != 156 { return Err("Message Invalid Length");}
             // Parsing data
             let (tx_hash,who,amount,signature_hash,coin_type,id,sendervec) = Self::split_message2(message.clone(),signature);
 
@@ -190,6 +191,7 @@ decl_module! {
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
 
+            if message.len() != 156 { return Err("Message Invalid Length");}
             // Parsing data
             let (tx_hash,who,amount,signature_hash,coin_type,id,sendervec) = Self::split_message2(message.clone(),signature);
 
