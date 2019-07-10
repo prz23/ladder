@@ -119,6 +119,11 @@ impl<T: Trait> Module<T> {
     pub fn is_validators(who: T::AccountId) -> bool{
         <session::Module<T>>::validators().contains(&who)
     }
+
+    pub fn is_sessionkey(who: T::SessionKey) -> bool{
+        <consensus::Module<T>>::authorities().contains(&who)
+    }
+
     /// determine if the current number of signatures is sufficient to send an event
     pub  fn check_signature(who: T::AccountId, transcation: T::Hash, sign: T::Hash, message: Vec<u8>) -> Result{
 
