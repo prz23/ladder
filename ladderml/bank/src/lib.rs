@@ -58,37 +58,32 @@ decl_module! {
 
         fn deposit_event<T>() = default;
 
-        /// deposit
+        /// deposit some token into the specific account
         pub fn deposit(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
-/*
 
+  /*  TODO::make sure the message is recevied from the validators!!!!!!!
             let validators = <session::Module<T>>::validators();
-            ensure!(validators.contains(&sender),"Not validator");
-*/
-            // resolving message --> Ethereum's transcation hash  tx_hash   accountid
-            //                       depositing amount    signature_hash
-            let (tx_hash, who, amount, signature_hash,coin_type,sendervec) = Self::split_message(message.clone(),signature);
+            ensure!(validators.contains(&sender),"Not validator");  */
 
-            if amount == 0 { return Err("cant deposit zero")};
-            // ensure no repeat desposit
-            //ensure!(Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already depositing.");
-            // ensure no repeat intentions to desposit
-            //ensure!(Self::intentions_desposit_vec().iter().find(|&t| t == &who).is_none(), "Cannot deposit if already in queue.");
+            // Parsing data
+            let (tx_hash, who, amount, signature_hash, coin_type, sendervec) = Self::split_message(message.clone(),signature);
+            if amount == 0 { return Err("Deposit token of the amout of Zero is Prohibited")};
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("ok") ,
+                Ok(y) =>  runtime_io::print("Signature is Verified") ,
                 Err(x) => return Err(x),
             }
 
-            Self::deposit_to_free(who.clone(),sendervec.clone(),coin_type,amount)?;
+            // Modify the storage of the token and relate support data.
+            Self::deposit_to_free(who.clone(), sendervec.clone(), coin_type, amount)?;
 
-            //Self::depositing_withdraw_record(who.clone(),T::Balance::sa(amount),coin_type,true);
-            Self::calculate_total_deposit(coin_type,T::Balance::sa(amount),true);
+            //a support data record the total deposit token
+            Self::calculate_total_deposit(coin_type, T::Balance::sa(amount), true);
             <DespositingTime<T>>::insert(who.clone(), 0);
             // emit an event
-            Self::deposit_event(RawEvent::Depositing(coin_type,who,sendervec,T::Balance::sa(amount),tx_hash));
+            Self::deposit_event(RawEvent::Depositing(coin_type, who, sendervec, T::Balance::sa(amount), tx_hash));
             Ok(())
         }
 
@@ -111,14 +106,16 @@ decl_module! {
 
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
-            // resovling message --> hash  tag  id  amount
+
+            // Parsing data
             let (tx_hash,who,amount,signature_hash,coin_type,id,sendervec) = Self::split_message2(message.clone(),signature);
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("ok") ,
+                Ok(y) =>  runtime_io::print("Signature is Verified") ,
                 Err(x) => return Err(x),
             }
+
             // ensure no repeat
             //ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
 
@@ -168,19 +165,20 @@ decl_module! {
            <SessionLength<T>>::put(T::BlockNumber::sa(session_len));
         }
 
-
+        /// withdraw the reward
         pub fn draw_reward(origin) -> Result{
              //ensure!(!Self::despositing_account().iter().find(|&t| t == &id).is_none(), "Cannot draw if not depositing.");
 
             let who = ensure_signed(origin)?;
             let mut reward = 0u64;
+            // calculate the reward of who's all cointype and outside address
             Self::iterator_all_token_for_who(who.clone(),|coin_type,sender|{
                 reward = reward + Self::deposit_reward_token((who.clone(),sender.clone(),coin_type));
                 Ok(())
             });
+
             let new_balance = <BalanceOf<T> as As<u64>>::sa(reward);
-             //let new_balance = <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(Self::count_draw_reward(id.clone())));
-             match T::Currency::deposit_into_existing(&who, new_balance){
+            match T::Currency::deposit_into_existing(&who, new_balance){
                  Err(x) => Err(x),
                  _ => Ok(()),
              }
@@ -191,12 +189,13 @@ decl_module! {
 
             //let validators = <session::Module<T>>::validators();
             //ensure!(validators.contains(&sender),"Not validator");
-            // resovling message --> hash  tag  id  amount
+
+            // Parsing data
             let (tx_hash,who,amount,signature_hash,coin_type,id,sendervec) = Self::split_message2(message.clone(),signature);
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("ok") ,
+                Ok(y) =>  runtime_io::print("Signature is Verified") ,
                 Err(x) => return Err(x),
             }
             // ensure no repeat
@@ -1009,12 +1008,14 @@ impl<T: Trait> Module<T>
         });
     }
 
+    /// Modify the 3 auxiliary vectors of the 4 Main Storage maps
     pub fn modify_the_vec(who:T::AccountId,coin_type:u64,sender:Vec<u8>){
-        // first, deposit some token , it wont do the delete , there must be some token in the map
+        // first, deposit some token , it wont do the delete , there must be some token in Main Storage maps
         if Self::total_token_for_specific_coin(who.clone(),sender.clone(),coin_type) == 0 {
-            //need to delete sender .
+            // when some token was fully deleted , need to delete the relate content in the support vector .
+            // first,  delete the outside address
             let mut sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
-            if sender_vec.iter().find(|&t| t == &sender).is_none(){ }else{
+            if sender_vec.iter().find(|&t| t == &sender).is_none(){ /* not happen */}else{
                 let mut  mark = 0usize;
                 sender_vec.iter().enumerate().for_each(|(i,v)|{
                     if sender == *v{
@@ -1024,7 +1025,7 @@ impl<T: Trait> Module<T>
                 sender_vec.remove(mark);
                 <DepositSenderList<T>>::insert((who.clone(),coin_type),sender_vec);
             }
-
+            // then, check the same owner and  the same coin type  with different senders are zero
             let mut total_token_for_a_coin_different_sender = 0u64;
             let mut sender_vec_2 = Self::deposit_sender_list((who.clone(),coin_type));
             sender_vec_2.iter().enumerate().for_each(|(i,v)|{
@@ -1033,7 +1034,7 @@ impl<T: Trait> Module<T>
                     + Self::deposit_otc_token((who.clone(),v.clone(),coin_type))
                     + Self::deposit_withdraw_token((who.clone(),v.clone(),coin_type));
             });
-
+            // it means that the coin type is empty
             if total_token_for_a_coin_different_sender == 0 {
                 // delete the coin_type
                 let mut coin_type_vec = Self::deposit_account_coin_list(who.clone());
@@ -1044,7 +1045,7 @@ impl<T: Trait> Module<T>
                 coin_type_vec.remove(mark);
                 <DepositAccountCoinList<T>>::insert(who.clone(),coin_type_vec);
             }else{ return; }
-
+            // if all coin type is delete , the accout will be removed.
             let who_coin_type_vec = Self::deposit_account_coin_list(who.clone());
             if who_coin_type_vec.is_empty(){
                 // delete the accountid
@@ -1058,24 +1059,25 @@ impl<T: Trait> Module<T>
             }else{ return;}
             return;
         }
-        // then, put the deposit Vec
-        // if not equal to zero, add them, if they do not exist
+        // then, put the deposit data to the Vectors,if they already in the vectors ,skip to next process
         let mut deposit_account_vec = Self::deposit_ladder_account_list();
         if deposit_account_vec.iter().find(|&t| t == &who).is_none() {
             // dont have it , add the accountid
             deposit_account_vec.push(who.clone());
             <DepositLadderAccountList<T>>::put(deposit_account_vec);
         }else {
-            //have it , do nothing
+            //have it , do nothing ,skip
         }
+        // then , put the coin type of the token to the second support vector, if it already exist ,skip
         let mut coin_type_vec = Self::deposit_account_coin_list(who.clone());
         if coin_type_vec.iter().find(|&t| t == &coin_type).is_none(){
             // none , add it
             coin_type_vec.push(coin_type);
             <DepositAccountCoinList<T>>::insert(who.clone(),coin_type_vec);
         }else{
-            // do nothing
+            // do nothing ,skip
         }
+        // fially, put the outside address into the vector , if it already exist ,skip
         let mut sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
         if sender_vec.iter().find(|&t| t == &sender).is_none(){
             // none , add it
@@ -1084,6 +1086,7 @@ impl<T: Trait> Module<T>
         }else{
             // do nothing
         }
+        // some amount of a new token was put into the map  and  the corresponding support vector is modified.
     }
     /*------------new---------------*/
 }
