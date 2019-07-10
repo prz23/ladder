@@ -1,5 +1,5 @@
 [package]
-name = "ladder-otc"
+name = "ladder-order"
 version = "0.1.0"
 authors = ["Ladder Network <contact@laddernetwork.io>"]
 edition = "2018"
@@ -81,12 +81,6 @@ git = 'https://github.com/paritytech/substrate.git'
 package = 'sr-primitives'
 version = '2.0.0'
 
-[dependencies.bank]
-default_features = false
-path = "../bank"
-package = 'ladder-bank'
-version = '0.1.0'
-
 [dependencies.balances]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -105,17 +99,6 @@ path = "../signcheck"
 package = 'ladder-signcheck'
 version = '0.1.0'
 
-[dependencies.order]
-default_features = false
-path = "../order"
-package = 'ladder-order'
-version = '0.1.0'
-
-
-[dependencies.rustc-hex]
-optional = true
-rustc-hex = "*"
-
 [features]
 default = ["std"]
 std = [
@@ -133,8 +116,6 @@ std = [
     "serde",
     "safe-mix/std",
     "sr_primitives/std",
-    "bank/std",
     "balances/std",
-    "order/std",
-    "rustc-hex",
+    "signcheck/std",
 ]

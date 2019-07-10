@@ -23,55 +23,11 @@ use rstd::ops::Div;
 
 use runtime_io::*;
 
-pub trait Trait: system::Trait + bank::Trait{
+use order::{OrderPair,OrderT,Symbol};
+
+pub trait Trait: system::Trait + bank::Trait + order::Trait{
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
-
-pub type Symbol = u64;
-
-#[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct OrderPair {
-    #[codec(compact)]
-    pub share: Symbol,
-    #[codec(compact)]
-    pub money: Symbol,
-}
-
-#[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub struct OrderContent<pair,AccountID,symbol,status> {
-    pub pair: pair,          // exchange pair
-    pub index: u64,          // sell order index assigned for a specific user
-    pub who: AccountID,      //  seller
-    pub amount: symbol,      // share
-    pub price: symbol,       // price
-    pub already_deal:symbol, // already sold
-    pub status: status,      // sell order status
-    pub longindex: u128,     // an unique index for each sell order
-    pub reserved: bool,      // send the balance to bank or contract
-}
-
-impl<pair,AccountID,symbol,status> OrderContent<pair,AccountID,symbol,status>{
-    pub fn reserved(&self) -> bool {
-        self.reserved
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Copy, Encode, Decode)]
-#[cfg_attr(feature = "std", derive(Debug))]
-pub enum OtcStatus {
-    New,
-    Half,
-    Done,
-}
-
-pub type OrderT<T> = OrderContent<
-    OrderPair,
-    <T as system::Trait>::AccountId,
-    Symbol,
-    OtcStatus,
->;
 
 decl_event!(
     pub enum Event<T>
@@ -88,22 +44,6 @@ decl_event!(
 decl_storage! {
     trait Store for Module<T: Trait> as Otc {
 
-        /// all seller order infomation
-        pub SellOrdersOf get(sell_order_of):map (T::AccountId, OrderPair, u64) => Option<OrderT<T>>;
-
-        /// exist exchange pair list
-        pub OrderPairList get(pair_list):  Vec<OrderPair>;
-
-        /// sell order index assigned for a specific user
-        pub LastSellOrderIndexOf get(last_sell_order_index_of): map(T::AccountId,OrderPair)=>Option<u64>;
-
-        ///unique index -> all sell orders
-        pub AllSellOrders get(all_sell_orders):map u128 => Option<OrderT<T>>;
-
-        pub AllSellOrdersIndex get(all_sell_orders_index): u128;
-
-        // orderpair --> unique index  Valid
-        pub ValidOrderIndexByOrderpair get(valid_order_index_by_orderpair) : map OrderPair => Vec<u128>;
      }
 }
 
@@ -114,31 +54,31 @@ decl_module! {
 
         /// add an exchange pair
         pub fn new_pair(origin,pair: OrderPair) -> Result {
-            Self::add_pair(pair)?;
+            <order::Module<T>>::add_pair(pair)?;
             Ok(())
         }
 
         ///  put up a sell order to sell the amount of pair.share for per_price of pair.money
-        pub fn put_order(origin, pair_type:OrderPair,amount:u64, per_price:u64, reserved:bool) -> Result{
+        pub fn put_order(origin, pair_type:OrderPair,amount:u64, per_price:u64,acc:Vec<u8>,reserved:bool) -> Result{
             let sender = ensure_signed(origin)?;
             // make sure the sell order is valid
-            Self::check_valid_order(sender.clone(),pair_type.clone(),amount,per_price)?;
+            Self::check_valid_order(sender.clone(),pair_type.clone(),amount,per_price,acc.clone())?;
             // generate a new sell order , lock the money in bank,deposit_event and put up the order
-            Self::generate_new_sell_order_and_put_into_list(sender.clone(),pair_type.clone(),amount,per_price,reserved);
+            Self::generate_new_sell_order_and_put_into_list(sender.clone(),pair_type.clone(),amount,per_price,reserved,acc);
 
             Ok(())
         }
 
         /// chose an sell order to buy the amount of pair.share
-        pub fn buy(origin, seller:T::AccountId, pair:OrderPair ,index:u64, amount:u64, reserved:bool) -> Result{
+        pub fn buy(origin, seller:T::AccountId, pair:OrderPair ,index:u64, amount:u64,acc:Vec<u8>,reserved:bool) -> Result{
             let buyer = ensure_signed(origin)?;
 
             // find the sell order
-            if let Some(mut sellorder) = Self::sell_order_of((seller,pair,index)){
+            if let Some(mut sellorder) = <order::Module<T>>::sell_order_of((seller,pair,index)){
                 // make sure the buy operate is valid
-                Self::check_valid_buy(buyer.clone(),amount,sellorder.clone())?;
+                Self::check_valid_buy(buyer.clone(),amount,sellorder.clone(),acc.clone())?;
                 // do the buy operate and modify the order's status
-                Self::buy_operate(buyer.clone(),sellorder.clone(),amount,reserved)?;
+                Self::buy_operate(buyer.clone(),sellorder.clone(),amount,reserved,acc)?;
             }else{
                 return Err("invalid sell order");
             }
@@ -149,8 +89,8 @@ decl_module! {
             let sender = ensure_signed(origin)?;
 
             // find  the order
-            if let Some(mut sellorder) = Self::sell_order_of((sender.clone(),pair_type,index)){
-                // cancel the sell order and return the share not exchanged
+            if let Some(mut sellorder) = <order::Module<T>>::sell_order_of((sender.clone(),pair_type,index)){
+                // cancel the sell order and unlock the share not deal yet
                 Self::cancel_order_operate(sender.clone(),sellorder)?;
             }else{
                 return Err("invalid sell order");
@@ -159,6 +99,7 @@ decl_module! {
         }
 
         pub fn match_order_verification(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
+            let sender = ensure_signed(origin)?;
 
             Ok(())
         }
@@ -166,163 +107,72 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    // add a new exchange pair
-    pub fn add_pair(pair: OrderPair) -> Result {
-        if let Err(_) = Self::is_valid_pair(&pair) {
-            let mut pair_list: Vec<OrderPair> = <OrderPairList<T>>::get();
-            pair_list.push(pair);
-            <OrderPairList<T>>::put(pair_list);
-        }
-        Ok(())
-    }
-
-    fn is_price_zero(price:u64) -> Result {
-        if price == Zero::zero() {
-            return Err("price cann't be 0");
-        }
-        Ok(())
-    }
-
-    ///
-    fn is_valid_pair(pair: &OrderPair) -> Result {
-        let pair_list: Vec<OrderPair> = <OrderPairList<T>>::get();
-        if pair_list.contains(pair) {
-            Ok(())
-        } else {
-            Err("an invalid orderpair")
-        }
-    }
 
     /// Query the Bank Module，make sure the seller have enough money to sell
     /// and check the parmeters is not zero
-    fn check_valid_order(who: T::AccountId, pair:OrderPair, amount:u64, price:u64) -> Result {
-        Self::is_valid_pair(&pair)?;
-        Self::is_price_zero(amount)?;
-        Self::is_price_zero(price)?;
+    fn check_valid_order(who: T::AccountId, pair:OrderPair, amount:u64, price:u64,acc:Vec<u8>) -> Result {
+
+        <order::Module<T>>::check_valid_order(who.clone(),&pair,amount,price)?;
 
         //bank---->pair.share  money enough?
-        let deposit_data = <bank::Module<T>>::despositing_banance(&who);
-        if  deposit_data == [].to_vec() { return Err("no data"); }
-        let mut  not_enough_money_error = false;
-        deposit_data.iter().enumerate().for_each(|(i,&(balance,coin))|{
-            if coin == pair.share {
-                if balance < T::Balance::sa(amount) {
-                    not_enough_money_error = true;
-                }
-            }
-        });
-        if not_enough_money_error == true { return Err("not_enough_money_error "); }
-        Ok(())
-    }
-
-    fn check_valid_buy(who:T::AccountId,amount:u64,sell_order:OrderT<T>) -> Result {
-
-        Self::is_price_zero(amount)?;
-        // cant buy exceed the sell order
-        let left_share = sell_order.amount - sell_order.already_deal;
-        if amount > left_share {
-            return Err("cant buy too much!");
+        let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),pair.share));
+        if free_token < amount {
+            return Err("not_enough_money_error ");
         }
-        //bank---->pair.share  money enough?
-        let deposit_data = <bank::Module<T>>::despositing_banance(&who);
-        if  deposit_data == [].to_vec() { return Err("no data"); }
-        let mut  not_enough_money_error = false;
-        deposit_data.iter().enumerate().for_each(|(i,&(balance,coin))|{
-            if coin == sell_order.pair.money {
-                if balance < T::Balance::sa(amount*sell_order.price) {
-                    not_enough_money_error = true;
-                }
-            }
-        });
-        if not_enough_money_error == true { return Err("not_enough_money_error "); }
+
         Ok(())
     }
 
-    fn generate_new_sell_order_and_put_into_list(who:T::AccountId,pair_type:OrderPair,amount:u64,per_price:u64,reserved:bool){
-        // assign a new sell order index
-        let new_last_index = Self::last_sell_order_index_of((who.clone(), pair_type.clone())).unwrap_or_default() + 1;
-        <LastSellOrderIndexOf<T>>::insert((who.clone(), pair_type.clone()), new_last_index);
+    fn check_valid_buy(who:T::AccountId,amount:u64,sellorder:OrderT<T>,acc:Vec<u8>) -> Result {
 
-        let new_unique_index = Self::all_sell_orders_index() + 1;
-        <AllSellOrdersIndex<T>>::put(new_unique_index);
+        let mut sell_order = sellorder.clone();
+        <order::Module<T>>::check_valid_buy(who.clone(),amount,&mut sell_order)?;
 
-        // generate a new sell order
-        let mut new_sell_order :OrderT<T> = OrderContent{
-            pair:pair_type.clone(),
-            index:new_last_index,
-            who:who.clone(),
-            amount: amount,      // pair.share
-            price: per_price,    // pair.money
-            already_deal:0,
-            status: OtcStatus::New,  //Status
-            longindex : new_unique_index,
-            reserved : reserved,
-        };
-        <SellOrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
-        <AllSellOrders<T>>::insert(new_unique_index,new_sell_order.clone());
-        let mut vec = <ValidOrderIndexByOrderpair<T>>::get(pair_type.clone());
-        vec.push(new_unique_index);
-        <ValidOrderIndexByOrderpair<T>>::insert(pair_type.clone(),vec);
-        // lock the money in bank with the amount of the sell order
-        <bank::Module<T>>::lock(who.clone(),pair_type.share,amount);
+        //bank---->pair.share  money enough?
 
-        //deposit_event
-        Self::deposit_event(RawEvent::SellOrder(who.clone(),pair_type.clone(),
-                                                new_last_index,amount,per_price,new_unique_index));
+        let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),sellorder.pair.money));
+        if free_token < amount {
+            return Err("not_enough_money_error ");
+        }
+        Ok(())
+    }
+
+    fn generate_new_sell_order_and_put_into_list(who:T::AccountId,pair_type:OrderPair,amount:u64,per_price:u64,reserved:bool,acc:Vec<u8>){
+        // put sell order in order Module
+        <order::Module<T>>::generate_new_sell_order_and_put_into_list(who.clone(),pair_type.clone(),amount,per_price,
+                                                                      reserved,acc.clone());
+        // lock the specific kingd of money of amount in bank Module
+        <bank::Module<T>>::lock_token(who.clone(),acc.clone(),pair_type.share,amount,bank::TokenType::OTC);
     }
 
     // buy operate , lock the money and change the status
-    fn buy_operate(buyer:T::AccountId,mut sell_order: OrderT<T>, amount:u64, reserved:bool) -> Result {
-        // modify the exchanged money
-        sell_order.already_deal = sell_order.already_deal+amount;
-        // change sell order status
-        if sell_order.already_deal < sell_order.amount {
-            sell_order.status = OtcStatus::Half;
-        }else if sell_order.amount == sell_order.already_deal {
-            sell_order.status = OtcStatus::Done;
-            let mut vec = <ValidOrderIndexByOrderpair<T>>::get(sell_order.pair.clone());
-            let mut  mark = 0usize;
-            vec.iter().enumerate().for_each(|(i,&index)|{
-                if index == sell_order.longindex { mark = i ;}
-            });
-            vec.remove(mark);
-            <ValidOrderIndexByOrderpair<T>>::insert(sell_order.pair.clone(),vec);
-        }else { return  Err("wrong!"); }
+    fn buy_operate(buyer:T::AccountId,mut sellorder: OrderT<T>, amount:u64, reserved:bool,acc:Vec<u8>) -> Result {
 
-        // save the modified sell order
-        <SellOrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
-                              sell_order.clone());
-        <AllSellOrders<T>>::insert(sell_order.longindex,sell_order.clone());
+        let mut sell_order = sellorder.clone();
+        // Judge and process this buy operation and update the sell order
+        <order::Module<T>>::buy_operate(buyer.clone(),&mut sell_order,amount,reserved,acc.clone())?;
 
-        //exchange the money in bank
+        // exchange/unlock/lock the token in bank for buyer & seller
         <bank::Module<T>>::buy_operate(buyer.clone(),sell_order.who.clone(),sell_order.pair.share.clone(),
                                        sell_order.pair.money.clone(),sell_order.price.clone(),
-                                       amount,sell_order.reserved(),reserved);
-        //deposit_event
-        //MatchOrder(id, price, seller, saleAmount, reserved, buyer, purchasingAmount, reserved);
-        Self::deposit_event(RawEvent::MatchOrder(sell_order.longindex,sell_order.price,sell_order.who.clone(),
-                                                 amount,sell_order.reserved(),buyer.clone(),sell_order.price*amount,reserved));
-        Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.who.clone(),sell_order.pair.clone(),
-                                          sell_order.index, amount, sell_order.longindex,reserved));
+                                       amount,sell_order.reserved(),reserved, sell_order.acc,acc);
+
         Ok(())
     }
 
     /// cancel the sell order
     pub fn cancel_order_operate(who:T::AccountId,mut sell_order:OrderT<T>) -> Result{
-        // if the order is in Done status ,return directly
-        if sell_order.status == OtcStatus::Done { return Ok(()) ;}
 
-        // calculate the left money in sell order
-        let left_shares = sell_order.amount - sell_order.already_deal;
-        // unlock the left
-        <bank::Module<T>>::unlock(who.clone(),sell_order.pair.share,left_shares);
-        //modify the status to done
-        sell_order.status = OtcStatus::Done;
-        <SellOrdersOf<T>>::insert((who.clone(), sell_order.pair.clone(), sell_order.index), sell_order.clone());
-        <AllSellOrders<T>>::insert(sell_order.longindex, sell_order.clone());
-        //deposit_event
-        Self::deposit_event(RawEvent::CancelsellOrder(who.clone(), sell_order.pair.clone(), sell_order.index,
-                                                      sell_order.longindex));
+        match <order::Module<T>>::cancel_order_operate(who.clone(),&mut sell_order){
+            Err("Has been cancelled")  => return Ok(()),
+            Ok(()) => {
+                // unlock the left share of seller
+                let left_shares = sell_order.amount - sell_order.already_deal;
+                <bank::Module<T>>::unlock_token(who.clone(),sell_order.acc,sell_order.pair.share,
+                                                left_shares,bank::TokenType::OTC);
+            },
+            _ => return Err("unknown err"),
+        }
         Ok(())
     }
 }
@@ -339,6 +189,9 @@ mod tests {
     use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
     use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
     use support::{StorageMap,StorageValue};
+    #[cfg(feature = "std")]
+    use rustc_hex::*;
+
 
     impl_outer_origin!{
 		pub enum Origin for Test {}
@@ -360,8 +213,6 @@ mod tests {
         type Event = ();
         type Log = DigestItem;
     }
-
-
 
     impl balances::Trait for Test {
         type Balance = u64;
@@ -399,6 +250,10 @@ mod tests {
         type Event = ();
     }
 
+    impl order::Trait for Test {
+        type Event = ();
+    }
+
     impl Trait for Test {
         type Event = ();
     }
@@ -408,33 +263,33 @@ mod tests {
         runtime_io::TestExternalities::new(t)
     }
     type Bank = bank::Module<Test>;
+    type Order = order::Module<Test>;
     type OTC = Module<Test>;
 
     #[test]
     fn order_pair_test() {
         with_externalities(&mut new_test_ext(), || {
             let pair:OrderPair = OrderPair{ share:1 ,money:2};
-            assert_err!(OTC::is_valid_pair(&pair) , "an invalid orderpair");
+            assert_err!(Order::is_valid_pair(&pair) , "an invalid orderpair");
             assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
-            assert_ok!(OTC::is_valid_pair(&pair));
+            assert_ok!(Order::is_valid_pair(&pair));
         });
     }
 
-
     #[test]
-    fn put_order_test() {
+    fn put_order_buy_test() {
         with_externalities(&mut new_test_ext(), || {
-
+            let acc : Vec<u8> = [2,3,4,5].to_vec();
             let pair:OrderPair = OrderPair{ share:1 ,money:2};
-            assert_err!(OTC::is_valid_pair(&pair) , "an invalid orderpair");
+            assert_err!(Order::is_valid_pair(&pair) , "an invalid orderpair");
             assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
-            assert_ok!(OTC::is_valid_pair(&pair));
+            assert_ok!(Order::is_valid_pair(&pair));
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,true) ,"price cann't be 0");
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,true) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,acc.clone(),true) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,acc.clone(),true) ,"price cann't be 0");
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,true) ,"no data");
-            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,true) ,"no data");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,acc.clone(),true) ,"no data");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,acc.clone(),true) ,"no data");
 
             Bank::depositing_withdraw_record(1,50,1,true);
             Bank::depositing_withdraw_record(1,50,2,true);
@@ -442,66 +297,158 @@ mod tests {
             assert_eq!(Bank::despositing_account(),vec![1]);
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
 
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,true));
-            let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,acc.clone(),true));
+            let aa = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (50, 2), (50, 3), (0, 4)].to_vec());
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
             Bank::depositing_withdraw_record(2,50,1,true);
             Bank::depositing_withdraw_record(2,50,2,true);
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
-            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5 ,true));
+            assert_ok!(OTC::buy(Some(2).into(),1, pair.clone(),1,5 ,acc.clone(),true));
             assert_eq!(Bank::despositing_banance(1),[(0, 0), (40, 1), (100, 2), (50, 3), (0, 4)].to_vec());
             assert_eq!(Bank::despositing_banance_reserved(1),[(0, 0), (5, 1), (0, 2), (0, 3), (0, 4)].to_vec());
 
             assert_eq!(Bank::despositing_banance(2),[(0, 0), (55, 1), (0, 2), (0, 3), (0, 4)].to_vec());
-            let bb = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            let bb = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(bb.already_deal,5);
 
-            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,1,true),"not_enough_money_error ");
+            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,1,acc.clone(),true),"not_enough_money_error ");
 
         });
     }
 
-    #[test]
-    fn lock_test() {
-        with_externalities(&mut new_test_ext(), || {
-
-            let pair:OrderPair = OrderPair{ share:1 ,money:2};
-            assert_err!(OTC::is_valid_pair(&pair) , "an invalid orderpair");
-            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
-            assert_ok!(OTC::is_valid_pair(&pair));
-
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10,true ) ,"price cann't be 0");
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,true) ,"price cann't be 0");
-
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,true) ,"no data");
-            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,true) ,"no data");
-
-            Bank::depositing_withdraw_record(1,50,1,true);
-            Bank::depositing_withdraw_record(1,50,2,true);
-            Bank::depositing_withdraw_record(1,50,3,true);
-            assert_eq!(Bank::despositing_account(),vec![1]);
-            assert_eq!(Bank::despositing_banance(1),[(0, 0), (50, 1), (50, 2), (50, 3), (0, 4)].to_vec());
-
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,false));
-            let aa = OTC::sell_order_of( (1, pair.clone(), 1) ).unwrap();
-
-
-            Bank::depositing_withdraw_record(2,50,1,true);
-            Bank::depositing_withdraw_record(2,50,2,true);
-            assert_eq!(Bank::despositing_banance(2),[(0, 0), (50, 1), (50, 2), (0, 3), (0, 4)].to_vec());
-
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,true));
-            let aa = OTC::sell_order_of( (1, pair.clone(), 2) ).unwrap();
-            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 30, 10 ,true));
-
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,true),"not_enough_money_error ");
-        });
-    }
     #[test]
     fn cancel_order_test() {
         with_externalities(&mut new_test_ext(), || {
+            let acc : Vec<u8> = [2,3,4,5].to_vec();
+            let pair:OrderPair = OrderPair{ share:1 ,money:2};
+            assert_err!(Order::is_valid_pair(&pair) , "an invalid orderpair");
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+            assert_ok!(Order::is_valid_pair(&pair));
+
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,acc.clone(),true) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,acc.clone(),true) ,"price cann't be 0");
+
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,acc.clone(),true) ,"not_enough_money_error ");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,acc.clone(),true) ,"not_enough_money_error ");
+
+            Bank::modify_token(1,acc.clone(),1,50,bank::TokenType::Free,true);
+            Bank::modify_token(1,acc.clone(),2,50,bank::TokenType::Free,true);
+            Bank::modify_token(1,acc.clone(),3,50,bank::TokenType::Free,true);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),1)),50);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),2)),50);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),3)),50);
+
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 10, 10 ,acc.clone(),true));
+            println!("  put order ");
+            // a new order's status is new
+            let aa = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(aa.status,order::OtcStatus::New);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),1)),40);
+            assert_eq!(Bank::deposit_otc_token((1,acc.clone(),1)),10);
+
+            // an order was put up , cancel it, and see the status changes into done
+            assert_ok!(OTC::cancel_order(Some(1).into() , pair.clone(),1));
+            let bb = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(bb.status,order::OtcStatus::Done);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),1)),50);
+            assert_eq!(Bank::deposit_otc_token((1,acc.clone(),1)),0);
+        });
+    }
+
+    #[test]
+    fn cancel_all_order_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let acc : Vec<u8> = [2,3,4,5].to_vec();
+            let pair:OrderPair = OrderPair{ share:3 ,money:2};
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+
+            let pair2:OrderPair = OrderPair{ share:3 ,money:1};
+            assert_ok!(OTC::new_pair(Some(1).into() , pair2.clone()));
+
+
+            Bank::modify_token(1,acc.clone(),1,50,bank::TokenType::Free,true);
+            Bank::modify_token(1,acc.clone(),2,50,bank::TokenType::Free,true);
+            Bank::modify_token(1,acc.clone(),3,50,bank::TokenType::Free,true);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),1)),50);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),2)),50);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),3)),50);
+
+            assert_ok!(OTC::put_order(Some(1).into() , pair.clone(), 15, 10 ,acc.clone(),true));
+            // a new order's status is new
+            let aa = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(aa.status,order::OtcStatus::New);
+            assert_eq!(Bank::deposit_free_token((1,acc.clone(),3)),35);
+            assert_eq!(Bank::deposit_otc_token((1,acc.clone(),3)),15);
+
+            assert_ok!(OTC::put_order(Some(1).into() , pair2.clone(), 15, 10 ,acc.clone(),true));
+            // an account 1 has type3 token 40 free and 15 locked by put up sell order
+            // now cancel all, the status turn into done
+            Order::cancel_order_for_bank_withdraw(1,pair.share,acc.clone());
+
+            // all status into done
+            let cc = Order::sell_order_of((1, pair.clone(), 1) ).unwrap();
+            assert_eq!(cc.status,order::OtcStatus::Done);
+            let dd = Order::sell_order_of((1, pair2.clone(), 1) ).unwrap();
+            assert_eq!(dd.status,order::OtcStatus::Done);
+        });
+    }
+
+    #[test]
+    fn settlement_test() {
+        with_externalities(&mut new_test_ext(), || {
+        let mut message : Vec<u8>= "00000000000000010000000000000002f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adadf499ed0e7a5c28bcf610ff4c866c8e5ea421f63c21a5c6004bc50b4dc4810ff72c81b6161f6bf7f76e635b161a2535f3b221bec1000000000000000000000000000000000000000000000000000000000000000101".from_hex().unwrap();
+        let sign : Vec<u8>= "4625ad0747cc75ab29c97a69ef561c2a7d154e7ec90b180d37df2b7a85ec6fb35588f5b38ca1af1e8e8a469114edecd05689c143e0cdb5ae032c349d0c22ae061b".from_hex().unwrap();
+
+        assert_ok!(Order::match_order_verification(Some(1).into(),message,sign));
+        });
+    }
+
+    #[test]
+    fn basic_withdraw_request_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::despositing_account(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+
+            //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
+            let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
+            let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
+            assert_ok!(Bank::withdrawrequest(Origin::signed(5),data2,sign2));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[].to_vec());
+            assert_eq!(Bank::despositing_banance_withdraw(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)]);
+        });
+    }
+
+    #[test]
+    fn withdraw_request_withdraw_sell_order_test() {
+        with_externalities(&mut new_test_ext(), || {
+            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::despositing_account(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+            // put order
+            let acc : Vec<u8> = [2,3,4,5].to_vec();
+            let pair:OrderPair = OrderPair{ share:1 ,money:2};
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+            assert_ok!(OTC::put_order(Some(11744161374129632607).into() , pair.clone(), 10, 10 ,acc.clone(),true));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (9999990, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::despositing_banance_reserved(11744161374129632607),[(0, 0), (10, 1), (0, 2), (0, 3), (0, 4)].to_vec());
+
+
+            //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
+            let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
+            let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
+            assert_ok!(Bank::withdrawrequest(Origin::signed(5),data2,sign2));
+            assert_eq!(Bank::despositing_banance(11744161374129632607),[].to_vec());
+            assert_eq!(Bank::despositing_banance_withdraw(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)]);
+
 
         });
     }

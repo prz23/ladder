@@ -7,8 +7,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Default, Clone)]
 pub struct State {
-    pub ingress: u64,
-    pub egress: u64,
+    pub request: u64,
     pub deposit: u64,
     pub withdraw: u64,
     pub authority: u64,

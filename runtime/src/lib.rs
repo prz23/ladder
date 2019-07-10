@@ -55,12 +55,15 @@ pub use bank::Call as BankCall;
 pub use exchange::Call as ExchangeCall;
 pub use erc::Call as ErcCall;
 pub use otc::Call as OtcCall;
+pub use order::Call as OrderCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use support::StorageValue;
 pub use staking::StakerStatus;
 pub use brand::Trademark;
 
 pub use system::EventRecord;
+
+pub use order;
 
 pub mod matrix;
 
@@ -244,6 +247,10 @@ impl otc::Trait for Runtime {
 	type Event = Event;
 }
 
+impl order::Trait for Runtime {
+	type Event = Event;
+}
+
 impl erc::Trait for Runtime {
 	type Event = Event;
 	type Currency =  Balances;
@@ -280,6 +287,7 @@ construct_runtime!(
 		Brand: brand::{Module, Call, Storage, Config<T>, Event<T>},
 		Otc: otc::{Module,Call,Storage,Event<T>},
 		Erc: erc::{Module,Call,Storage,Config<T>,Event<T>},
+		Order: order::{Module,Call,Storage,Event<T>},
 	}
 );
 
