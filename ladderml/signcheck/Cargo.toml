@@ -81,6 +81,12 @@ git = 'https://github.com/paritytech/substrate.git'
 package = 'sr-primitives'
 version = '2.0.0'
 
+[dependencies.session]
+default_features = false
+git = 'https://github.com/paritytech/substrate.git'
+package = 'srml-session'
+version = '2.0.0'
+
 [dependencies.rustc-hex]
 optional = true
 rustc-hex = "*"
@@ -102,5 +108,6 @@ std = [
     'serde',
     'safe-mix/std',
     'sr_primitives/std',
+    "session/std",
     "rustc-hex",
 ]

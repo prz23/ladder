@@ -1014,6 +1014,7 @@ dependencies = [
  "sr-std 2.0.0 (git+https://github.com/paritytech/substrate)",
  "sr-version 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-consensus 2.0.0 (git+https://github.com/paritytech/substrate)",
+ "srml-session 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-sudo 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-support 2.0.0 (git+https://github.com/paritytech/substrate)",
  "srml-system 2.0.0 (git+https://github.com/paritytech/substrate)",
