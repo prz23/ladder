@@ -90,7 +90,6 @@ where
     C::Api: VendorApi<B>,
 {
     let key = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
-    let key2 = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
     let kovan_address = Address::from_str(&config.kovan_address).unwrap();
     let abos_address = Address::from_str(&config.abos_address).unwrap();
     let mapper_address = Address::from_str(&config.mapper_address).unwrap();
@@ -104,13 +103,6 @@ where
     let info = client.info().unwrap();
     let at = BlockId::Hash(info.best_hash);
     let packet_nonce = PacketNonce {
-        nonce: client
-            .runtime_api()
-            .account_nonce(&at, &key.public().0.unchecked_into())
-            .unwrap(),
-        last_block: at,
-    };
-    let packet_nonce2 = PacketNonce {
         nonce: client
             .runtime_api()
             .account_nonce(&at, &key.public().0.unchecked_into())
@@ -198,20 +190,6 @@ where
         },
     }
     .start();
-
-    let id_need = key2.public().0.unchecked_into();
-
-    if config.strategy.enableexchange {
-        // exchange
-        let _ext = Exchange {
-            client: client.clone(),
-            pool: pool.clone(),
-            accountid: id_need,
-            packet_nonce: Arc::new(Mutex::new(packet_nonce2)),
-            spv: spv.clone(),
-        }
-        .start();
-    }
 
     // how to fetch real key?
     let events_key = StorageKey(primitives::twox_128(b"System Events").to_vec());

@@ -87,7 +87,7 @@ impl DepositEvent {
         result[8..28].copy_from_slice(&self.sender.0[..]);
         result[28..60].copy_from_slice(&self.recipient.0[..]);
         self.value.to_big_endian(&mut result[60..92]);
-        result[96..Self::BANKER_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
+        result[92..Self::BANKER_LENGTH].copy_from_slice(&self.tx_hash.0[..]);
         return result;
     }
 }
