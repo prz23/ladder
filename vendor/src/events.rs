@@ -73,7 +73,7 @@ impl DepositEvent {
         let mut tmp = [0u8; 8];
         tmp.copy_from_slice(&bytes[0..8]);
         Ok(Self {
-            coin: u64::from_le_bytes(tmp),
+            coin: u64::from_be_bytes(tmp),
             sender: bytes[8..28].into(),
             recipient: bytes[28..60].into(),
             value: U256::from_big_endian(&bytes[60..92]),
@@ -126,7 +126,7 @@ impl RequestEvent {
         let mut tmp = [0u8; 8];
         tmp.copy_from_slice(&bytes[0..8]);
         Ok(Self {
-            coin: u64::from_le_bytes(tmp),
+            coin: u64::from_be_bytes(tmp),
             id: U256::from_big_endian(&bytes[8..40]),
             sender: bytes[40..60].into(),
             recipient: bytes[60..92].into(),
@@ -182,7 +182,7 @@ impl WithdrawEvent {
         let mut tmp = [0u8; 8];
         tmp.copy_from_slice(&bytes[0..8]);
         Ok(Self {
-            coin: u64::from_le_bytes(tmp),
+            coin: u64::from_be_bytes(tmp),
             id: U256::from_big_endian(&bytes[8..40]),
             sender: bytes[40..60].into(),
             recipient: bytes[60..92].into(),
@@ -251,11 +251,11 @@ impl AuthorityEvent {
         let mut tmp: [u8; 8] = [0u8; 8];
         let mut index: usize = 0;
         tmp.copy_from_slice(&bytes[index..(index + 8)]);
-        let coin = u64::from_le_bytes(tmp);
+        let coin = u64::from_be_bytes(tmp);
         index += 8;
         let mut tmp: [u8; 4] = [0u8; 4];
         tmp.copy_from_slice(&bytes[index..(index + 4)]);
-        let last_len = u32::from_le_bytes(tmp);
+        let last_len = u32::from_be_bytes(tmp);
         index += 4;
 
         let mut last: Vec<Address> = Vec::with_capacity(last_len as usize);
@@ -266,7 +266,7 @@ impl AuthorityEvent {
         }
 
         tmp.copy_from_slice(&bytes[index..(index + 4)]);
-        let next_len = u32::from_le_bytes(tmp);
+        let next_len = u32::from_be_bytes(tmp);
         index += 4;
 
         let next: Vec<Address> = (0..next_len)
@@ -333,9 +333,9 @@ impl MatchEvent {
         }
         let mut tmp = [0u8; 8];
         tmp.copy_from_slice(&bytes[0..8]);
-        let tag = u64::from_le_bytes(tmp);
+        let tag = u64::from_be_bytes(tmp);
         tmp.copy_from_slice(&bytes[8..16]);
-        let bill = u64::from_le_bytes(tmp);
+        let bill = u64::from_be_bytes(tmp);
         Ok(Self {
             tag: tag,
             bill: bill,

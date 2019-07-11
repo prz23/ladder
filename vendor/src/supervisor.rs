@@ -106,44 +106,24 @@ where
             let mut message = relay_message.clone();
             let nonce = self.get_nonce();
             let signature: Vec<u8> = signer::Eth::sign_message(&self.eth_key, &message.raw).into();
-
-            let function = match message.ty {
-                RelayType::Match => {
-                    // TODO
-                    info!(
-                        "listener match message: 0x{}, signature: 0x{}",
-                        message.raw.to_hex(),
-                        signature.to_hex()
+            
+            trace!(
+                    "listener {:?} message: 0x{}, signature: 0x{}",
+                    message.ty,
+                    message.raw.to_hex(),
+                    signature.to_hex()
                     );
-                    Call::Order(OrderCall::match_order_verification(message.raw, signature))
-                },
+            let function = match message.ty {
+                RelayType::Match => Call::Order(OrderCall::match_order_verification(message.raw, signature)),
                 RelayType::Request => Call::Bank(BankCall::request(message.raw, signature)),
                 RelayType::Deposit => Call::Bank(BankCall::deposit(message.raw, signature)),
                 RelayType::Withdraw => Call::Bank(BankCall::withdraw(message.raw, signature)),
-                RelayType::SetAuthorities => {
-                    Call::Matrix(MatrixCall::reset_authorities(message.raw, signature))
-                },
-                RelayType::ExchangeRate => {
-                    Call::Exchange(ExchangeCall::check_exchange(message.raw, signature))
-                },
-                RelayType::LockToken => {
-                    info!(
-                        "listener lock token message: 0x{}, signature: 0x{}",
-                        message.raw.to_hex(),
-                        signature.to_hex()
-                    );
-                    Call::Erc(ErcCall::lock_erc(message.raw, signature))
-                },
-                RelayType::UnlockToken => {
-                    info!(
-                        "listener unlock token message: 0x{}, signature: 0x{}",
-                        message.raw.to_hex(),
-                        signature.to_hex()
-                    );
-                    Call::Erc(ErcCall::unlock_erc(message.raw, signature))
-                }
+                RelayType::SetAuthorities => Call::Matrix(MatrixCall::reset_authorities(message.raw, signature)),
+                RelayType::ExchangeRate => Call::Exchange(ExchangeCall::check_exchange(message.raw, signature)),
+                RelayType::LockToken => Call::Erc(ErcCall::lock_erc(message.raw, signature)),
+                RelayType::UnlockToken => Call::Erc(ErcCall::unlock_erc(message.raw, signature)),
             };
-
+            info!("ladder operator nonce: {}, function: {:?}", nonce, message.ty);
             let raw_payload = (
                 Compact::<Index>::from(nonce), // index/nonce
                 function,                      //function
@@ -155,7 +135,6 @@ where
             } else {
                 self.key.sign(payload)
             });
-            trace!("########## signature {}", signature.clone().0[..].to_hex());
             let extrinsic = UncheckedExtrinsic::new_signed(
                 raw_payload.0.into(),
                 raw_payload.1,
