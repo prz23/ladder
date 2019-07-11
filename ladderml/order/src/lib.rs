@@ -48,7 +48,8 @@ pub struct OrderContent<pair,AccountID,symbol,status> {
     pub status: status,      // sell order status
     pub longindex: u128,     // an unique index for each sell order
     pub reserved: bool,      // send the balance to bank or contract
-    pub acc: Vec<u8>,        // sell's out side account
+    pub acc: Vec<u8>,        // seller's send account
+    pub acc2: Vec<u8>,       // seller's recive account
 }
 
 impl<pair,AccountID,symbol,status> OrderContent<pair,AccountID,symbol,status>{
@@ -80,7 +81,7 @@ decl_event!(
         SellOrder(AccountId,OrderPair,u64,Symbol,Symbol,u128), // seller pair index amount price uniqueindex
         Buy(AccountId,AccountId,OrderPair,u64,Symbol,u128,bool), //buyer seller pair index amount uniqueindex
         CancelsellOrder(AccountId,OrderPair,u64,u128),
-        MatchOrder(u128, Symbol, AccountId,Vec<u8>, u64, bool, u64, AccountId,Vec<u8>, u64, bool,u64),
+        MatchOrder(u128, Symbol, AccountId,Vec<u8>,Vec<u8>, u64, bool, u64, AccountId,Vec<u8>,Vec<u8>, u64, bool,u64),
         AlertOrder(u128,AccountId,Symbol,u64), // uniqueindex seller newamount cointype
         Settlement(Vec<u8>,Vec<u8>),
     }
@@ -226,7 +227,8 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    pub fn generate_new_sell_order_and_put_into_list(who:T::AccountId,pair_type:OrderPair,amount:u64,per_price:u64,reserved:bool,acc:Vec<u8>){
+    pub fn generate_new_sell_order_and_put_into_list(who:T::AccountId,pair_type:OrderPair,amount:u64,per_price:u64,
+                                                     reserved:bool,acc:Vec<u8>,acc2:Vec<u8>){
         // assign a new sell order index
         let new_last_index = Self::last_sell_order_index_of((who.clone(), pair_type.clone())).unwrap_or_default() + 1;
         <LastSellOrderIndexOf<T>>::insert((who.clone(), pair_type.clone()), new_last_index);
@@ -246,6 +248,7 @@ impl<T: Trait> Module<T> {
             longindex : new_unique_index,
             reserved : reserved,
             acc: acc,
+            acc2: acc2,
         };
         // save the sell order in 3 different ways
         <SellOrdersOf<T>>::insert((who.clone(), pair_type.clone(), new_last_index), new_sell_order.clone());
@@ -263,7 +266,7 @@ impl<T: Trait> Module<T> {
     }
 
     // buy operate , lock the money and change the status
-    pub fn buy_operate(buyer:T::AccountId,mut sell_order:&mut OrderT<T>, amount:u64, reserved:bool,acc:Vec<u8>) -> Result {
+    pub fn buy_operate(buyer:T::AccountId,mut sell_order:&mut OrderT<T>, amount:u64, reserved:bool,acc:Vec<u8>,acc2:Vec<u8>) -> Result {
         // modify the exchanged money
         sell_order.already_deal = sell_order.already_deal+amount;
         // change sell order status
@@ -282,8 +285,8 @@ impl<T: Trait> Module<T> {
         //deposit_event
         //MatchOrder(id, price, seller, saleAmount, reserved, buyer, purchasingAmount, reserved);
         Self::deposit_event(RawEvent::MatchOrder(sell_order.longindex,sell_order.price,sell_order.who.clone(),
-                                                 sell_order.acc.clone(),amount,sell_order.reserved(),sell_order.pair.share,
-                                                 buyer.clone(),acc,sell_order.price*amount,reserved,sell_order.pair.money));
+                                                 sell_order.acc.clone(),sell_order.acc2.clone(),amount,sell_order.reserved(),sell_order.pair.share,
+                                                 buyer.clone(),acc,acc2,sell_order.price*amount,reserved,sell_order.pair.money));
         Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.who.clone(),sell_order.pair.clone(),
                                           sell_order.index, amount, sell_order.longindex,reserved));
         Ok(())

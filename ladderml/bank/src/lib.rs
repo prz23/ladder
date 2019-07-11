@@ -201,7 +201,7 @@ decl_module! {
                 Err(x) => return Err(x),
             }
             // ensure no repeat
-            // ensure!(!Self::despositing_account().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
+            ensure!(!Self::deposit_ladder_account_list().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
 
             let lock_withdraw_balance = Self::withdraw_request(who.clone(),amount,coin_type,sendervec.clone());
             Self::deposit_event(RawEvent::WithdrawRequest(coin_type,id,who,sendervec,lock_withdraw_balance,tx_hash));
@@ -792,20 +792,20 @@ impl<T: Trait> Module<T>
     /// by modifying the buyer's ID and the buyer's bid amount of two kinds of currencies.
     pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64,
                        type_money:u64 ,price:u64 ,amount:u64, sell_res:bool, buy_res:bool ,
-                       sellsender:Vec<u8> , buyersender:Vec<u8>){
+                       sellsender:Vec<u8>, buyersender:Vec<u8>, sellreciver:Vec<u8>, buyerreciver:Vec<u8>){
         // Deducting the amount locked in by the seller and transferring the buyer's money.
         // unlock the reserved token anyway
-        Self::modify_token(seller.clone(),sellsender.clone(),type_share,amount,TokenType::OTC,false);
+        Self::modify_token(seller.clone(),sellreciver.clone(),type_share,amount,TokenType::OTC,false);
         //Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,LockType::OTCLock,false);
         if sell_res {
-            Self::modify_token(seller.clone(),sellsender.clone(),type_money,amount * price,TokenType::Free,true);
+            Self::modify_token(seller.clone(),sellreciver.clone(),type_money,amount * price,TokenType::Free,true);
             //Self::depositing_withdraw_record(seller.clone(), T::Balance::sa(amount * price), type_money, true);
         }
         // At the same time deduct the buyer's money anyway
-        Self::modify_token(buyer.clone(),buyersender.clone(),type_money,amount * price,TokenType::Free,false);
+        Self::modify_token(buyer.clone(),buyerreciver.clone(),type_money,amount * price,TokenType::Free,false);
         //Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount * price), type_money, false);
         if buy_res {
-            Self::modify_token(buyer.clone(),buyersender.clone(),type_share,amount,TokenType::Free,true);
+            Self::modify_token(buyer.clone(),buyerreciver.clone(),type_share,amount,TokenType::Free,true);
             //Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount), type_share, true);
         }
     }
@@ -1257,7 +1257,7 @@ mod tests {
 
             let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
             let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
-            assert_ok!(Bank::withdrawrequest(Origin::signed(5),data2,sign2));
+            assert_ok!(Bank::request(Origin::signed(5),data2,sign2));
             assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
                        ,0);
             assert_eq!(Bank::deposit_withdraw_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
@@ -1297,6 +1297,7 @@ mod tests {
             println!("end");
             //
             assert_eq!(Bank::deposit_ladder_account_list(),[].to_vec());
+            println!("end2");
             assert_eq!(Bank::deposit_account_coin_list(1),[].to_vec());
             println!("deposit_account_coin_list{:?}",Bank::deposit_account_coin_list(1));
             //assert_eq!(Bank::deposit_sender_list((1,2)),[].to_vec());
