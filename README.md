@@ -160,7 +160,10 @@ cargo run -- --dev
 		"price": "Symbol",
 		"already_deal": "Symbol",
 		"status": "OtcStatus",
-		"longindex": "u128"
+		"longindex": "u128",
+		"reserved": "bool",
+		"acc": "Vec<u8>",
+		"acc2": "Vec<u8>"
 	},
 	"TokenInfoT": {
 		"id": "u64",
