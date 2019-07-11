@@ -288,7 +288,7 @@ decl_storage! {
         CoinReward get(coin_reward) : map u64 => T::Balance;
 
         /// Investment proportion. Controlling the Ratio of External Assets to Local Assets
-        DespositExchangeRate get(desposit_exchange_rate) :  u64 = 10000000000000;
+        DespositExchangeRate get(desposit_exchange_rate) :  u64 = 1000000000;
 
     }
         add_extra_genesis {
@@ -702,6 +702,7 @@ impl<T: Trait> Module<T>
             <CoinDeposit<T>>::insert(i,T::Balance::sa(0));
             <CoinReward<T>>::insert(i,T::Balance::sa(0));
         }
+        <order::Module<T>>::init_basic_pair();
     }
 
     pub fn calculate_total_deposit(coin_type:u64, balance:T::Balance, in_out:bool){

@@ -178,6 +178,13 @@ impl<T: Trait> Module<T> {
         return (tag_u64,bill_u64,from,from_bond,to,to_bond,value_u64,reserved_u64);
     }
     */
+    pub fn init_basic_pair(){
+        let mut pair_list: Vec<OrderPair> = <OrderPairList<T>>::get();
+        pair_list.push(OrderPair{share:1,money:2});
+        pair_list.push(OrderPair{share:2,money:1});
+        <OrderPairList<T>>::put(pair_list);
+    }
+
     // add a new exchange pair
     pub fn add_pair(pair: OrderPair) -> Result {
         if let Err(_) = Self::is_valid_pair(&pair) {
