@@ -219,9 +219,8 @@ where
                         RawEvent::MatchOrder(bill, price, seller, sell_sender, sell_receiver, sell_amount, sell_reserved, sell_tag,
                                 buyer, buy_sender, buy_receiver, buy_amount, buy_reserved, buy_tag) => {
                                 
-                                // TODO to side chain decimal.
-                                let sell_value: U256 = U256::from(*sell_amount) * U256::from(10^9);
-                                let buy_value: U256 = U256::from(*buy_amount) * U256::from(10^9);
+                                let sell_value: U256 = U256::from(*sell_amount) * U256::from(1_000_000_000);
+                                let buy_value: U256 = U256::from(*buy_amount) * U256::from(1_000_000_000);
 
                                 let sell_event = events::MatchEvent {
                                     tag: *sell_tag,
