@@ -5,7 +5,7 @@ use log::{info, trace};
 use network::SyncProvider;
 use node_primitives::{AccountId, Nonce as Index};
 use node_runtime::{
-    BankCall, Call, ExchangeCall, MatrixCall, ErcCall, UncheckedExtrinsic,
+    BankCall, Call, ExchangeCall, MatrixCall, ErcCall, OrderCall, UncheckedExtrinsic,
     VendorApi, /*,exchangerate */
 };
 use primitives::{crypto::*, ed25519::Pair, Pair as TraitPair, blake2_256};
@@ -111,13 +111,13 @@ where
                 RelayType::Match => {
                     // TODO
                     info!(
-                        "listener Ingress message: 0x{}, signature: 0x{}",
+                        "listener match message: 0x{}, signature: 0x{}",
                         message.raw.to_hex(),
                         signature.to_hex()
                     );
-                    Call::Matrix(MatrixCall::ingress(message.raw, signature))
+                    Call::Order(OrderCall::match_order_verification(message.raw, signature))
                 },
-                RelayType::Request => Call::Matrix(MatrixCall::egress(message.raw, signature)),
+                RelayType::Request => Call::Bank(BankCall::request(message.raw, signature)),
                 RelayType::Deposit => Call::Bank(BankCall::deposit(message.raw, signature)),
                 RelayType::Withdraw => Call::Bank(BankCall::withdraw(message.raw, signature)),
                 RelayType::SetAuthorities => {

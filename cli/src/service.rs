@@ -94,11 +94,11 @@ construct_service_factory! {
                             Ok(service) => {
                                 executor.spawn(start_vendor(
                                     VendorServiceConfig { kovan_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
-                                                        abos_url: "http://47.99.236.226:1338".to_string(),
+                                                        abos_url: "http://47.92.173.78:1337".to_string(),
                                                         eth_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
                                                         mapper_address: "c6f47FDdB36c1442B3a7229BEE5C35e7079E2C1e".to_string(),
-                                                        kovan_address: "cCD3e73667d3e0f93574160eecf2ACe4D31B061A".to_string(),
-                                                        abos_address: "34870eD198f2A3BAc2A0Fa44C12d2DDd97799363".to_string(),
+                                                        kovan_address: "E68ccBF91ad45C4249b877f1B9f8224179e1a126".to_string(),
+                                                        abos_address: "9dCA5E2eDE0a6848bE3d24EFB4D871a53786A1d2".to_string(),
                                                         db_path: db_path,
                                                         eth_key: keyring.to_hex(), // sign message
                                                         strategy: run_args.into(),
