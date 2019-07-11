@@ -83,7 +83,7 @@ impl DepositEvent {
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut result = vec![0u8; Self::BANKER_LENGTH];
-        result[0..8].copy_from_slice(&self.coin.to_le_bytes());
+        result[0..8].copy_from_slice(&self.coin.to_be_bytes());
         result[8..28].copy_from_slice(&self.sender.0[..]);
         result[28..60].copy_from_slice(&self.recipient.0[..]);
         self.value.to_big_endian(&mut result[60..92]);
@@ -137,7 +137,7 @@ impl RequestEvent {
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut result = vec![0u8; Self::REQUEST_LENGTH];
-        result[0..8].copy_from_slice(&self.coin.to_le_bytes());
+        result[0..8].copy_from_slice(&self.coin.to_be_bytes());
         self.id.to_big_endian(&mut result[8..40]);
         result[40..60].copy_from_slice(&self.sender.0[..]);
         result[60..92].copy_from_slice(&self.recipient.0[..]);
@@ -193,7 +193,7 @@ impl WithdrawEvent {
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut result = vec![0u8; Self::WITHDRAW_LENGTH];
-        result[0..8].copy_from_slice(&self.coin.to_le_bytes());
+        result[0..8].copy_from_slice(&self.coin.to_be_bytes());
         self.id.to_big_endian(&mut result[8..40]);
         result[40..60].copy_from_slice(&self.sender.0[..]);
         result[60..92].copy_from_slice(&self.recipient.0[..]);
@@ -294,15 +294,15 @@ impl AuthorityEvent {
             + (self.next_len as usize) * 20;
         let mut result: Vec<u8> = Vec::with_capacity(capacity);
         let mut index = 0;
-        result[index..(index + 8)].copy_from_slice(&self.coin.to_le_bytes());
+        result[index..(index + 8)].copy_from_slice(&self.coin.to_be_bytes());
         index += 8;
-        result[index..(index + 4)].copy_from_slice(&self.last_len.to_le_bytes());
+        result[index..(index + 4)].copy_from_slice(&self.last_len.to_be_bytes());
         index += 4;
         for i in 0..self.last_len as usize {
             result[index..(index + 20)].copy_from_slice(&(self.last[i].0[..]));
             index += 20;
         }
-        result[index..(index + 4)].copy_from_slice(&self.next_len.to_le_bytes());
+        result[index..(index + 4)].copy_from_slice(&self.next_len.to_be_bytes());
         index += 4;
         for i in 0..self.next_len as usize {
             result[index..(index + 20)].copy_from_slice(&self.next[i].0[..]);
@@ -350,8 +350,8 @@ impl MatchEvent {
 
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut result = vec![0u8; Self::SETTLE_LENGTH];
-        result[0..8].copy_from_slice(&self.tag.to_le_bytes());
-        result[8..16].copy_from_slice(&self.bill.to_le_bytes());
+        result[0..8].copy_from_slice(&self.tag.to_be_bytes());
+        result[8..16].copy_from_slice(&self.bill.to_be_bytes());
         result[16..36].copy_from_slice(&self.from.0[..]);
         result[36..68].copy_from_slice(&self.from_bond.0[..]);
         result[68..88].copy_from_slice(&self.to.0[..]);
