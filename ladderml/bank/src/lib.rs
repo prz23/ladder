@@ -796,18 +796,14 @@ impl<T: Trait> Module<T>
                        sellsender:Vec<u8>, buyersender:Vec<u8>, sellreciver:Vec<u8>, buyerreciver:Vec<u8>){
         // Deducting the amount locked in by the seller and transferring the buyer's money.
         // unlock the reserved token anyway
-        Self::modify_token(seller.clone(),sellreciver.clone(),type_share,amount,TokenType::OTC,false);
-        //Self::lock_unlock_record(seller.clone(),T::Balance::sa(amount),type_share,LockType::OTCLock,false);
+        Self::modify_token(seller.clone(),sellsender.clone(),type_share,amount,TokenType::OTC,false);
         if sell_res {
             Self::modify_token(seller.clone(),sellreciver.clone(),type_money,amount * price,TokenType::Free,true);
-            //Self::depositing_withdraw_record(seller.clone(), T::Balance::sa(amount * price), type_money, true);
         }
         // At the same time deduct the buyer's money anyway
-        Self::modify_token(buyer.clone(),buyerreciver.clone(),type_money,amount * price,TokenType::Free,false);
-        //Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount * price), type_money, false);
+        Self::modify_token(buyer.clone(),buyersender.clone(),type_money,amount * price,TokenType::Free,false);
         if buy_res {
             Self::modify_token(buyer.clone(),buyerreciver.clone(),type_share,amount,TokenType::Free,true);
-            //Self::depositing_withdraw_record(buyer.clone(), T::Balance::sa(amount), type_share, true);
         }
     }
 

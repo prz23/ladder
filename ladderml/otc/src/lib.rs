@@ -142,7 +142,6 @@ impl<T: Trait> Module<T> {
         if free_token < amount {
             return Err("not_enough_money_error ");
         }
-
         Ok(())
     }
 
@@ -485,7 +484,7 @@ mod tests {
             let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
             let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_ok!(Bank::deposit(Some(1).into(),data,sign));
-            assert_eq!(Bank::deposit_free_token((11744161374129632607,seller_acc.clone(),1)),10000000);
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,seller_acc.clone(),1)),100000000000);
 
 
             //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
@@ -509,13 +508,13 @@ mod tests {
             let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
             let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_ok!(Bank::deposit(Some(1).into(),data,sign));
-            assert_eq!(Bank::deposit_free_token((11744161374129632607,seller_acc.clone(),1)),10000000);
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,seller_acc.clone(),1)),100000000000);
 
             // put order
             let pair:OrderPair = OrderPair{ share:1 ,money:2};
             assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
             assert_ok!(OTC::put_order(Some(11744161374129632607).into() , pair.clone(), 10, 10 ,seller_acc.clone(),seller_acc2.clone(),true));
-            assert_eq!(Bank::deposit_free_token((11744161374129632607,seller_acc.clone(),1)),9999990);
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,seller_acc.clone(),1)),99999999990);
 
             //assert_eq!(Bank::coin_deposit(0),<tests::Test as Trait>::Balance::sa(0));
             let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
@@ -523,7 +522,7 @@ mod tests {
             assert_ok!(Bank::request(Origin::signed(5),data2,sign2));
 
             assert_eq!(Bank::deposit_free_token((11744161374129632607,seller_acc.clone(),1)),0);
-            assert_eq!(Bank::deposit_withdraw_token((11744161374129632607,seller_acc.clone(),1)),10000000);
+            assert_eq!(Bank::deposit_withdraw_token((11744161374129632607,seller_acc.clone(),1)),100000000000);
         });
     }
 }
