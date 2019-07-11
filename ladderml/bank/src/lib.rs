@@ -793,18 +793,19 @@ impl<T: Trait> Module<T>
     /// by modifying the buyer's ID and the buyer's bid amount of two kinds of currencies.
     pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64,
                        type_money:u64 ,price:u64 ,amount:u64, sell_res:bool, buy_res:bool ,
-                       sellsender:Vec<u8>, buyersender:Vec<u8>, sellreciver:Vec<u8>, buyerreciver:Vec<u8>){
+                       sellsender:Vec<u8>, sellrevicer:Vec<u8>, buyersender:Vec<u8>, buyerreciver:Vec<u8>) -> Result{
         // Deducting the amount locked in by the seller and transferring the buyer's money.
         // unlock the reserved token anyway
-        Self::modify_token(seller.clone(),sellsender.clone(),type_share,amount,TokenType::OTC,false);
+        Self::modify_token(seller.clone(),sellsender.clone(),type_share,amount,TokenType::OTC,false)?;
         if sell_res {
-            Self::modify_token(seller.clone(),sellreciver.clone(),type_money,amount * price,TokenType::Free,true);
+            Self::modify_token(seller.clone(),sellrevicer.clone(),type_money,amount * price,TokenType::Free,true)?;
         }
         // At the same time deduct the buyer's money anyway
-        Self::modify_token(buyer.clone(),buyersender.clone(),type_money,amount * price,TokenType::Free,false);
+        Self::modify_token(buyer.clone(),buyersender.clone(),type_money,amount * price,TokenType::Free,false)?;
         if buy_res {
-            Self::modify_token(buyer.clone(),buyerreciver.clone(),type_share,amount,TokenType::Free,true);
+            Self::modify_token(buyer.clone(),buyerreciver.clone(),type_share,amount,TokenType::Free,true)?;
         }
+        Ok(())
     }
 
     // return the amout of the token of  the cointype of who
