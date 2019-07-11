@@ -81,6 +81,7 @@ decl_event!(
         Buy(AccountId,AccountId,OrderPair,u64,Symbol,u128,bool), //buyer seller pair index amount uniqueindex
         CancelsellOrder(AccountId,OrderPair,u64,u128),
         MatchOrder(u128, Symbol, AccountId,Vec<u8>, u64, bool, u64, AccountId,Vec<u8>, u64, bool,u64),
+        AlertOrder(u128,AccountId,Symbol,u64), // uniqueindex seller newamount cointype
         Settlement(Vec<u8>,Vec<u8>),
     }
 );
@@ -316,6 +317,17 @@ impl<T: Trait> Module<T> {
         <ValidOrderIndexByOrderpair<T>>::insert(sell_order.pair.clone(),vec);
     }
 
+    pub fn alert_order_operate( sell_order: OrderT<T>,new_amount: u64) {
+        let mut sellorder = sell_order.clone();
+        sellorder.amount = new_amount;
+        // update the modified sell order
+        <SellOrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
+                                  sell_order.clone());
+        <AllSellOrders<T>>::insert(sell_order.longindex,sell_order.clone());
+
+        // deposit_event
+        Self::deposit_event(RawEvent::AlertOrder(sell_order.longindex,sell_order.who,sell_order.amount,sell_order.pair.share));
+    }
 
     pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64,acc:Vec<u8>){
         // find the valid sell order for the account

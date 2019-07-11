@@ -221,6 +221,7 @@ impl<T: Trait> Module<T> {
             let decrease_amount = sell_order.amount - amount;
             <bank::Module<T>>::unlock_token(seller.clone(),sell_order.acc.clone(),sell_order.pair.share,decrease_amount,bank::TokenType::OTC);
         }
+        <order::Module<T>>::alert_order_operate(sell_order.clone(),amount);
         Ok(())
     }
 }
