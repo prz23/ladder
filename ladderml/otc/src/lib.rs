@@ -97,6 +97,34 @@ decl_module! {
             }
             Ok(())
         }
+
+        pub fn cancel_order_with_uniqueindex(origin, index:u128) -> Result {
+            let sender = ensure_signed(origin)?;
+
+            // find  the order
+            if let Some(mut sellorder) = <order::Module<T>>::all_sell_orders(index){
+                // cancel the sell order and unlock the share not deal yet
+                Self::cancel_order_operate(sender.clone(),sellorder)?;
+            }else{
+                return Err("invalid sell order");
+            }
+            Ok(())
+        }
+
+        pub fn alert_order(origin,index:u128,amount:u64) -> Result {
+            //
+            let sender = ensure_signed(origin)?;
+            // find  the order
+            if let Some(mut sellorder) = <order::Module<T>>::all_sell_orders(index){
+                // cancel the sell order and unlock the share not deal yet
+                Self::alert_order_operate(sender.clone(),sellorder,amount)?;
+            }else{
+                return Err("invalid sell order");
+            }
+            Ok(())
+
+        }
+
     }
 }
 
@@ -114,6 +142,14 @@ impl<T: Trait> Module<T> {
             return Err("not_enough_money_error ");
         }
 
+        Ok(())
+    }
+
+    fn check_enough_token(who:T::AccountId,acc:Vec<u8>,cointype:u64,amount:u64) -> Result{
+        let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),cointype));
+        if free_token < amount {
+            return Err("not_enough_money_error ");
+        }
         Ok(())
     }
 
@@ -167,6 +203,25 @@ impl<T: Trait> Module<T> {
             },
             _ => return Err("unknown err"),
         }
+        Ok(())
+    }
+
+    // alert sell order
+    pub fn alert_order_operate(seller:T::AccountId , sell_order: OrderT<T> ,amount: u64) -> Result {
+        if sell_order.status == order::OtcStatus::Done { return Err("Cant modify completed order");}
+        if amount == sell_order.amount { return Err("Same amount in the sell order");}
+        if amount > sell_order.amount {
+            //
+            let increment_amount = amount - sell_order.amount;
+            Self::check_enough_token(seller.clone(),sell_order.acc.clone(),sell_order.pair.share,increment_amount)?;
+            <bank::Module<T>>::lock_token(seller.clone(),sell_order.acc.clone(),sell_order.pair.share,increment_amount,bank::TokenType::OTC);
+        }else {
+            if amount <= sell_order.already_deal {return Err("Cant smaller than already dealed amount.");}
+            //
+            let decrease_amount = sell_order.amount - amount;
+            <bank::Module<T>>::unlock_token(seller.clone(),sell_order.acc.clone(),sell_order.pair.share,decrease_amount,bank::TokenType::OTC);
+        }
+        <order::Module<T>>::alert_order_operate(sell_order.clone(),amount);
         Ok(())
     }
 }
