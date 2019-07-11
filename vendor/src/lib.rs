@@ -216,20 +216,20 @@ where
             events.iter().for_each(|event| {
                 if let Event::order(e) = event {
                     match e {
-                        RawEvent::MatchOrder(bill, price, sell_bond, seller, sell_amount, sell_reserved, sell_tag,
-                                buy_bond, buyer, buy_amount, buy_reserved, buy_tag) => {
+                        RawEvent::MatchOrder(bill, price, seller, sell_sender, sell_receiver, sell_amount, sell_reserved, sell_tag,
+                                buyer, buy_sender, buy_receiver, buy_amount, buy_reserved, buy_tag) => {
                                 
                                 // TODO to side chain decimal.
-                                let sell_value: U256 = U256::from(*sell_amount);
-                                let buy_value: U256 = U256::from(*buy_amount);
+                                let sell_value: U256 = U256::from(*sell_amount) * U256::from(10^9);
+                                let buy_value: U256 = U256::from(*buy_amount) * U256::from(10^9);
 
                                 let sell_event = events::MatchEvent {
                                     tag: *sell_tag,
                                     bill: *bill as u64,
-                                    from: Address::from_slice(seller.as_ref()),
-                                    from_bond: H256::from_slice(sell_bond.as_ref()),
-                                    to: Address::from_slice(buyer.as_ref()),
-                                    to_bond: H256::from_slice(buy_bond.as_ref()),
+                                    from: Address::from_slice(sell_sender.as_ref()),
+                                    from_bond: H256::from_slice(seller.as_ref()),
+                                    to: Address::from_slice(buy_receiver.as_ref()),
+                                    to_bond: H256::from_slice(buyer.as_ref()),
                                     value: sell_value,
                                     reserved: *sell_reserved as u8,
                                 };
@@ -238,10 +238,10 @@ where
                                 let buy_event = events::MatchEvent {
                                     tag: *buy_tag,
                                     bill: *bill as u64,
-                                    from: Address::from_slice(buyer.as_ref()),
-                                    from_bond: H256::from_slice(buy_bond.as_ref()),
-                                    to: Address::from_slice(seller.as_ref()),
-                                    to_bond: H256::from_slice(sell_bond.as_ref()),
+                                    from: Address::from_slice(buy_sender.as_ref()),
+                                    from_bond: H256::from_slice(buyer.as_ref()),
+                                    to: Address::from_slice(sell_receiver.as_ref()),
+                                    to_bond: H256::from_slice(seller.as_ref()),
                                     value: buy_value,
                                     reserved: *buy_reserved as u8,
                                 };
@@ -251,7 +251,7 @@ where
                         }
                         RawEvent::Settlement(message, signatures) => {
                             info!(
-                                "raw event ingress: message: {}, signatures: {}",
+                                "raw match event: message: {}, signatures: {}",
                                 message.to_hex(),
                                 signatures.to_hex()
                             );
@@ -267,7 +267,7 @@ where
                                 })
                                 .map_err(|_err| {
                                     warn!(
-                                        "unexpected format of ingress, message {:?}",
+                                        "unexpected format of match, message {:?}",
                                         message.to_hex()
                                     );
                                 });
