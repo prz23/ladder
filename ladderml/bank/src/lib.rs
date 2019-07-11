@@ -1254,7 +1254,7 @@ mod tests {
             let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
             assert_ok!(Bank::deposit(Some(1).into(),data,sign));
             assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
-                       ,10000000);
+                       ,100000000000);
 
             let mut data2 : Vec<u8>= "00000000000000010000000000000000000000000000000000000000000000000000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
             let sign2 : Vec<u8>= "b36bba3f9e7138e45b9ff9918a0759623ca146b3956174efaadb37635c2adb440f9fd75e7773803337d4802d94f5c78788121dccd4b698080b047171966483711b".from_hex().unwrap();
@@ -1262,7 +1262,7 @@ mod tests {
             assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
                        ,0);
             assert_eq!(Bank::deposit_withdraw_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1))
-                       ,10000000);
+                       ,100000000000);
         });
     }
     #[test]
@@ -1291,21 +1291,19 @@ mod tests {
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),1000000000);
             assert_eq!(Bank::deposit_otc_token((1,sender.clone(),2)),0);
 
-            println!("start");
-            // withdraw  success test
-           // assert_ok!(Bank::withdraw_from_free(1,sender.clone(),2,1000000000));
-            //assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),0);
-            println!("end");
-            //
-            assert_eq!(Bank::deposit_ladder_account_list(),[].to_vec());
-            println!("end2");
-            assert_eq!(Bank::deposit_account_coin_list(1),[].to_vec());
+            assert_eq!(Bank::deposit_ladder_account_list(),[1].to_vec());
+            assert_eq!(Bank::deposit_account_coin_list(1),[2].to_vec());
             println!("deposit_account_coin_list{:?}",Bank::deposit_account_coin_list(1));
             //assert_eq!(Bank::deposit_sender_list((1,2)),[].to_vec());
 
             //iter test
             Bank::calculate_reward_and_reward();
-            assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),100000);
+            assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),200000);
+
+            //withdraw request
+            println!("request {}",Bank::withdraw_request(1,500000,2,sender.clone()));
+            assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),999500000);
+            assert_eq!(Bank::deposit_withdraw_token((1,sender.clone(),2)),500000);
         });
     }
 
@@ -1320,24 +1318,16 @@ mod tests {
             assert_eq!(Bank::deposit_account_coin_list(11744161374129632607),[1].to_vec());
             println!(" {:?}", Bank::deposit_sender_list((11744161374129632607,1)));
             assert_eq!(Bank::deposit_sender_list((11744161374129632607,1)),[[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec()].to_vec());
-            assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1)),10000000);
-
-/*
-            let mut data : Vec<u8>= "0000000000000001f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
-            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
-            assert_err!(Bank::deposit(Origin::signed(5),data,sign),"This signature is repeat!");
-            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (0, 3), (0, 4)].to_vec());
-
-            let mut data : Vec<u8>= "0000000000000002f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad00000000000000000000000000000000000000000000000000000000000000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea3".from_hex().unwrap();
-            let sign : Vec<u8>= "99ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf619".from_hex().unwrap();
-            assert_err!(Bank::deposit(Origin::signed(5),data,sign),"cant deposit zero");
-            //  assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (1000, 3), (0, 4)].to_vec());
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1)),100000000000);
 
             let mut data : Vec<u8>= "0000000000000003f758e53313Fa9264E1E23bF0Bd9b14A7E98C82745f35dce98ba4fba25530a026ed80b2cecdaa31091ba4958b99b52ea1d068adad0000000000000000000000000000000000000000000000056bc75e2d631000001bc8676204852133d9b70bfef9ac4bedec87e281458ae052a76139a28fa8cea4".from_hex().unwrap();
-            let sign : Vec<u8>= "12ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
-            assert_ok!(Bank::deposit(Origin::signed(5),data,sign));
-            assert_eq!(Bank::despositing_banance(11744161374129632607),[(0, 0), (10000000, 1), (0, 2), (10000000, 3), (0, 4)].to_vec());
-*/
+            let sign : Vec<u8>= "11ee83fc6db16b233d763fc71efe8f0b8db95df8403a2a87b34f51cb3d7b4e136cf66a4ef0f685b3b7ac74644577154899e55cb398cd538bc615cc5e0ab6acf61c".from_hex().unwrap();
+            assert_ok!(Bank::deposit(Some(1).into(),data,sign));
+            assert_eq!(Bank::deposit_ladder_account_list(),[11744161374129632607].to_vec());
+            assert_eq!(Bank::deposit_account_coin_list(11744161374129632607),[1,3].to_vec());
+            println!(" {:?}", Bank::deposit_sender_list((11744161374129632607,3)));
+            assert_eq!(Bank::deposit_sender_list((11744161374129632607,3)),[[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec()].to_vec());
+            assert_eq!(Bank::deposit_free_token((11744161374129632607,[247, 88, 229, 51, 19, 250, 146, 100, 225, 226, 59, 240, 189, 155, 20, 167, 233, 140, 130, 116].to_vec(),1)),100000000000);
         });
     }
 
