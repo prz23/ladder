@@ -133,49 +133,56 @@ cargo run -- --dev
 * Settings => Developer => Manually enter your custom type definitions as valid JSON
 ```
 {
-	"Symbol": "u64",
-	"OrderPair": {
-		"share": "Symbol",
-		"money": "Symbol"
-	},
-	"Status": {
-		"_enum": [
-			"Lcoking",
-			"Unlock",
-			"Withdraw"
-		]
-	},
-	"OtcStatus": {
-		"_enum": [
-			"New",
-			"Half",
-			"Done"
-		]
-	},
-	"OrderT": {
-		"pair": "OrderPair",
-		"index": "u64",
-		"who": "AccountId",
-		"amount": "Symbol",
-		"price": "Symbol",
-		"already_deal": "Symbol",
-		"status": "OtcStatus",
-		"longindex": "u128",
-		"reserved": "bool",
-		"acc": "Vec<u8>",
-		"acc2": "Vec<u8>"
-	},
-	"TokenInfoT": {
-		"id": "u64",
-		"sender": "Vec<u8>",
-		"beneficiary": "AccountId",
-		"value": "Balance",
-		"cycle": "u64",
-		"reward": "Balance",
-		"txhash": "Vec<u8>",
-		"status": "Status",
-		"now_cycle": "u64",
-		"reserved": "bool"
-	}
+  "Symbol": "u64",
+  "OrderPair": {
+    "share": "Symbol",
+    "money": "Symbol"
+  },
+  "Status": {
+    "_enum": [
+      "Lcoking",
+      "Unlock",
+      "Withdraw"
+    ]
+  },
+  "OtcStatus": {
+    "_enum": [
+      "New",
+      "Half",
+      "Done"
+    ]
+  },
+  "TokenType": {
+    "_enum": [
+      "Free",
+      "OTC",
+      "WithDraw",
+      "Reward"
+    ]
+  },
+  "OrderT": {
+    "pair": "OrderPair",
+    "index": "u64",
+    "who": "AccountId",
+    "amount": "Symbol",
+    "price": "Symbol",
+    "already_deal": "Symbol",
+    "status": "OtcStatus",
+    "longindex": "u128",
+    "reserved": "bool",
+    "acc": "Vec<u8>"
+  },
+  "TokenInfoT": {
+    "id": "u64",
+    "sender": "Vec<u8>",
+    "beneficiary": "AccountId",
+    "value": "Balance",
+    "cycle": "u64",
+    "reward": "Balance",
+    "txhash": "Vec<u8>",
+    "status": "Status",
+    "now_cycle": "u64",
+    "reserved": "bool"
+  }
 }
 ```
