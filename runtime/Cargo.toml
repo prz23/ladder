@@ -8,36 +8,36 @@ edition = "2018"
 integer-sqrt = { version = "0.1.2" }
 safe-mix = { version = "1.0", default-features = false }
 parity-codec = { version = "3.3", default-features = false, features = ["derive"] }
-substrate-primitives = { git = "https://github.com/paritytech/substrate", default-features = false }
-client = { package = "substrate-client", git = "https://github.com/paritytech/substrate", default-features = false }
-rstd = { package = "sr-std", git = "https://github.com/paritytech/substrate", default-features = false }
-runtime_primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate", default-features = false }
-offchain-primitives = { package = "substrate-offchain-primitives", git = "https://github.com/paritytech/substrate", default-features = false }
-version = { package = "sr-version", git = "https://github.com/paritytech/substrate", default-features = false }
-support = { package = "srml-support", git = "https://github.com/paritytech/substrate", default-features = false }
-aura = { package = "srml-aura", git = "https://github.com/paritytech/substrate", default-features = false }
-balances = { package = "srml-balances", git = "https://github.com/paritytech/substrate", default-features = false }
-consensus = { package = "srml-consensus", git = "https://github.com/paritytech/substrate", default-features = false }
-contract = { package = "srml-contract", git = "https://github.com/paritytech/substrate", default-features = false }
-council = { package = "srml-council", git = "https://github.com/paritytech/substrate", default-features = false }
-democracy = { package = "srml-democracy", git = "https://github.com/paritytech/substrate", default-features = false }
-executive = { package = "srml-executive", git = "https://github.com/paritytech/substrate", default-features = false }
-finality-tracker = { package = "srml-finality-tracker", git = "https://github.com/paritytech/substrate", default-features = false }
-grandpa = { package = "srml-grandpa", git = "https://github.com/paritytech/substrate", default-features = false }
-indices = { package = "srml-indices", git = "https://github.com/paritytech/substrate", default-features = false }
-session = { package = "srml-session", git = "https://github.com/paritytech/substrate", default-features = false }
-staking = { package = "srml-staking", git = "https://github.com/paritytech/substrate", default-features = false }
-system = { package = "srml-system", git = "https://github.com/paritytech/substrate", default-features = false }
-timestamp = { package = "srml-timestamp", git = "https://github.com/paritytech/substrate", default-features = false }
-treasury = { package = "srml-treasury", git = "https://github.com/paritytech/substrate", default-features = false }
-sudo = { package = "srml-sudo", git = "https://github.com/paritytech/substrate", default-features = false }
+substrate-primitives = { git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+client = { package = "substrate-client", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+rstd = { package = "sr-std", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+runtime_primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+offchain-primitives = { package = "substrate-offchain-primitives", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+version = { package = "sr-version", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+support = { package = "srml-support", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+aura = { package = "srml-aura", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+balances = { package = "srml-balances", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+consensus = { package = "srml-consensus", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+contract = { package = "srml-contract", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+council = { package = "srml-council", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+democracy = { package = "srml-democracy", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+executive = { package = "srml-executive", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+finality-tracker = { package = "srml-finality-tracker", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+grandpa = { package = "srml-grandpa", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+indices = { package = "srml-indices", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+session = { package = "srml-session", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+staking = { package = "srml-staking", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+system = { package = "srml-system", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+timestamp = { package = "srml-timestamp", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+treasury = { package = "srml-treasury", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+sudo = { package = "srml-sudo", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 node-primitives = { path = "../primitives", default-features = false }
-consensus_aura = { package = "substrate-consensus-aura-primitives", git = "https://github.com/paritytech/substrate", default-features = false }
+consensus_aura = { package = "substrate-consensus-aura-primitives", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 rustc-hex = { version = "2.0", optional = true }
 serde = { version = "1.0", optional = true }
-substrate-keyring = { git = "https://github.com/paritytech/substrate", optional = true }
-consensus_authorities = { package = "substrate-consensus-authorities", git = "https://github.com/paritytech/substrate", default-features = false }
-runtime-io = { package = "sr-io", git = "https://github.com/paritytech/substrate", default-features = false }
+substrate-keyring = { git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", optional = true }
+consensus_authorities = { package = "substrate-consensus-authorities", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+runtime-io = { package = "sr-io", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 brand = { path = "../ladderml/brand", default_features = false}
 
 [dependencies.signcheck]

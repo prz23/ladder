@@ -20,3 +20,22 @@ signer = { git = "https://github.com/laddernetwork/signer" }
 
 [build-dependencies]
 vergen = "3"
+
+[workspace]
+members = [
+    "cli",
+    "vendor",
+    "executor",
+    "runtime",
+    "ladderml/bank",
+    "ladderml/brand",
+    "ladderml/erc",
+    "ladderml/exchange",
+    "ladderml/order",
+    "ladderml/otc",
+    "ladderml/signcheck"
+]
+
+exclude = [
+    "runtime/wasm",
+]

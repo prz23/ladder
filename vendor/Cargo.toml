@@ -26,12 +26,12 @@ tokio-core = "0.1.8"
 rustc-hex = "1.0"
 
 node-runtime = { path = "../runtime" }
-runtime_primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate" }
-client = { package = "substrate-client", git = "https://github.com/paritytech/substrate", default-features = false }
-network = { package = "substrate-network", git = "https://github.com/paritytech/substrate" }
-keystore = { package = "substrate-keystore", git = "https://github.com/paritytech/substrate" }
-primitives = { package = "substrate-primitives", git = "https://github.com/paritytech/substrate" }
-transaction_pool = { package = "substrate-transaction-pool", git = "https://github.com/paritytech/substrate" }
+runtime_primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3" }
+client = { package = "substrate-client", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+network = { package = "substrate-network", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3" }
+keystore = { package = "substrate-keystore", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3" }
+primitives = { package = "substrate-primitives", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3" }
+transaction_pool = { package = "substrate-transaction-pool", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3" }
 
 node-primitives = { path = "../primitives"}
 curl = { version = "*"}

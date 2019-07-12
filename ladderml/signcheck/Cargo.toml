@@ -13,19 +13,19 @@ version = '3.2'
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'substrate-primitives'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.rstd]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'sr-std'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.runtime-io]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'sr-io'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.safe-mix]
 default-features = false
@@ -43,49 +43,49 @@ version = '1.0'
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'srml-sudo'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.support]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'srml-support'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.system]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'srml-system'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.timestamp]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'srml-timestamp'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.consensus]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'srml-consensus'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.version]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'sr-version'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.sr_primitives]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'sr-primitives'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.session]
 default_features = false
 git = 'https://github.com/paritytech/substrate.git'
 package = 'srml-session'
-version = '2.0.0'
+rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.rustc-hex]
 optional = true

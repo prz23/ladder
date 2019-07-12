@@ -8,10 +8,10 @@ edition = "2018"
 serde = { version = "1.0", optional = true }
 serde_derive = { version = "1.0", optional = true }
 parity-codec = { version = "3.3", default-features = false }
-srml-support = { git = "https://github.com/paritytech/substrate.git", default-features = false }
-system = { package = "srml-system", git = "https://github.com/paritytech/substrate.git", default-features = false }
-primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate.git", default-features = false }
-runtime_io = { package = "sr-io", git = "https://github.com/paritytech/substrate.git", default-features = false }
+srml-support = { git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+system = { package = "srml-system", git = "https://github.com/paritytech/substrate.git",rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
+runtime_io = { package = "sr-io", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 
 [features]
 default = ["std"]
