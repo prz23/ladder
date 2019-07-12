@@ -202,8 +202,15 @@ decl_module! {
             }
             // ensure no repeat
             ensure!(!Self::deposit_ladder_account_list().iter().find(|&t| t == &who).is_none(), "Cannot deposit if not depositing.");
-
+/*
+            if amount > Self::ptotential_withdrawable_coin(who.clone(),sendervec.clone(),coin_type){
+                return Err("Cant request too much");
+            }
+            */
             let lock_withdraw_balance = Self::withdraw_request(who.clone(),amount,coin_type,sendervec.clone());
+
+            if lock_withdraw_balance == T::Balance::sa(0) { return Ok(());}
+
             Self::deposit_event(RawEvent::WithdrawRequest(coin_type,id,who,sendervec,lock_withdraw_balance,tx_hash));
             Ok(())
         }
@@ -849,30 +856,30 @@ impl<T: Trait> Module<T>
 
     /// Insufficient token when withdrawing, it will cancel the sell order to get some free token
     pub fn withdraw_request(who:T::AccountId,withdraw_amount:u64,cointype:u64,sender:Vec<u8>) -> T::Balance {
+       // println!("withdraw_amount {} cointype {}",withdraw_amount,cointype);
         // get the current amount of free token , if the data in uninited ,return zero.
         let free_token = Self::free_token_for_specific_coin(who.clone(),sender.clone(),cointype);
         // if free token is enough to withdraw , withdraw it.
         if free_token >= withdraw_amount {
             // free token is enough for the withdraw , do the lock/unlock operation
-            Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw);
-           // Self::lock(who.clone(),cointype,withdraw_amount,LockType::WithDrawLock);
-            //Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount),id));
-            return T::Balance::sa(withdraw_amount);
+            match Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
+                Ok(()) =>   return T::Balance::sa(withdraw_amount),
+                Err(x) => return  T::Balance::sa(0),
+            }
         }
         // if the free token is less than the requested amount
         // cancel all sell order and  turn The remaining money in sell orders into free token
         // calculate the total amount of specified cointype for who in sell orders
         let amount_on_sale = Self::selling_token_for_specific_coin(who.clone(),sender.clone(),cointype);
-       // let amount_on_sale = Self::is_specific_token_on_sale(who.clone(),cointype,LockType::OTCLock);
         if amount_on_sale == 0 {
             //if there is no sell order , directly do the lock/unlock operation
             // TODO::this situation isn't supposed  to happen when free_token is zero.
             // in another word, when into this case ,  the free_token must not be zero.
             // so the free token is reachable.
-            Self::lock_token(who.clone(),sender.clone(),cointype,free_token,TokenType::WithDraw);
-           // Self::lock(who.clone(),cointype,T::Balance::as_(free_token),LockType::WithDrawLock);
-            //Self::deposit_event(RawEvent::WithdrawRequest(who,free_token,id));
-            return T::Balance::sa(free_token);
+            match Self::lock_token(who.clone(),sender.clone(),cointype,free_token,TokenType::WithDraw){
+                Ok(()) =>  return T::Balance::sa(free_token),
+                Err(x) => return  T::Balance::sa(0),
+            }
         }else {
             //Cancel all sell orders  , TODO:: Processing only part of sell orders
             <order::Module<T>>::cancel_order_for_bank_withdraw(who.clone(),cointype,sender.clone());
@@ -885,17 +892,17 @@ impl<T: Trait> Module<T>
             // lock the The Optimum Range of Lockable token
             if new_free_amount >= withdraw_amount{
                 // free token is sufficient,  Then turn (withdraw_amount) from free into Withdraw_lock
-                Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw);
-                // event  after the order been canceled , the
-                //Self::deposit_event(RawEvent::WithdrawRequest(who,T::Balance::sa(withdraw_amount),id));
-                return T::Balance::sa(withdraw_amount);
+                match  Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
+                    Ok(()) =>  return T::Balance::sa(withdraw_amount),
+                    Err(x) => return T::Balance::sa(0),
+                }
             }else {
                 //TODO::this situation is supposed not to happen
                 // free token is not sufficient,  Then turn all(new_free_amount) from free into Withdraw_lock
-                Self::lock_token(who.clone(),sender.clone(),cointype,new_free_amount,TokenType::WithDraw);
-                // event  after the order been canceled , the
-                //Self::deposit_event(RawEvent::WithdrawRequest(who,new_free_amount,id));
-                return T::Balance::sa(new_free_amount);
+                match Self::lock_token(who.clone(),sender.clone(),cointype,new_free_amount,TokenType::WithDraw){
+                    Ok(()) => return T::Balance::sa(new_free_amount),
+                    Err(x) => return T::Balance::sa(0),
+                }
             }
         }
     }
@@ -998,6 +1005,11 @@ impl<T: Trait> Module<T>
         Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
     }
 
+    pub fn ptotential_withdrawable_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64 {
+        Self::deposit_free_token((who.clone(),sender.clone(),coin_type))
+            + Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
+    }
+
     pub fn total_token_for_specific_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64{
         Self::deposit_free_token((who.clone(),sender.clone(),coin_type))
             + Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
@@ -1029,36 +1041,32 @@ impl<T: Trait> Module<T>
                 <DepositSenderList<T>>::insert((who.clone(),coin_type),sender_vec);
             }
             // then, check the same owner and  the same coin type  with different senders are zero
-            let mut total_token_for_a_coin_different_sender = 0u64;
             let mut sender_vec_2 = Self::deposit_sender_list((who.clone(),coin_type));
-            sender_vec_2.iter().enumerate().for_each(|(i,v)|{
-                total_token_for_a_coin_different_sender = total_token_for_a_coin_different_sender
-                    +Self::deposit_free_token((who.clone(),v.clone(),coin_type))
-                    + Self::deposit_otc_token((who.clone(),v.clone(),coin_type))
-                    + Self::deposit_withdraw_token((who.clone(),v.clone(),coin_type));
-            });
-            // it means that the coin type is empty
-            if total_token_for_a_coin_different_sender == 0 {
+                 if sender_vec_2.is_empty(){
                 // delete the coin_type
                 let mut coin_type_vec = Self::deposit_account_coin_list(who.clone());
+                if coin_type_vec.iter().find(|&t| t == &coin_type).is_none(){ /* not happen */ }else{
                 let mut mark = 0usize;
                 coin_type_vec.iter().enumerate().for_each(|(i,&v)|{
                     if v == coin_type{ mark = i ;}
                 });
                 coin_type_vec.remove(mark);
                 <DepositAccountCoinList<T>>::insert(who.clone(),coin_type_vec);
+                }
             }else{ return; }
             // if all coin type is delete , the accout will be removed.
             let who_coin_type_vec = Self::deposit_account_coin_list(who.clone());
             if who_coin_type_vec.is_empty(){
                 // delete the accountid
                 let mut accountid_vec = Self::deposit_ladder_account_list();
+                if accountid_vec.iter().find(|&t| t == &who).is_none(){ /* not happen */ }else{
                 let mut mark = 0usize;
                 accountid_vec.iter().enumerate().for_each(|(i,v)|{
-                    if *v == who.clone(){ mark = i ;}
+                    if *v == who.clone(){  mark = i ;}
                 });
                 accountid_vec.remove(mark);
                 <DepositLadderAccountList<T>>::put(accountid_vec);
+                }
             }else{ return;}
             return;
         }
@@ -1265,6 +1273,7 @@ mod tests {
                        ,100000000000);
         });
     }
+
     #[test]
     fn new_test() {
         with_externalities(&mut new_test_ext(), || {
