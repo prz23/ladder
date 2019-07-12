@@ -794,14 +794,17 @@ impl<T: Trait> Module<T>
     pub fn buy_operate(buyer:T::AccountId,seller:T::AccountId, type_share:u64,
                        type_money:u64 ,price:u64 ,amount:u64, sell_res:bool, buy_res:bool ,
                        sellsender:Vec<u8>, sellrevicer:Vec<u8>, buyersender:Vec<u8>, buyerreciver:Vec<u8>) -> Result{
+        let token_needed_105 = amount as f64 * price as f64;
+        let token_needed = token_needed_105/ <order::Module<T>>::price_exchange_rate() as f64;
+
         // Deducting the amount locked in by the seller and transferring the buyer's money.
         // unlock the reserved token anyway
         Self::modify_token(seller.clone(),sellsender.clone(),type_share,amount,TokenType::OTC,false)?;
         if sell_res {
-            Self::modify_token(seller.clone(),sellrevicer.clone(),type_money,amount * price,TokenType::Free,true)?;
+            Self::modify_token(seller.clone(),sellrevicer.clone(),type_money,token_needed as u64,TokenType::Free,true)?;
         }
         // At the same time deduct the buyer's money anyway
-        Self::modify_token(buyer.clone(),buyersender.clone(),type_money,amount * price,TokenType::Free,false)?;
+        Self::modify_token(buyer.clone(),buyersender.clone(),type_money,token_needed as u64,TokenType::Free,false)?;
         if buy_res {
             Self::modify_token(buyer.clone(),buyerreciver.clone(),type_share,amount,TokenType::Free,true)?;
         }

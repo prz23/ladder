@@ -107,6 +107,7 @@ decl_storage! {
         // orderpair --> unique index  Valid
         pub ValidOrderIndexByOrderpair get(valid_order_index_by_orderpair) : map OrderPair => Vec<u128>;
 
+        PriceExchangeRate get(price_exchange_rate) : u64 = 10000;
      }
 }
 
@@ -178,6 +179,11 @@ impl<T: Trait> Module<T> {
         return (tag_u64,bill_u64,from,from_bond,to,to_bond,value_u64,reserved_u64);
     }
     */
+
+    pub fn exchange_price() -> f64 {
+        Self::price_exchange_rate() as f64
+    }
+
     pub fn init_basic_pair(){
         let mut pair_list: Vec<OrderPair> = <OrderPairList<T>>::get();
         pair_list.push(OrderPair{share:1,money:2});

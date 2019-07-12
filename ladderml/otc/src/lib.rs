@@ -161,7 +161,9 @@ impl<T: Trait> Module<T> {
         //bank---->pair.share  money enough?
 
         let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),sellorder.pair.money));
-        if free_token < amount*sell_order.price {
+        let token_needed_105 = amount as f64 *sell_order.price as f64;
+        let token_needed = token_needed_105/ <order::Module<T>>::price_exchange_rate() as f64;
+        if (free_token as f64) < token_needed  {
             return Err("not_enough_money_error ");
         }
         Ok(())
