@@ -107,7 +107,7 @@ decl_storage! {
         // orderpair --> unique index  Valid
         pub ValidOrderIndexByOrderpair get(valid_order_index_by_orderpair) : map OrderPair => Vec<u128>;
 
-        PriceExchangeRate get(price_exchange_rate) : u64 = 10000;
+        PriceExchangeRate get(price_exchange_rate) : u64 = 100000;
      }
 }
 
