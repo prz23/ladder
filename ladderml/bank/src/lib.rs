@@ -62,10 +62,6 @@ decl_module! {
         pub fn deposit(origin, message: Vec<u8>, signature: Vec<u8>) -> Result {
             let sender = ensure_signed(origin)?;
 
-  /*  TODO::make sure the message is recevied from the validators!!!!!!!
-            let validators = <session::Module<T>>::validators();
-            ensure!(validators.contains(&sender),"Not validator");  */
-
             if message.len() != 124 { return Err("Message Invalid Length");}
             // Parsing data
             let (tx_hash, who, amount, signature_hash, coin_type, sendervec) = Self::split_message(message.clone(),signature);

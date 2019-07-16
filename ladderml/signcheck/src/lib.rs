@@ -120,8 +120,11 @@ impl<T: Trait> Module<T> {
         <session::Module<T>>::validators().contains(&who)
     }
 
-    pub fn is_sessionkey(who: T::SessionKey) -> bool{
-        <consensus::Module<T>>::authorities().contains(&who)
+    pub fn is_sessionkey(who: T::SessionKey) -> Result {
+        if <consensus::Module<T>>::authorities().contains(&who) {
+            return Ok(());
+        }
+        return Err("Not SessionKey");
     }
 
     /// determine if the current number of signatures is sufficient to send an event
@@ -129,6 +132,11 @@ impl<T: Trait> Module<T> {
 
         let sender = who;
 
+        let session_key: T::SessionKey = Decode::decode(&mut &sender.encode()[..]).unwrap();
+
+        Self::is_sessionkey(session_key)?;
+
+        // let s: T::SessionKey = Decode::decode(&mut sender.encode()).unwrap();
         // Query whether a transaction already exists
         if !<NumberOfSignedContract<T>>::exists(transcation) {
             <NumberOfSignedContract<T>>::insert(&transcation,0);
