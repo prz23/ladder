@@ -302,7 +302,7 @@ impl<T: Trait> Module<T> {
         //MatchOrder(id, price, seller, saleAmount, reserved, buyer, purchasingAmount, reserved);
         Self::deposit_event(RawEvent::MatchOrder(sell_order.longindex,sell_order.price,sell_order.who.clone(),
                                                  sell_order.acc.clone(),sell_order.acc2.clone(),amount,sell_order.reserved(),sell_order.pair.share,
-                                                 buyer.clone(),acc,acc2,sell_order.token_needed as u64,reserved,sell_order.pair.money));
+                                                 buyer.clone(),acc,acc2,token_needed as u64,reserved,sell_order.pair.money));
         Self::deposit_event(RawEvent::Buy(buyer.clone(),sell_order.who.clone(),sell_order.pair.clone(),
                                           sell_order.index, amount, sell_order.longindex,reserved));
         Ok(())

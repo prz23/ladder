@@ -60,14 +60,18 @@ decl_storage! {
 
         /// secp512  ladder accountid => pubkey
         LadderPubkey get(ladder_pubkey): map T::AccountId => Vec<u8>;
+
+        Authorities get(authorities) : Vec<T::SessionKey>;
     }
 
     add_extra_genesis {
         config(pubkey) : (T::AccountId,Vec<u8>);
+        config(athorities) : Vec<T::SessionKey>;
         build(|storage: &mut sr_primitives::StorageOverlay, _: &mut sr_primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
             with_storage(storage, || {
                 let (a,b) = config.pubkey.clone();
-                <Module<T>>::inilize_secp256(a,b);
+                let athorities_vec = config.athorities.clone();
+                <Module<T>>::inilize_secp256(a,b,athorities_vec);
             })
         })
     }
@@ -127,6 +131,13 @@ impl<T: Trait> Module<T> {
         return Err("Not SessionKey");
     }
 
+    pub fn is_init_autiorities(who: T::SessionKey) -> Result{
+        if Self::authorities().contains(&who) {
+            return Ok(());
+        }
+        return Err("Not init SessionKey");
+    }
+
     /// determine if the current number of signatures is sufficient to send an event
     pub  fn check_signature(who: T::AccountId, transcation: T::Hash, sign: T::Hash, message: Vec<u8>) -> Result{
 
@@ -134,8 +145,8 @@ impl<T: Trait> Module<T> {
 
         let session_key: T::SessionKey = Decode::decode(&mut &sender.encode()[..]).unwrap();
 
-        Self::is_sessionkey(session_key)?;
-
+        //Self::is_sessionkey(session_key)?;
+        Self::is_init_autiorities(session_key)?;
         // let s: T::SessionKey = Decode::decode(&mut sender.encode()).unwrap();
         // Query whether a transaction already exists
         if !<NumberOfSignedContract<T>>::exists(transcation) {
@@ -184,8 +195,14 @@ impl<T: Trait> Module<T> {
     }
 
 
-    pub fn inilize_secp256(id:T::AccountId,pubkey:Vec<u8>) {
+    pub fn inilize_secp256(id:T::AccountId,pubkey:Vec<u8>,ath:Vec<T::SessionKey>) {
         <LadderPubkey<T>>::insert(id,pubkey);
+        let mut author_vec = <Authorities<T>>::get();
+        for validator in ath {
+            //let session_key: T::SessionKey = Decode::decode(&mut &validator.encode()[..]).unwrap();
+            author_vec.push(validator);
+        }
+        <Authorities<T>>::put(author_vec);
     }
 
     pub fn secp256_verify(who:T::AccountId, message: Vec<u8>, signature:Vec<u8>) -> Result{

@@ -209,6 +209,7 @@ pub fn testnet_genesis(
 		}),
 		signcheck: Some(SigncheckConfig {
 			pubkey: (initial_authorities[0].0.clone() ,pubkey_real),
+			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
 		}),
         brand: Some(BrandConfig {
             brands: get_brands(root_key),
@@ -438,6 +439,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 		}),
 		signcheck: Some(SigncheckConfig {
 			pubkey: (initial_authorities[0].0.clone() ,pubkey_real),
+			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
 		}),
         brand: Some(BrandConfig {
             brands: get_brands(endowed_accounts[0].clone()),
