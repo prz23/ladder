@@ -95,6 +95,15 @@ pub fn testnet_genesis(
 
 	let pubkey_real : Vec<u8>= [181, 159, 233, 133, 253, 60, 0, 222, 56, 170, 16, 148, 215, 168, 163, 73, 20, 119, 29, 2, 90, 128, 56, 35, 133, 2, 208, 126, 139, 64, 72, 172, 154, 251, 104, 210, 44, 119, 55, 105, 33, 160, 86, 207, 65, 246, 246, 89, 244, 247, 15, 155, 7, 210, 136, 127, 254, 59, 147, 98, 213, 112, 112, 182].to_vec();
 
+	let pubkey_vec = vec![[4u8].to_vec()];
+	let init_auth = initial_authorities.clone();
+	let mut bond_pubkey_vec : Vec<(AccountId,Vec<u8>)> = vec![];
+	let mut i = 0usize;
+	for (v,_,_) in init_auth{
+		bond_pubkey_vec.push((v,pubkey_vec[i].clone()));
+		i = i + 1;
+	}
+
 	const STASH: u128 = 1 << 20;
     const ENDOWMENT: u128 = 1 << 20;
 
@@ -208,7 +217,7 @@ pub fn testnet_genesis(
 			total:0 ,
 		}),
 		signcheck: Some(SigncheckConfig {
-			pubkey: (initial_authorities[0].0.clone() ,pubkey_real),
+			pubkey: bond_pubkey_vec.clone(),
 			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
 		}),
         brand: Some(BrandConfig {
@@ -307,6 +316,16 @@ fn ladder_testnet_genesis() -> GenesisConfig {
                 .unchecked_into(), // 5G5FgS2DvWpFTW4pjNL4ugzUYMwEPRuoiWWVX1sE3U49T293
         ),
     ];
+
+
+	let pubkey_vec = vec![[4u8].to_vec()];
+	let init_auth = initial_authorities.clone();
+	let mut bond_pubkey_vec : Vec<(AccountId,Vec<u8>)> = vec![];
+	let mut i = 0usize;
+	for (v,_,_) in init_auth{
+		bond_pubkey_vec.push((v,pubkey_vec[i].clone()));
+		i = i + 1;
+	}
 
     // root account.
     let endowed_accounts: Vec<AccountId> = vec![
@@ -438,7 +457,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			total:0 ,
 		}),
 		signcheck: Some(SigncheckConfig {
-			pubkey: (initial_authorities[0].0.clone() ,pubkey_real),
+			pubkey: bond_pubkey_vec.clone(),
 			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
 		}),
         brand: Some(BrandConfig {

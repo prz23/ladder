@@ -65,13 +65,13 @@ decl_storage! {
     }
 
     add_extra_genesis {
-        config(pubkey) : (T::AccountId,Vec<u8>);
+        config(pubkey) : Vec<(T::AccountId,Vec<u8>)>;
         config(athorities) : Vec<T::SessionKey>;
         build(|storage: &mut sr_primitives::StorageOverlay, _: &mut sr_primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
             with_storage(storage, || {
-                let (a,b) = config.pubkey.clone();
+                let pubkey_vec = config.pubkey.clone();
                 let athorities_vec = config.athorities.clone();
-                <Module<T>>::inilize_secp256(a,b,athorities_vec);
+                <Module<T>>::inilize_secp256(pubkey_vec,athorities_vec);
             })
         })
     }
@@ -195,8 +195,11 @@ impl<T: Trait> Module<T> {
     }
 
 
-    pub fn inilize_secp256(id:T::AccountId,pubkey:Vec<u8>,ath:Vec<T::SessionKey>) {
-        <LadderPubkey<T>>::insert(id,pubkey);
+    pub fn inilize_secp256( pubkey_vec :Vec<(T::AccountId,Vec<u8>)> ,ath:Vec<T::SessionKey>) {
+        pubkey_vec.iter().enumerate().for_each(|(i,(id,pubkey))|{
+            <LadderPubkey<T>>::insert(id,pubkey);
+        });
+
         let mut author_vec = <Authorities<T>>::get();
         for validator in ath {
             //let session_key: T::SessionKey = Decode::decode(&mut &validator.encode()[..]).unwrap();
