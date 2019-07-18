@@ -171,8 +171,7 @@ decl_module! {
             // calculate the reward of who's all cointype and outside address
             Self::iterator_all_token_for_who(who.clone(),|coin_type,sender|{
                 reward = reward + Self::deposit_reward_token((who.clone(),sender.clone(),coin_type));
-                <DepositRewardToken<T>>::insert((who.clone(),sender.clone(),coin_type),0);
-                //Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Reward,false)?;
+                Self::take_out_reward_token(who.clone(),sender.clone(),coin_type)?;
                 Ok(())
             });
 
@@ -962,9 +961,9 @@ impl<T: Trait> Module<T>
         Ok(())
     }
 
-    pub fn take_out_reward_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
-        <DepositRewardToken<T>>::insert((who.clone(),sender.clone(),coin_type),current_token);
-        Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Reward,false)?;
+    pub fn take_out_reward_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> Result {
+        let remove_amount = Self::deposit_reward_token((who.clone(),sender.clone(),coin_type));
+        Self::modify_token(who.clone(),sender.clone(),coin_type,remove_amount,TokenType::Reward,false)?;
         Ok(())
     }
 
