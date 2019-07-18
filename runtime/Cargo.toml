@@ -70,6 +70,12 @@ default_features = false
 path = '../ladderml/order'
 package = 'ladder-order'
 
+[dependencies.statistics]
+default_features = false
+path = '../ladderml/statistics'
+package = 'ladder-statistics'
+
+
 [features]
 default = ["std"]
 core = [
@@ -115,4 +121,5 @@ std = [
     "otc/std",
     "erc/std",
     "order/std",
+    "statistics/std",
 ]

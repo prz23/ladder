@@ -56,6 +56,7 @@ pub use exchange::Call as ExchangeCall;
 pub use erc::Call as ErcCall;
 pub use otc::Call as OtcCall;
 pub use order::Call as OrderCall;
+pub use statistics::Call as StaCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use support::StorageValue;
 pub use staking::StakerStatus;
@@ -251,6 +252,10 @@ impl order::Trait for Runtime {
 	type Event = Event;
 }
 
+impl statistics::Trait for Runtime {
+	type Event = Event;
+}
+
 impl erc::Trait for Runtime {
 	type Event = Event;
 	type Currency =  Balances;
@@ -288,6 +293,7 @@ construct_runtime!(
 		Otc: otc::{Module,Call,Storage,Event<T>},
 		Erc: erc::{Module,Call,Storage,Config<T>,Event<T>},
 		Order: order::{Module,Call,Storage,Event<T>},
+		Statistics: statistics::{Module,Call,Storage,Event<T>},
 	}
 );
 
