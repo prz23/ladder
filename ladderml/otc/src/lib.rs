@@ -92,7 +92,7 @@ decl_module! {
             // find  the order
             if let Some(mut sellorder) = <order::Module<T>>::sell_order_of((sender.clone(),pair_type,index)){
                 // cancel the sell order and unlock the share not deal yet
-                Self::cancel_order_operate(sender.clone(),sellorder)?;
+                Self::cancel_order_operate(&sender,sellorder)?;
             }else{
                 return Err("invalid sell order");
             }
@@ -105,7 +105,7 @@ decl_module! {
             // find  the order
             if let Some(mut sellorder) = <order::Module<T>>::all_sell_orders(index){
                 // cancel the sell order and unlock the share not deal yet
-                Self::cancel_order_operate(sender.clone(),sellorder)?;
+                Self::cancel_order_operate(&sender,sellorder)?;
             }else{
                 return Err("invalid sell order");
             }
@@ -145,7 +145,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    fn check_enough_token(who:T::AccountId,acc:Vec<u8>,cointype:u64,amount:u64) -> Result{
+    fn check_enough_token(who:&T::AccountId,acc:Vec<u8>,cointype:u64,amount:u64) -> Result{
         let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),cointype));
         if free_token < amount {
             return Err("not_enough_money_error ");
@@ -174,7 +174,7 @@ impl<T: Trait> Module<T> {
         <order::Module<T>>::generate_new_sell_order_and_put_into_list(who.clone(),pair_type.clone(),amount,per_price,
                                                                       reserved,acc.clone(),acc2.clone());
         // lock the specific kingd of money of amount in bank Module
-        <bank::Module<T>>::lock_token(who.clone(),acc.clone(),pair_type.share,amount,bank::TokenType::OTC);
+        <bank::Module<T>>::lock_token(&who,acc.clone(),pair_type.share,amount,bank::TokenType::OTC);
     }
 
     // buy operate , lock the money and change the status
@@ -194,14 +194,14 @@ impl<T: Trait> Module<T> {
     }
 
     /// cancel the sell order
-    pub fn cancel_order_operate(who:T::AccountId,mut sell_order:OrderT<T>) -> Result{
+    pub fn cancel_order_operate(who:&T::AccountId,mut sell_order:OrderT<T>) -> Result{
 
-        match <order::Module<T>>::cancel_order_operate(who.clone(),&mut sell_order){
+        match <order::Module<T>>::cancel_order_operate(&who,&mut sell_order){
             Err("Has been cancelled")  => return Ok(()),
             Ok(()) => {
                 // unlock the left share of seller
                 let left_shares = sell_order.amount - sell_order.already_deal;
-                <bank::Module<T>>::unlock_token(who.clone(),sell_order.acc,sell_order.pair.share,
+                <bank::Module<T>>::unlock_token(&who,sell_order.acc,sell_order.pair.share,
                                                 left_shares,bank::TokenType::OTC);
             },
             _ => return Err("unknown err"),
@@ -216,17 +216,18 @@ impl<T: Trait> Module<T> {
         if amount > sell_order.amount {
             //
             let increment_amount = amount - sell_order.amount;
-            Self::check_enough_token(seller.clone(),sell_order.acc.clone(),sell_order.pair.share,increment_amount)?;
-            <bank::Module<T>>::lock_token(seller.clone(),sell_order.acc.clone(),sell_order.pair.share,increment_amount,bank::TokenType::OTC);
+            Self::check_enough_token(&seller,sell_order.acc.clone(),sell_order.pair.share,increment_amount)?;
+            <bank::Module<T>>::lock_token(&seller,sell_order.acc.clone(),sell_order.pair.share,increment_amount,bank::TokenType::OTC);
         }else {
             if amount <= sell_order.already_deal {return Err("Cant smaller than already dealed amount.");}
             //
             let decrease_amount = sell_order.amount - amount;
-            <bank::Module<T>>::unlock_token(seller.clone(),sell_order.acc.clone(),sell_order.pair.share,decrease_amount,bank::TokenType::OTC);
+            <bank::Module<T>>::unlock_token(&seller,sell_order.acc.clone(),sell_order.pair.share,decrease_amount,bank::TokenType::OTC);
         }
-        <order::Module<T>>::alert_order_operate(sell_order.clone(),amount);
+        <order::Module<T>>::alert_order_operate(sell_order,amount);
         Ok(())
     }
+
 }
 
 

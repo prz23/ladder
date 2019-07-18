@@ -309,7 +309,7 @@ impl<T: Trait> Module<T> {
     }
 
     /// cancel the sell order
-    pub fn cancel_order_operate(who:T::AccountId,mut sell_order:&mut OrderT<T>) -> Result{
+    pub fn cancel_order_operate(who: &T::AccountId,mut sell_order:&mut OrderT<T>) -> Result{
         // if the order is in Done status ,return directly
         if sell_order.status == OtcStatus::Done { return Err("Has been cancelled") ;}
 
@@ -336,16 +336,16 @@ impl<T: Trait> Module<T> {
         <ValidOrderIndexByOrderpair<T>>::insert(sell_order.pair.clone(),vec);
     }
 
-    pub fn alert_order_operate( sell_order: OrderT<T>,new_amount: u64) {
+    pub fn alert_order_operate(sell_order: OrderT<T>,new_amount: u64) {
         let mut sellorder = sell_order.clone();
         sellorder.amount = new_amount;
         // update the modified sell order
-        <SellOrdersOf<T>>::insert((sell_order.who.clone(),sell_order.pair.clone(),sell_order.index.clone()),
-                                  sell_order.clone());
-        <AllSellOrders<T>>::insert(sell_order.longindex,sell_order.clone());
+        <SellOrdersOf<T>>::insert((sellorder.who.clone(),sellorder.pair.clone(),sellorder.index.clone()),
+                                  sellorder.clone());
+        <AllSellOrders<T>>::insert(sellorder.longindex,sellorder.clone());
 
         // deposit_event
-        Self::deposit_event(RawEvent::AlertOrder(sell_order.longindex,sell_order.who,sell_order.amount,sell_order.pair.share));
+        Self::deposit_event(RawEvent::AlertOrder(sellorder.longindex,sellorder.who,sellorder.amount,sellorder.pair.share));
     }
 
     pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64,acc:Vec<u8>){

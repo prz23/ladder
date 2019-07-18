@@ -859,7 +859,7 @@ impl<T: Trait> Module<T>
         // if free token is enough to withdraw , withdraw it.
         if free_token >= withdraw_amount {
             // free token is enough for the withdraw , do the lock/unlock operation
-            match Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
+            match Self::lock_token(&who,sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
                 Ok(()) =>   return T::Balance::sa(withdraw_amount),
                 Err(x) => return  T::Balance::sa(0),
             }
@@ -873,7 +873,7 @@ impl<T: Trait> Module<T>
             // TODO::this situation isn't supposed  to happen when free_token is zero.
             // in another word, when into this case ,  the free_token must not be zero.
             // so the free token is reachable.
-            match Self::lock_token(who.clone(),sender.clone(),cointype,free_token,TokenType::WithDraw){
+            match Self::lock_token(&who,sender.clone(),cointype,free_token,TokenType::WithDraw){
                 Ok(()) =>  return T::Balance::sa(free_token),
                 Err(x) => return  T::Balance::sa(0),
             }
@@ -883,20 +883,20 @@ impl<T: Trait> Module<T>
             // if success canceled , Then turn (amount_on_sale) from OTC_lock into free
             // in this case , if the free token is zero , the unlock will init the data
             // else , business as usual
-            Self::unlock_token(who.clone(),sender.clone(),cointype,amount_on_sale,TokenType::OTC);
+            Self::unlock_token(&who,sender.clone(),cointype,amount_on_sale,TokenType::OTC);
             // retrieve the updated free token  notice that [ new_free_amount = amount_on_sale + free_token ]
             let new_free_amount = Self::free_token_for_specific_coin(who.clone(),sender.clone(),cointype);
             // lock the The Optimum Range of Lockable token
             if new_free_amount >= withdraw_amount{
                 // free token is sufficient,  Then turn (withdraw_amount) from free into Withdraw_lock
-                match  Self::lock_token(who.clone(),sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
+                match  Self::lock_token(&who,sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
                     Ok(()) =>  return T::Balance::sa(withdraw_amount),
                     Err(x) => return T::Balance::sa(0),
                 }
             }else {
                 //TODO::this situation is supposed not to happen
                 // free token is not sufficient,  Then turn all(new_free_amount) from free into Withdraw_lock
-                match Self::lock_token(who.clone(),sender.clone(),cointype,new_free_amount,TokenType::WithDraw){
+                match Self::lock_token(&who,sender.clone(),cointype,new_free_amount,TokenType::WithDraw){
                     Ok(()) => return T::Balance::sa(new_free_amount),
                     Err(x) => return T::Balance::sa(0),
                 }
@@ -944,19 +944,19 @@ impl<T: Trait> Module<T>
     }
 
     ///  free -> otc/withdraw
-    pub fn lock_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64,token_type:TokenType) -> Result{
+    pub fn lock_token(who:&T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64,token_type:TokenType) -> Result{
         Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Free,false)?;
         Self::modify_token(who.clone(),sender.clone(),coin_type,amount,token_type,true)?;
         Ok(())
     }
     ///  otc/withdraw -> free
-    pub fn unlock_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64,token_type:TokenType) -> Result{
+    pub fn unlock_token(who:&T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64,token_type:TokenType) -> Result{
         Self::modify_token(who.clone(),sender.clone(),coin_type,amount,token_type,false)?;
         Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Free,true)?;
         Ok(())
     }
     /// reward functions
-    pub fn reward_token(who:T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
+    pub fn reward_token(who:&T::AccountId,sender:Vec<u8>,coin_type:u64,amount:u64) -> Result {
         Self::modify_token(who.clone(),sender.clone(),coin_type,amount,TokenType::Reward,true)?;
         Ok(())
     }
@@ -981,15 +981,15 @@ impl<T: Trait> Module<T>
     }
 
     pub fn iterator_all_token<F>(mut func: F) -> Result
-        where F: FnMut(T::AccountId,u64,Vec<u8>) -> Result
+        where F: FnMut(&T::AccountId,u64,Vec<u8>) -> Result
     {
         let all_deposit_account = Self::deposit_ladder_account_list();
         all_deposit_account.iter().enumerate().for_each(|(ia,accountid)|{
-            let accountid_coin_vec = Self::deposit_account_coin_list(accountid.clone());
+            let accountid_coin_vec = Self::deposit_account_coin_list(accountid);
             accountid_coin_vec.iter().enumerate().for_each(|(ib,&coin_type)|{
                 let sender_vec = Self::deposit_sender_list((accountid.clone(),coin_type));
                 sender_vec.iter().enumerate().for_each(|(ic,sender)|{
-                    func(accountid.clone(),coin_type,sender.to_vec());
+                    func(accountid,coin_type,sender.to_vec());
                 });
             });
         });
@@ -1009,15 +1009,15 @@ impl<T: Trait> Module<T>
             + Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
     }
 
-    pub fn total_token_for_specific_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64{
+    pub fn total_token_for_specific_coin(who:&T::AccountId,sender:&Vec<u8>,coin_type:u64) -> u64{
         Self::deposit_free_token((who.clone(),sender.clone(),coin_type))
             + Self::deposit_otc_token((who.clone(),sender.clone(),coin_type))
             + Self::deposit_withdraw_token((who.clone(),sender.clone(),coin_type))
     }
     pub fn calculate_reward_and_reward(){
         Self::iterator_all_token(|accountid,coin_type,sender|{
-            let total_token_for_this_coin = Self::total_token_for_specific_coin(accountid.clone(),sender.clone(),coin_type);
-            Self::reward_token(accountid.clone(),sender.clone(),coin_type,Self::reward_calcul(total_token_for_this_coin));
+            let total_token_for_this_coin = Self::total_token_for_specific_coin(&accountid,&sender,coin_type);
+            Self::reward_token(&accountid,sender.clone(),coin_type,Self::reward_calcul(total_token_for_this_coin));
             Ok(())
         });
     }
@@ -1025,7 +1025,7 @@ impl<T: Trait> Module<T>
     /// Modify the 3 auxiliary vectors of the 4 Main Storage maps
     pub fn modify_the_vec(who:T::AccountId,coin_type:u64,sender:Vec<u8>){
         // first, deposit some token , it wont do the delete , there must be some token in Main Storage maps
-        if Self::total_token_for_specific_coin(who.clone(),sender.clone(),coin_type) == 0 {
+        if Self::total_token_for_specific_coin(&who,&sender,coin_type) == 0 {
             // when some token was fully deleted , need to delete the relate content in the support vector .
             // first,  delete the outside address
             let mut sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
@@ -1050,11 +1050,11 @@ impl<T: Trait> Module<T>
                     if v == coin_type{ mark = i ;}
                 });
                 coin_type_vec.remove(mark);
-                <DepositAccountCoinList<T>>::insert(who.clone(),coin_type_vec);
+                <DepositAccountCoinList<T>>::insert(&who,coin_type_vec);
                 }
             }else{ return; }
             // if all coin type is delete , the accout will be removed.
-            let who_coin_type_vec = Self::deposit_account_coin_list(who.clone());
+            let who_coin_type_vec = Self::deposit_account_coin_list(&who);
             if who_coin_type_vec.is_empty(){
                 // delete the accountid
                 let mut accountid_vec = Self::deposit_ladder_account_list();
@@ -1083,7 +1083,7 @@ impl<T: Trait> Module<T>
         if coin_type_vec.iter().find(|&t| t == &coin_type).is_none(){
             // none , add it
             coin_type_vec.push(coin_type);
-            <DepositAccountCoinList<T>>::insert(who.clone(),coin_type_vec);
+            <DepositAccountCoinList<T>>::insert(&who,coin_type_vec);
         }else{
             // do nothing ,skip
         }
@@ -1282,7 +1282,7 @@ mod tests {
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),1000000000);
 
             // lock to otc
-            assert_ok!(Bank::lock_token(1,sender.clone(),2,1000,TokenType::OTC));
+            assert_ok!(Bank::lock_token(&1,sender.clone(),2,1000,TokenType::OTC));
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),999999000);
             assert_eq!(Bank::deposit_otc_token((1,sender.clone(),2)),1000);
 
@@ -1295,7 +1295,7 @@ mod tests {
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),999999000);
 
             // unlock to free
-            assert_ok!(Bank::unlock_token(1,sender.clone(),2,1000,TokenType::OTC));
+            assert_ok!(Bank::unlock_token(&1,sender.clone(),2,1000,TokenType::OTC));
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),1000000000);
             assert_eq!(Bank::deposit_otc_token((1,sender.clone(),2)),0);
 
