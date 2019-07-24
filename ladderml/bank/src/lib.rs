@@ -85,7 +85,7 @@ decl_module! {
         }
 
         /// Take the initiative to receive awards
-        pub fn draw_reward_all(origin) -> Result {
+        pub fn draw_reward_uesless(origin) -> Result {
              let sender = ensure_signed(origin)?;
 
              ensure!(!Self::despositing_account().iter().find(|&t| t == &sender).is_none(), "Cannot draw if not depositing.");
@@ -175,11 +175,15 @@ decl_module! {
                 Ok(())
             });
 
+             <RewardRecord<T>>::insert(&who,T::Balance::sa(0));
+
             let new_balance = <BalanceOf<T> as As<u64>>::sa(reward);
-            match T::Currency::deposit_into_existing(&who, new_balance){
+            T::Currency::deposit_creating(&who, new_balance);
+            Ok(())
+        /*    match T::Currency::deposit_creating(&who, new_balance){
                  Err(x) => Err(x),
                  _ => Ok(()),
-             }
+             }*/
         }
 
         pub fn request(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
@@ -459,7 +463,7 @@ impl<T: Trait> Module<T>
 
         // 1. Reward directly to account 2. Click to get reward
         match Self::enable_record() {
-            true => {Self::reward_deposit_record();
+            true => { //Self::reward_deposit_record();
                      Self::calculate_reward_and_reward();},
             _ =>  Self::reward_deposit(),
         }
@@ -917,10 +921,13 @@ impl<T: Trait> Module<T>
             TokenType::Reward => Self::deposit_reward_token((who.clone(),sender.clone(),coin_type)),
         };
         if plus_or_minus {
-            current_token = current_token + amount;
+            //current_token = current_token + amount;
+            current_token = current_token.checked_add(amount)
+                .ok_or_else(|| "account has too much funds")?;
         }else {
             if  current_token < amount{ return Err("insufficient token"); }
-            current_token = current_token - amount;
+            current_token = current_token.checked_sub(amount)
+                .ok_or_else(|| "account has too few funds")?;
         }
         match token_type {
             TokenType::Free => <DepositFreeToken<T>>::insert((who.clone(),sender.clone(),coin_type),current_token),
@@ -1017,7 +1024,9 @@ impl<T: Trait> Module<T>
     pub fn calculate_reward_and_reward(){
         Self::iterator_all_token(|accountid,coin_type,sender|{
             let total_token_for_this_coin = Self::total_token_for_specific_coin(&accountid,&sender,coin_type);
-            Self::reward_token(&accountid,sender.clone(),coin_type,Self::reward_calcul(total_token_for_this_coin));
+            let reward = Self::reward_calcul(total_token_for_this_coin);
+            Self::reward_token(&accountid,sender.clone(),coin_type,reward);
+            <RewardRecord<T>>::mutate(accountid,|bal| *bal = *bal+ T::Balance::sa(reward) );
             Ok(())
         });
     }
@@ -1099,6 +1108,12 @@ impl<T: Trait> Module<T>
         // some amount of a new token was put into the map  and  the corresponding support vector is modified.
     }
     /*------------new---------------*/
+
+    //
+    pub fn deposit_reward(who:T::AccountId , amount:u64){
+        let new_balance = <BalanceOf<T> as As<u64>>::sa(amount);
+        T::Currency::deposit_into_existing(&who, new_balance).ok();
+    }
 }
 
 
@@ -1312,6 +1327,19 @@ mod tests {
             println!("request {}",Bank::withdraw_request(1,500000,2,sender.clone()));
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),999500000);
             assert_eq!(Bank::deposit_withdraw_token((1,sender.clone(),2)),500000);
+
+            //iter test
+            Bank::calculate_reward_and_reward();  //300000
+            assert_eq!(Bank::reward_record(1),300000);
+            Bank::calculate_reward_and_reward();
+            assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),400000);
+            assert_eq!(Bank::reward_record(1),400000);
+
+            assert_ok!(Bank::draw_reward(Some(1).into()));
+
+            assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),0);
+            assert_eq!(Bank::reward_record(1),0);
+
         });
     }
 

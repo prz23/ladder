@@ -36,7 +36,7 @@ decl_event!(
 );
 
 decl_storage! {
-    trait Store for Module<T: Trait> as Exchange {
+    trait Store for Module<T: Trait> as Statistics {
         // each coin => amount of exchanged
         TradingVolumeTotal get(trading_volume_total): map u64 => u128;
 
@@ -55,6 +55,9 @@ decl_storage! {
         // time period (block)
         TimePeriod get(time_period) : u64 = 1000;
 
+       pub Data: double_map u64, twox_128(u64) => u64;
+
+       pub Data2 get(data2): linked_map u64 => Vec<u64>;
 
     }
 }
@@ -115,6 +118,9 @@ impl<T: Trait> Module<T> {
 
         Self::number_of_trading_person(seller,share);
         Self::number_of_trading_person(buyer,money);
+    }
+    pub fn clean_volum_and_number(){
+
     }
 
     pub fn calculate_a_b(who:&T::AccountId,coin_type:u64) -> (f64,f64){

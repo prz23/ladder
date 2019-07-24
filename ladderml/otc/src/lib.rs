@@ -6,7 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 use sr_primitives::traits::{As,CheckedAdd, CheckedSub, Hash, Verify, Zero};
 use support::{
     decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
-    StorageValue,
+    StorageValue,StorageList,
 };
 
 use system::ensure_signed;
@@ -43,8 +43,31 @@ decl_event!(
 
 decl_storage! {
     trait Store for Module<T: Trait> as Otc {
+                // each coin => amount of exchanged
+        TradingVolumeTotal get(trading_volume_total): map u64 => u128;
 
-     }
+        // (who,coin) => amount of exchanged
+        TradingVolumePerson get(trading_volume_person) : map (T::AccountId,u64) => u128;
+
+        // (who,coin) => amount of exchanged
+        TradingVolumePersonTemp get(trading_volume_person_temp) : map (T::AccountId,u64) => u128;
+
+        //
+        TransactionsQuantityTotal get(transactions_quantity_total) : map u64 => u64;
+
+        //
+        TransactionsQuantityPerson get(transactions_quantity_person) : map (T::AccountId,u64) => u64;
+
+        //
+        TransactionsQuantityPersonTemp get(transactions_quantity_person_temp) : map (T::AccountId,u64) => u64;
+        //
+        PeriodicHoldings get(periodic_holdings) : map (T::AccountId,u64) => u128;
+
+        //
+        AllConinType get(all_coin_type) : Vec<u64>;
+        // support vec Vec<AccountId> record all buyer seller
+        Participant get(participant) : Vec<(T::AccountId,u64)>;
+    }
 }
 
 decl_module! {
@@ -158,14 +181,13 @@ impl<T: Trait> Module<T> {
         let mut sell_order = sellorder.clone();
         <order::Module<T>>::check_valid_buy(who.clone(),amount,&mut sell_order)?;
 
-        //bank---->pair.share  money enough?
-
         let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),sellorder.pair.money));
-        let token_needed_105 = amount as f64 *sell_order.price as f64;
-        let token_needed = token_needed_105/ <order::Module<T>>::price_exchange_rate() as f64;
+        let token_needed = Self::price_restoration(amount,sell_order.price.clone());
+
         if (free_token as f64) < token_needed  {
             return Err("not_enough_money_error ");
         }
+
         Ok(())
     }
 
@@ -190,7 +212,17 @@ impl<T: Trait> Module<T> {
                                        amount,sell_order.reserved(),reserved,
                                        sell_order.acc,sell_order.acc2,acc,acc2)?;
 
+        // every settlement , record the trade volum and number
+        Self::volum_and_number_rocord(&sell_order.who,sell_order.pair.share,&buyer,sell_order.pair.money.clone(),
+                                      amount,Self::price_restoration(amount,sell_order.price.clone())as u64);
         Ok(())
+    }
+
+    /// price_restoration / 10000
+    pub fn price_restoration(amount:u64,price:u64) -> f64{
+        let token_needed_105 = amount as f64 * price as f64;
+        let token_needed = token_needed_105/ <order::Module<T>>::price_exchange_rate() as f64;
+        token_needed
     }
 
     /// cancel the sell order
@@ -228,6 +260,72 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
+    /*-----------------record------------------*/
+    //Basic storage operations
+    ///increase amount of coin_type to the total volume record
+    pub fn increase_trading_volume_total(coin_type:u64, amount:u64) {
+        let new_volume = amount as u128 + Self::trading_volume_total(coin_type);
+        <TradingVolumeTotal<T>>::insert(coin_type,new_volume);
+    }
+
+    pub fn increase_trading_volume_person(who:&T::AccountId,coin_type:u64,amount:u64){
+        let new_volume = amount as u128 + Self::trading_volume_person((who.clone(),coin_type));
+        <TradingVolumePerson<T>>::insert((who.clone(),coin_type),new_volume);
+    }
+
+    pub fn number_of_trading_total(coin_type:u64){
+        let new_volume = 1u128 + Self::transactions_quantity_total(coin_type) as u128;
+        <TradingVolumeTotal<T>>::insert(coin_type,new_volume as u128);
+    }
+
+    pub fn number_of_trading_person(who:&T::AccountId,coin_type:u64){
+        let new_times = 1 + Self::transactions_quantity_person((who.clone(),coin_type));
+        <TransactionsQuantityPerson<T>>::insert((who.clone(),coin_type),new_times);
+    }
+
+    /// in OTC module , when order settle , record data , in bank each period of session clean the data
+    pub fn volum_and_number_rocord(seller:&T::AccountId, share:u64, buyer:&T::AccountId, money:u64, amount_s:u64, amount_b:u64){
+
+        if !Self::participant().contains(&(seller.clone(),share)){
+            // not exist , init it to zero
+            <TradingVolumePerson<T>>::insert((seller.clone(),share),0u128);
+            <TransactionsQuantityPerson<T>>::insert((seller.clone(),share),0u64);
+        }
+        if !Self::participant().contains(&(buyer.clone(),money)){
+            // not exist , init it to zero
+            <TradingVolumePerson<T>>::insert((buyer.clone(),money),0u128);
+            <TransactionsQuantityPerson<T>>::insert((buyer.clone(),money),0u64);
+        }
+
+        Self::increase_trading_volume_total(share,amount_s);
+        Self::increase_trading_volume_total(money,amount_b);
+
+        Self::increase_trading_volume_person(seller,share,amount_s);
+        Self::increase_trading_volume_person(buyer,money,amount_b);
+
+        Self::number_of_trading_total(share);
+        Self::number_of_trading_total(money);
+
+        Self::number_of_trading_person(seller,share);
+        Self::number_of_trading_person(buyer,money);
+
+        let mut buyersellervec = Self::participant();
+        if buyersellervec.contains(&(seller.clone(),money)) { }else { buyersellervec.push((seller.clone(),share)); <Participant<T>>::put(buyersellervec); }
+        let mut buyersellervec = Self::participant();
+        if buyersellervec.contains(&(buyer.clone(),money)) { }else { buyersellervec.push((buyer.clone(),money)); <Participant<T>>::put(buyersellervec); }
+    }
+
+    pub fn periodical_clean() {
+        // put a new empty vector into the Participant storage
+        <Participant<T>>::put([].to_vec() as Vec<(T::AccountId,u64)>);
+        // clear the total data using cointype
+        Self::all_coin_type().iter().enumerate().for_each(|(i,coin)|{
+            <TransactionsQuantityTotal<T>>::insert(coin,0u64);
+            <TradingVolumeTotal<T>>::insert(coin,0u128);
+        });
+        //clear cointype
+        <AllConinType<T>>::put([].to_vec() as Vec<u64>);
+    }
 }
 
 

@@ -75,6 +75,10 @@ default_features = false
 path = '../ladderml/statistics'
 package = 'ladder-statistics'
 
+[dependencies.ladsession]
+default_features = false
+path = '../ladderml/ladsession'
+package = 'ladder-ladsession'
 
 [features]
 default = ["std"]
@@ -122,4 +126,5 @@ std = [
     "erc/std",
     "order/std",
     "statistics/std",
+    "ladsession/std",
 ]
