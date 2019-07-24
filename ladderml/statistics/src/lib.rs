@@ -55,10 +55,6 @@ decl_storage! {
         // time period (block)
         TimePeriod get(time_period) : u64 = 1000;
 
-       pub Data: double_map u64, twox_128(u64) => u64;
-
-       pub Data2 get(data2): linked_map u64 => Vec<u64>;
-
     }
 }
 
