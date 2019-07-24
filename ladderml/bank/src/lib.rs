@@ -241,7 +241,8 @@ decl_storage! {
         DepositLadderAccountList get(deposit_ladder_account_list) : Vec<T::AccountId>;
         DepositAccountCoinList get(deposit_account_coin_list) : map T::AccountId => Vec<u64>;
         DepositSenderList get(deposit_sender_list) : map (T::AccountId,u64) => Vec<Vec<u8>>;
-
+        // statistic record
+        TotalTokenCoin get(total_token_coin) : map u64 => u128 ;  // coin => total
 
         /// accountid => (balance , type)
         DespositingBalance get(despositing_banance): map T::AccountId => Vec<(T::Balance,u64)>;
@@ -250,12 +251,6 @@ decl_storage! {
         DespositingBalanceReserved get(despositing_banance_reserved): map T::AccountId => Vec<(T::Balance,u64)>;
         /// Locked token for withdraw
         DespositingBalanceWithdraw get(despositing_banance_withdraw): map T::AccountId => Vec<(T::Balance,u64)>;
-
-        /// All the accounts with a desire to deposit.  to control one time one deposit.
-        IntentionsDespositVec  get(intentions_desposit_vec) :  Vec<T::AccountId>;
-        /// accountid => balance cointype
-        IntentionsDesposit  get(intentions_desposit): map T::AccountId => (T::Balance , u64);
-
 
         /// All the accounts with a desire to withdraw.  to control one time one deposit.
         IntentionsWithdrawVec  get(intentions_withdraw_vec): Vec<T::AccountId>;
@@ -1109,10 +1104,15 @@ impl<T: Trait> Module<T>
     }
     /*------------new---------------*/
 
-    //
-    pub fn deposit_reward(who:T::AccountId , amount:u64){
+    // send who the amount of balance
+    pub fn deposit_reward(who:&T::AccountId , amount:u64){
         let new_balance = <BalanceOf<T> as As<u64>>::sa(amount);
-        T::Currency::deposit_into_existing(&who, new_balance).ok();
+        T::Currency::deposit_creating(who, new_balance);
+    }
+
+    /// return one's deposit amount
+    pub fn deposit_amount_statics(){
+
     }
 }
 

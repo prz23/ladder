@@ -67,6 +67,9 @@ decl_storage! {
         AllConinType get(all_coin_type) : Vec<u64>;
         // support vec Vec<AccountId> record all buyer seller
         Participant get(participant) : Vec<(T::AccountId,u64)>;
+
+        //default exchangerate to lad  coin => rate*10000
+        ExchangeToLad get(exchange_to_lad) : map u64 => u64;
     }
 }
 
