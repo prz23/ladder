@@ -1292,6 +1292,7 @@ mod tests {
     fn new_test() {
         with_externalities(&mut new_test_ext(), || {
             let sender = [1,2].to_vec();
+            let sender2 = [3,4].to_vec();
             //deposit
             Bank::deposit_to_free(1,sender.clone(),2,1000000000);
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),2)),1000000000);
@@ -1335,15 +1336,26 @@ mod tests {
             assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),400000);
             assert_eq!(Bank::reward_record(1),400000);
 
+            // draw reward
             assert_ok!(Bank::draw_reward(Some(1).into()));
-
             assert_eq!(Bank::deposit_reward_token((1,sender.clone(),2)),0);
             assert_eq!(Bank::reward_record(1),0);
 
             //deposit twice
             Bank::deposit_to_free(1,sender.clone(),3,1000000000);
+            Bank::deposit_to_free(1,sender2.clone(),1,1000000000);
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),3)),1000000000);
+            assert_eq!(Bank::deposit_free_token((1,sender2.clone(),1)),1000000000);
 
+            //iter test2
+            Bank::calculate_reward_and_reward();  //300000
+            assert_eq!(Bank::reward_record(1),200000);
+
+            // draw reward
+            assert_ok!(Bank::draw_reward(Some(1).into()));
+            assert_eq!(Bank::deposit_reward_token((1,sender.clone(),3)),0);
+            assert_eq!(Bank::deposit_reward_token((1,sender2.clone(),1)),0);
+            assert_eq!(Bank::reward_record(1),0);
         });
     }
 
