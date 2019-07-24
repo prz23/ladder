@@ -89,7 +89,7 @@ rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 
 [dependencies.rustc-hex]
 optional = true
-rustc-hex = "*"
+version = "1.0"
 
 [features]
 default = ["std"]

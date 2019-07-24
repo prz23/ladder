@@ -26,13 +26,12 @@ use node_runtime::{
     Trademark, BrandConfig, SigncheckConfig,ErcConfig,
 };
 use primitives::{
-    crypto::{Ss58Codec, UncheckedInto},
+    crypto::{Ss58Codec, UncheckedInto, UncheckedFrom},
     ed25519,
     ed25519::Public as AuthorityId,
     sr25519, Pair,
 };
 use substrate_service;
-use primitives::crypto::UncheckedFrom;
 
 /// Specialized `ChainSpec`.
 pub type ChainSpec = substrate_service::ChainSpec<GenesisConfig>;
@@ -60,11 +59,32 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, Author
     )
 }
 
+/// Helper function to generate brands.
 pub fn get_brands(owned: AccountId) -> Vec<(Trademark, AccountId)> {
     vec![
         (Trademark{ name: b"ETH-kovan".to_vec(), id: 1 }, owned.clone()),
         (Trademark{ name: b"ABOS-test".to_vec(), id: 2 }, owned.clone()),
     ]
+}
+
+/// Helper function to generate bond that linked authority and ethereum public key.
+pub fn join_authorities_eth_bond(
+    initial_authorities:& Vec<(AccountId, AccountId, AuthorityId)>, 
+    bonds: Vec<Vec<u8>>
+) -> Result<Vec<(AccountId,Vec<u8>)>, &str>{
+    if initial_authorities.len() != bonds.len() {
+        return Err("different data length");
+    }
+
+    let author_bonds:Vec<(AccountId,Vec<u8>)> = initial_authorities.iter()
+        .zip(bonds.iter())
+        .map(|((stash, controller, session), public_key)| {
+            let mut r = [0u8; 32];
+            r.copy_from_slice(session.as_ref());
+            let mock_id: AccountId = UncheckedFrom::unchecked_from(r);
+            return (mock_id, public_key.clone());
+        }).collect();
+    return Ok(author_bonds);
 }
 
 /// Helper function to create GenesisConfig for testing
@@ -93,16 +113,10 @@ pub fn testnet_genesis(
         ]
     });
 
-	let pubkey_real : Vec<u8>= [181, 159, 233, 133, 253, 60, 0, 222, 56, 170, 16, 148, 215, 168, 163, 73, 20, 119, 29, 2, 90, 128, 56, 35, 133, 2, 208, 126, 139, 64, 72, 172, 154, 251, 104, 210, 44, 119, 55, 105, 33, 160, 86, 207, 65, 246, 246, 89, 244, 247, 15, 155, 7, 210, 136, 127, 254, 59, 147, 98, 213, 112, 112, 182].to_vec();
-
-	let pubkey_vec = vec![[4u8].to_vec()];
-	let init_auth = initial_authorities.clone();
-	let mut bond_pubkey_vec : Vec<(AccountId,Vec<u8>)> = vec![];
-	let mut i = 0usize;
-	for (v,_,_) in init_auth{
-		bond_pubkey_vec.push((v,pubkey_vec[i].clone()));
-		i = i + 1;
-	}
+    let ethereum_public_keys: Vec<Vec<u8>> = vec![
+        // alice ethereum public key
+        hex!("4707a1eb3028f30b0d8646ca22bf8791210de0e8b80bcd1bbd7176c96fbaa2a223d365c7bf10f69dc8f45de2f182cf1f7217d93b69993c0b32445892b0d768b7").to_vec()
+    ];
 
 	const STASH: u128 = 1 << 20;
     const ENDOWMENT: u128 = 1 << 20;
@@ -217,7 +231,7 @@ pub fn testnet_genesis(
 			total:0 ,
 		}),
 		signcheck: Some(SigncheckConfig {
-			pubkey: bond_pubkey_vec.clone(),
+			pubkey: join_authorities_eth_bond(&initial_authorities, ethereum_public_keys).unwrap(),
 			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
 		}),
         brand: Some(BrandConfig {
@@ -317,15 +331,12 @@ fn ladder_testnet_genesis() -> GenesisConfig {
         ),
     ];
 
-
-	let pubkey_vec = vec![[4u8].to_vec()];
-	let init_auth = initial_authorities.clone();
-	let mut bond_pubkey_vec : Vec<(AccountId,Vec<u8>)> = vec![];
-	let mut i = 0usize;
-	for (v,_,_) in init_auth{
-		bond_pubkey_vec.push((v,pubkey_vec[i].clone()));
-		i = i + 1;
-	}
+    let ethereum_public_keys: Vec<Vec<u8>> = vec![
+        hex!("b59fe985fd3c00de38aa1094d7a8a34914771d025a8038238502d07e8b4048ac9afb68d22c77376921a056cf41f6f659f4f70f9b07d2887ffe3b9362d57070b6").to_vec(),
+        hex!("cd3463a8be2cc3d3d589d5dc3e91a0f3f49fdafc201d0a9da0c684b285acf588c1945c8bae64112408b6d5e5084da11de530891df665bd666b0a2df98157ca0d").to_vec(),
+        hex!("1c8e0106db1a5e3ca1228366bb3b6f7a9dee067d8d40bedcbc5d11eec30eb65e69b5f44241927108e71d14c54f386142360c9b57485904b3bb181c01ff8ca5f1").to_vec(),
+        hex!("84f934cd44c0a044cc808dc11ce42623560b92961c2d4fc58d160006a7893bf47cf66a726388749a5b2cc46f85a21e41affca5156094003ced2669c605d6d251").to_vec(),
+    ];
 
     // root account.
     let endowed_accounts: Vec<AccountId> = vec![
@@ -342,9 +353,6 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 
     const ENDOWMENT: u128 = 10_000_000 * DOLLARS;
     const STASH: u128 = 100 * DOLLARS;
-
-	let pubkey_real : Vec<u8>= [181, 159, 233, 133, 253, 60, 0, 222, 56, 170, 16, 148, 215, 168, 163, 73, 20, 119, 29, 2, 90, 128, 56, 35, 133, 2, 208, 126, 139, 64, 72, 172, 154, 251, 104, 210, 44, 119, 55, 105, 33, 160, 86, 207, 65, 246, 246, 89, 244, 247, 15, 155, 7, 210, 136, 127, 254, 59, 147, 98, 213, 112, 112, 182].to_vec();
-
 
     GenesisConfig {
 		consensus: Some(ConsensusConfig {
@@ -457,7 +465,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			total:0 ,
 		}),
 		signcheck: Some(SigncheckConfig {
-			pubkey: bond_pubkey_vec.clone(),
+			pubkey: join_authorities_eth_bond(&initial_authorities, ethereum_public_keys).unwrap(),
 			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
 		}),
         brand: Some(BrandConfig {
