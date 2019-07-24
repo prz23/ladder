@@ -1347,9 +1347,10 @@ mod tests {
             assert_eq!(Bank::deposit_free_token((1,sender.clone(),3)),1000000000);
             assert_eq!(Bank::deposit_free_token((1,sender2.clone(),1)),1000000000);
 
+            assert_eq!(Bank::reward_record(1),0);
             //iter test2
             Bank::calculate_reward_and_reward();  //300000
-            assert_eq!(Bank::reward_record(1),200000);
+            assert_eq!(Bank::reward_record(1),300000);
 
             // draw reward
             assert_ok!(Bank::draw_reward(Some(1).into()));
