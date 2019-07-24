@@ -37,9 +37,7 @@ decl_event!(
 
 decl_storage! {
     trait Store for Module<T: Trait> as Ladsession {
-       pub Data: double_map u64, twox_128(u64) => u64;
 
-       pub Data2 get(data2): linked_map u64 => Vec<u64>;
 
        NewSessionCount get(new_session_count) : u64 = 0;
        NewSession get(new_session) : u64 = 100;
