@@ -25,7 +25,7 @@ use parity_codec::{Decode, Encode};
 use rstd::ops::Div;
 
 use support::traits::Currency;
-
+use session::OnSessionChange;
 use signcheck;
 
 
@@ -168,10 +168,7 @@ decl_module! {
            <SessionLength<T>>::put(T::BlockNumber::sa(session_len));
         }
 
-        /// a new session starts
-		fn on_finalize(n: T::BlockNumber) {
-		    Self::check_rotate_session(n);
-		}
+
     }
 }
 
@@ -218,7 +215,7 @@ decl_storage! {
         config(total) : u64;
         build(|storage: &mut sr_primitives::StorageOverlay, _: &mut sr_primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
             with_storage(storage, || {
-                <Module<T>>::inilize_deposit_data();
+               <Module<T>>::inilize_deposit_data();
             })
         })
     }
@@ -287,52 +284,8 @@ impl<T: Trait> Module<T>
         return (hash,signature_hash,id as u64);
     }
 
-    /// Hook to be called after transaction processing.
-    pub fn check_rotate_session(block_number: T::BlockNumber) {
-        // do this last, after the staking system has had chance to switch out the authorities for the
-        // new set.
-        // check block number and call next_session if necessary.
-        let is_final_block = ((block_number - Self::last_length_change()) % Self::length()).is_zero();
-        let (should_end_session, apply_rewards) = None
-            .map_or((is_final_block, is_final_block), |apply_rewards| (true, apply_rewards));
-        if should_end_session {
-            runtime_io::print("Start new session of erc");
-            Self::rotate_session(is_final_block, apply_rewards);
-        }
-    }
 
-    /// The last length change, if there was one, zero if not.
-    pub fn last_length_change() -> T::BlockNumber {
-        <LastLengthChange<T>>::get().unwrap_or_else(T::BlockNumber::zero)
-    }
 
-    /// Move onto next session: register the new authority set.
-    pub fn rotate_session(is_final_block: bool, _apply_rewards: bool) {
-        let now = <timestamp::Module<T>>::get();
-        let _time_elapsed = now.clone() - Self::current_start();
-        let session_index = <CurrentIndex<T>>::get() + One::one();
-        Self::deposit_event(RawEvent::NewRewardSession(session_index));
-
-        // Increment current session index.
-        <CurrentIndex<T>>::put(session_index);
-        <CurrentStart<T>>::put(now);
-        // Enact session length change.
-        let len_changed = if let Some(next_len) = <NextSessionLength<T>>::take() {
-            <SessionLength<T>>::put(next_len);
-            true
-        } else {
-            false
-        };
-        if len_changed || !is_final_block {
-            let block_number = <system::Module<T>>::block_number();
-            <LastLengthChange<T>>::put(block_number);
-        }
-        Self::adjust_deposit_list();
-        match Self::enable_record() {
-            _ =>  Self::reward_deposit(),
-            true =>  Self::reward_deposit(),
-        }
-    }
 
     fn adjust_deposit_list(){
         // update the session time of the depositing account
@@ -577,6 +530,12 @@ impl<T: Trait> Module<T>
     }
 }
 
+impl<T: Trait> OnSessionChange<T::Moment> for Module<T> {
+    fn on_session_change(elapsed: T::Moment, should_reward: bool) {
+        runtime_io::print("LadderSessionErc");
+        Self::reward_deposit()
+    }
+}
 
 #[cfg(test)]
 mod tests {

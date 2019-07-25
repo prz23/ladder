@@ -98,11 +98,12 @@ impl<T: Trait> Module<T> {
     }
 
     pub fn is_new_session() -> bool {
-        if Self::new_session_count() >= Self::new_session(){
+        let session_count = Self::new_session_count() + 1;
+        if session_count >= Self::new_session(){
             <NewSessionCount<T>>::put(0);
             return true;
         }
-        <NewSessionCount<T>>::put(Self::new_session_count()+1);
+        <NewSessionCount<T>>::put(session_count);
         true
     }
 
@@ -119,7 +120,7 @@ impl<T: Trait> Module<T> {
 
 impl<T: Trait> OnSessionChange<T::Moment> for Module<T> {
     fn on_session_change(elapsed: T::Moment, should_reward: bool) {
-        runtime_io::print("LadderSession");
+        runtime_io::print("LadderSessionTest");
         Self::new_session_start(elapsed, should_reward);
     }
 }

@@ -23,7 +23,7 @@ use node_runtime::{
     BalancesConfig, BankConfig, ConsensusConfig, ContractConfig, CouncilSeatsConfig,
     CouncilVotingConfig, DemocracyConfig, GrandpaConfig, IndicesConfig, Perbill, Permill,
     SessionConfig, StakerStatus, StakingConfig, SudoConfig, TimestampConfig, TreasuryConfig,
-    Trademark, BrandConfig, SigncheckConfig,ErcConfig,
+    Trademark, BrandConfig, SigncheckConfig,ErcConfig,OtcConfig
 };
 use primitives::{
     crypto::{Ss58Codec, UncheckedInto, UncheckedFrom},
@@ -57,6 +57,13 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, Author
         get_account_id_from_seed(seed),
         get_session_key_from_seed(seed),
     )
+}
+
+pub fn get_exchangelad() -> Vec<(u64,u64)>{
+   vec![
+	   (1,1000),
+	   (2,50000),
+   ]
 }
 
 /// Helper function to generate brands.
@@ -230,6 +237,7 @@ pub fn testnet_genesis(
 			reward_balance_factor: vec![1,2,3,4],
 			total:0 ,
 		}),
+
 		signcheck: Some(SigncheckConfig {
 			pubkey: join_authorities_eth_bond(&initial_authorities, ethereum_public_keys).unwrap(),
 			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
@@ -241,6 +249,10 @@ pub fn testnet_genesis(
 			session_length:10,
 			enable_record:true,
 			total:0,
+		}),
+		otc: Some(OtcConfig {
+			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
+			exchangelad : get_exchangelad(),
 		}),
 	}
 }
@@ -464,6 +476,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			reward_balance_factor: vec![1,2,3,4],
 			total:0 ,
 		}),
+
 		signcheck: Some(SigncheckConfig {
 			pubkey: join_authorities_eth_bond(&initial_authorities, ethereum_public_keys).unwrap(),
 			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
@@ -475,6 +488,10 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			session_length:10,
 			enable_record:true,
 			total:0,
+		}),
+		otc: Some(OtcConfig {
+			athorities: initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
+			exchangelad : get_exchangelad(),
 		}),
 	}
 }

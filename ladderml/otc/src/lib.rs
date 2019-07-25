@@ -16,6 +16,8 @@ use rstd::prelude::*;
 
 #[cfg(feature = "std")]
 pub use std::fmt;
+#[cfg(feature = "std")]
+use runtime_io::with_storage;
 
 // use Encode, Decode
 use parity_codec::{Decode, Encode};
@@ -71,6 +73,18 @@ decl_storage! {
         //default exchangerate to lad  coin => rate*10000
         ExchangeToLad get(exchange_to_lad) : map u64 => u64;
     }
+
+        add_extra_genesis {
+        config(athorities) : Vec<T::SessionKey>;
+        config(exchangelad) : Vec<(u64,u64)>;
+        build(|storage: &mut sr_primitives::StorageOverlay, _: &mut sr_primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
+            with_storage(storage, || {
+              let exchangelad_vec = config.exchangelad.clone();
+                <Module<T>>::inilize_exchange_data(exchangelad_vec);
+            })
+        })
+    }
+
 }
 
 decl_module! {
@@ -216,8 +230,9 @@ impl<T: Trait> Module<T> {
                                        sell_order.acc,sell_order.acc2,acc,acc2)?;
 
         // every settlement , record the trade volum and number
-        Self::volum_and_number_rocord(&sell_order.who,sell_order.pair.share,&buyer,sell_order.pair.money.clone(),
+        Self::volum_and_number_rocord(&sell_order.who,sell_order.pair.share.clone(),&buyer,sell_order.pair.money.clone(),
                                       amount,Self::price_restoration(amount,sell_order.price.clone())as u64);
+        Self::record_the_last_exchange_data(sell_order.pair.share.clone(),sell_order.pair.money.clone(),amount,sell_order.price.clone());
         Ok(())
     }
 
@@ -328,6 +343,24 @@ impl<T: Trait> Module<T> {
         });
         //clear cointype
         <AllConinType<T>>::put([].to_vec() as Vec<u64>);
+    }
+
+    pub fn inilize_exchange_data(data:Vec<(u64,u64)>){
+        //ExchangeToLad get(exchange_to_lad) : map u64 => u64;
+        data.iter().enumerate().for_each(|(i,(coin,exchange_rate))|{
+            <ExchangeToLad<T>>::insert(coin,exchange_rate);
+        });
+    }
+
+    pub fn record_the_last_exchange_data(share:u64, money:u64, amount:u64, price:u64){
+
+        //TODO:: some calculate ->
+        let exchange_rate_share = 10;
+        let exchange_rate_money = 10;
+
+        //update the data
+        <ExchangeToLad<T>>::insert(share,exchange_rate_share);
+        <ExchangeToLad<T>>::insert(money,exchange_rate_money);
     }
 }
 
