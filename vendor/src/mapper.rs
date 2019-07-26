@@ -133,6 +133,7 @@ mod tests {
     use contracts;
     use serde_json::json;
     use tokio_core::reactor::Core;
+    use crate::vendor::Vendor;
 
     #[test]
     fn test_vendor_stream() {

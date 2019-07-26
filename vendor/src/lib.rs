@@ -182,6 +182,7 @@ where
         enable: config.strategy.sender,
         proxy: AbosProxy {
             pair: eth_pair.clone(),
+            chain_id: U256::from_str("00000000000000000000000000000000000000000000ca812def6446350c7e8d").unwrap(),
             context: SignContext {
                 height: 0,
                 nonce: U256::from(0),

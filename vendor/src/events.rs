@@ -501,23 +501,24 @@ mod tests {
     use rustc_hex::{FromHex, ToHex};
     use web3::types::Bytes;
 
-    fn prepare_data() -> (H256, Address, U256, H256, &'static str) {
-        let tag: H256 = "0x0000000000000000000000000000000000000000000000000000000000000002".into();
-        let recipient: Address = "0x74241db5f3ebaeecf9506e4ae988186093341604".into();
-        // 0x00000000000000000000000000000000000000000000000000000000054c5638
-        let value: U256 = U256::from_dec_str("88888888").unwrap();
+    fn prepare_data() -> (u64, Address, H256, U256, H256, &'static str) {
+        let coin: u64 = 2;
+        let sender: Address = "0x74241db5f3ebaeecf9506e4ae988186093341604".into();
+        let recipient: H256 = "0x176c96fbaa2a223d365c7bf10f69dc8f45de2f182cf1f7217d93b69993c232ef".into();
+        let value: U256 = U256::from_dec_str("88888888").unwrap(); // 0x00000000000000000000000000000000000000000000000000000000054c5638
         let tx_hash: H256 =
             "0x1045bfe274b88120a6b1e5d01b5ec00ab5d01098346e90e7c7a3c9b8f0181c80".into();
-        let bytes_str: &'static str = "000000000000000000000000000000000000000000000000000000000000000274241db5f3ebaeecf9506e4ae98818609334160400000000000000000000000000000000000000000000000000000000054c56381045bfe274b88120a6b1e5d01b5ec00ab5d01098346e90e7c7a3c9b8f0181c80";
-        (tag, recipient, value, tx_hash, bytes_str)
+        let bytes_str: &'static str = "0000000274241db5f3ebaeecf9506e4ae988186093341604176c96fbaa2a223d365c7bf10f69dc8f45de2f182cf1f7217d93b69993c232ef00000000000000000000000000000000000000000000000000000000054c56381045bfe274b88120a6b1e5d01b5ec00ab5d01098346e90e7c7a3c9b8f0181c80";
+        (coin, sender, recipient, value, tx_hash, bytes_str)
     }
 
     #[test]
     fn test_message_to_bytes() {
-        let (tag, recipient, value, tx_hash, bytes_str) = prepare_data();
+        let (coin, sender, recipient, value, tx_hash, bytes_str) = prepare_data();
 
-        let message = IngressEvent {
-            tag: tag,
+        let message = DepositEvent {
+            coin: coin,
+            sender: sender,
             recipient: recipient,
             value: value,
             tx_hash: tx_hash,
@@ -528,10 +529,11 @@ mod tests {
 
     #[test]
     fn test_message_from_bytes() {
-        let (tag, recipient, value, tx_hash, bytes_str) = prepare_data();
+        let (coin, sender, recipient, value, tx_hash, bytes_str) = prepare_data();
 
-        let message = IngressEvent::from_bytes(bytes_str.from_hex().unwrap().as_slice()).unwrap();
-        assert_eq!(message.tag, tag);
+        let message = DepositEvent::from_bytes(bytes_str.from_hex().unwrap().as_slice()).unwrap();
+        assert_eq!(message.coin, coin);
+        assert_eq!(message.sender, sender);
         assert_eq!(message.recipient, recipient);
         assert_eq!(message.value, value);
         assert_eq!(message.tx_hash, tx_hash);
@@ -539,12 +541,12 @@ mod tests {
 
     #[test]
     fn test_message_from_log() {
-        let (tag, recipient, value, tx_hash, _bytes_str) = prepare_data();
-        let ingress_topic = contracts::bridge::events::ingress::filter().topic0;
+        let (coin, sender, recipient, value, tx_hash, _bytes_str) = prepare_data();
+        let ingress_topic = contracts::bridge::events::deposit::filter().topic0;
         let log = Log {
                     address: "0xf1dF5972B7e394201d4fFADD797FAa4A3C8be0ea".into(),
                     topics: ingress_topic.into(),
-                    data: Bytes("000000000000000000000000000000000000000000000000000000000000000200000000000000000000000074241db5f3ebaeecf9506e4ae98818609334160400000000000000000000000074241db5f3ebaeecf9506e4ae98818609334160400000000000000000000000000000000000000000000000000000000054c5638".from_hex().unwrap()),
+                    data: Bytes("0000000274241db5f3ebaeecf9506e4ae988186093341604176c96fbaa2a223d365c7bf10f69dc8f45de2f182cf1f7217d93b69993c232ef00000000000000000000000000000000000000000000000000000000054c56381045bfe274b88120a6b1e5d01b5ec00ab5d01098346e90e7c7a3c9b8f0181c80".from_hex().unwrap()),
                     transaction_hash: Some(tx_hash),
                     block_hash: None,
                     block_number: None,
@@ -554,8 +556,9 @@ mod tests {
                     log_type: None,
                     removed: None,
                 };
-        let message = IngressEvent::from_log(&log).unwrap();
-        assert_eq!(message.tag, tag);
+        let message = DepositEvent::from_log(&log, &ChainAlias::ABOS).unwrap();
+        assert_eq!(message.coin, coin);
+        assert_eq!(message.sender, sender);
         assert_eq!(message.recipient, recipient);
         assert_eq!(message.value, value);
     }

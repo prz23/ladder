@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_log_stream_twice_no_logs() {
-        let deposit_topic = contracts::bridge::events::ingress::filter().topic0;
+        let deposit_topic = contracts::bridge::events::deposit::filter().topic0;
 
         let transport = mock_transport!(
             "eth_blockNumber" =>
@@ -232,7 +232,7 @@ mod tests {
             transport: transport.clone(),
             contract_address: "0000000000000000000000000000000000000001".into(),
             last_block_number: 3,
-            filter: contracts::bridge::events::ingress::filter(),
+            filter: contracts::bridge::events::deposit::filter(),
             chain: ChainAlias::ETH,
         });
 
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_log_stream_once_one_log() {
-        let deposit_topic = contracts::bridge::events::ingress::filter().topic0;
+        let deposit_topic = contracts::bridge::events::deposit::filter().topic0;
 
         let transport = mock_transport!(
             "eth_blockNumber" =>
@@ -288,7 +288,7 @@ mod tests {
             transport: transport.clone(),
             contract_address: "0000000000000000000000000000000000000001".into(),
             last_block_number: 3,
-            filter: contracts::bridge::events::ingress::filter(),
+            filter: contracts::bridge::events::deposit::filter(),
             chain: ChainAlias::ETH,
         });
 

@@ -71,8 +71,7 @@ mod tests {
         let mut ss = StateStorage::load(&file_path).unwrap();
         println!("{:?}", ss.state);
         let state = State {
-            ingress: 10,
-            egress: 10,
+            request: 10,
             deposit: 10,
             withdraw: 10,
             authority: 10,

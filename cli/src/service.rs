@@ -93,9 +93,9 @@ construct_service_factory! {
                         match FullComponents::<Factory>::new(config, executor.clone()) {
                             Ok(service) => {
                                 executor.spawn(start_vendor(
-                                    VendorServiceConfig { kovan_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+                                    VendorServiceConfig { kovan_url: "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816".to_string(),
                                                         abos_url: "http://47.92.173.78:1337".to_string(),
-                                                        eth_url: "https://kovan.infura.io/v3/5b83a690fa934df09253dd2843983d89".to_string(),
+                                                        eth_url: "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816".to_string(),
                                                         mapper_address: "c6f47FDdB36c1442B3a7229BEE5C35e7079E2C1e".to_string(),
                                                         kovan_address: "E68ccBF91ad45C4249b877f1B9f8224179e1a126".to_string(),
                                                         abos_address: "9dCA5E2eDE0a6848bE3d24EFB4D871a53786A1d2".to_string(),
