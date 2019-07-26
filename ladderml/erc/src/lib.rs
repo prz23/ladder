@@ -19,13 +19,14 @@ pub use std::fmt;
 #[cfg(feature = "std")]
 use runtime_io::with_storage;
 
+use session::OnSessionChange;
 
 // use Encode, Decode
 use parity_codec::{Decode, Encode};
 use rstd::ops::Div;
 
 use support::traits::Currency;
-use session::OnSessionChange;
+
 use signcheck;
 
 
@@ -162,13 +163,6 @@ decl_module! {
             Ok(())
         }
 
-        /// set session lenth
-        fn set_session_lenth(session_len: u64 ){
-           ensure!(session_len >= 10,"the session lenth must larger than 10");
-           <SessionLength<T>>::put(T::BlockNumber::sa(session_len));
-        }
-
-
     }
 }
 
@@ -176,18 +170,6 @@ decl_storage! {
     trait Store for Module<T: Trait> as Erc {
         /// record depositing info of balance & session_time
         DespoitingAccount get(despositing_account): Vec<T::AccountId>;
-        ///Session module
-		/// Block at which the session length last changed.
-		LastLengthChange: Option<T::BlockNumber>;
-		/// Current length of the session.
-		pub SessionLength get(length) config(session_length): T::BlockNumber = T::BlockNumber::sa(10);
-
-		/// The next session length.
-		NextSessionLength: Option<T::BlockNumber>;
-		/// Timestamp when current session started.
-		pub CurrentStart get(current_start) build(|_| T::Moment::zero()): T::Moment;
-		/// Current index of the session.
-		pub CurrentIndex get(current_index) build(|_| T::BlockNumber::sa(0)): T::BlockNumber;
 
 		EnableRewardRecord get(enable_record) config(): bool;
 
@@ -210,12 +192,14 @@ decl_storage! {
         AccountUnlockCount get(account_unlock_count) : map  T::AccountId => Vec<u64>;
         // id -> accountID
         IdwithAccount get(id_with_account): map u64 => T::AccountId;
+        //
+        Acc get(acc) config() : T::AccountId;
     }
         add_extra_genesis {
         config(total) : u64;
         build(|storage: &mut sr_primitives::StorageOverlay, _: &mut sr_primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
             with_storage(storage, || {
-               <Module<T>>::inilize_deposit_data();
+                <Module<T>>::inilize_deposit_data();
             })
         })
     }
@@ -276,16 +260,18 @@ impl<T: Trait> Module<T>
         let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
         id_vec.drain(0..16);
         let mut id = Self::u8array_to_u128(id_vec.as_slice());
-        let hash:Vec<u8> = messagedrain.drain(0..32).collect();
+        let hash: Vec<u8> = messagedrain.drain(0..32).collect();
         //let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
         // Signature_Hash
-        let signature_hash =  Decode::decode(&mut &signature[..]).unwrap();
+        let signature_hash = Decode::decode(&mut &signature[..]).unwrap();
 
-        return (hash,signature_hash,id as u64);
+        return (hash, signature_hash, id as u64);
     }
 
-
-
+    pub fn erc_new_session(){
+        Self::adjust_deposit_list();
+        Self::reward_deposit();
+    }
 
     fn adjust_deposit_list(){
         // update the session time of the depositing account
@@ -532,8 +518,7 @@ impl<T: Trait> Module<T>
 
 impl<T: Trait> OnSessionChange<T::Moment> for Module<T> {
     fn on_session_change(elapsed: T::Moment, should_reward: bool) {
-        runtime_io::print("LadderSessionErc");
-        Self::reward_deposit()
+        Self::erc_new_session();
     }
 }
 
@@ -608,11 +593,20 @@ mod tests {
         type Event = ();
     }
 
+    impl<T: Trait> OnSessionChange<T::Moment> for Test {
+        fn on_session_change(elapsed: T::Moment, should_reward: bool) {
+            runtime_io::print("LadderSessionTest");
+            println!("111111111111111111111111111111111111");
+        }
+    }
+
     fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
         let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
         runtime_io::TestExternalities::new(t)
     }
 
+    type System = system::Module<Test>;
+    type Session = session::Module<Test>;
     type Erc = Module<Test>;
 
     #[test]
@@ -673,4 +667,36 @@ mod tests {
             assert_ok!(Erc::unlock_erc(Some(2).into(),mess.clone(),signa));
         });
     }
+
+    #[test]
+    fn session_change_should_work() {
+        with_externalities(&mut new_test_ext(), || {
+            // Block 1: No change
+            System::set_block_number(1);
+            Session::check_rotate_session(1);
+            //assert_eq!(Consensus::authorities(), vec![UintAuthorityId(1), UintAuthorityId(2), UintAuthorityId(3)]);
+
+            assert_eq!(Session::forcing_new_session(),None);
+            // Block 2: Session rollover, but no change.
+            System::set_block_number(2);
+            Session::check_rotate_session(2);
+            //assert_eq!(Consensus::authorities(), vec![UintAuthorityId(1), UintAuthorityId(2), UintAuthorityId(3)]);
+
+            assert_ok!(Session::apply_force_new_session(true));
+            assert_eq!(Session::forcing_new_session(),Some(true));
+            // Block 3: Set new key for validator 2; no visible change.
+            System::set_block_number(3);
+            //assert_ok!(Session::set_key(Origin::signed(2), UintAuthorityId(5)));
+            //assert_eq!(Consensus::authorities(), vec![UintAuthorityId(1), UintAuthorityId(2), UintAuthorityId(3)]);
+
+            Session::check_rotate_session(3);
+            //assert_eq!(Consensus::authorities(), vec![UintAuthorityId(1), UintAuthorityId(2), UintAuthorityId(3)]);
+
+            // Block 4: Session rollover, authority 2 changes.
+            System::set_block_number(4);
+            Session::check_rotate_session(4);
+            //assert_eq!(Consensus::authorities(), vec![UintAuthorityId(1), UintAuthorityId(5), UintAuthorityId(3)]);
+        });
+    }
+
 }

@@ -246,7 +246,7 @@ pub fn testnet_genesis(
             brands: get_brands(root_key),
         }),
 		erc: Some(ErcConfig{
-			session_length:10,
+			acc: initial_authorities[0].1.clone(),
 			enable_record:true,
 			total:0,
 		}),
@@ -485,7 +485,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
             brands: get_brands(endowed_accounts[0].clone()),
         }),
 		erc: Some(ErcConfig{
-			session_length:10,
+			acc: initial_authorities[0].1.clone(),
 			enable_record:true,
 			total:0,
 		}),
