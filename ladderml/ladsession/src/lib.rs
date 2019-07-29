@@ -136,6 +136,7 @@ mod tests {
     use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
     use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
     use support::{StorageMap,StorageValue};
+    use order::OrderPair;
 
     impl_outer_origin!{
 		pub enum Origin for Test {}
@@ -158,22 +159,134 @@ mod tests {
         type Log = DigestItem;
     }
 
+    impl balances::Trait for Test {
+        type Balance = u64;
+        type OnFreeBalanceZero = ();
+        type OnNewAccount = ();
+        type Event = ();
+        type TransactionPayment = ();
+        type TransferPayment = ();
+        type DustRemoval = ();
+    }
 
-    impl Trait for Test {
+    impl consensus::Trait for Test {
+        type Log = DigestItem;
+        type SessionKey = UintAuthorityId;
+        type InherentOfflineReport = ();
+    }
+
+    impl timestamp::Trait for Test {
+        type Moment = u64;
+        type OnTimestampSet = ();
+    }
+
+    impl session::Trait for Test {
+        type ConvertAccountIdToSessionKey = ConvertUintAuthorityId;
+        type OnSessionChange = ();
         type Event = ();
     }
+
+    impl signcheck::Trait for Test {
+        type Event = ();
+    }
+
+    impl bank::Trait for Test {
+        type Currency = balances::Module<Self>;
+        type Event = ();
+    }
+
+    impl order::Trait for Test {
+        type Event = ();
+    }
+
+    impl otc::Trait for Test {
+        type Event = ();
+    }
+
 
     fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
         let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
         runtime_io::TestExternalities::new(t)
     }
 
-    type statistics = Module<Test>;
+    type Bank = bank::Module<Test>;
+    type OTC = otc::Module<Test>;
+    type Order = order::Module<Test>;
+    /////type Statistics = statistics::Module<Test>;
+    type Ladsession = Module<Test>;
 
     #[test]
-    fn resolving_data_test() {
+    fn ladsession_test() {
         with_externalities(&mut new_test_ext(), || {
             //
+            let seller_acc : Vec<u8> = [2,3,4,95].to_vec();
+            let seller_acc2 : Vec<u8> = [3,4,5,6,1].to_vec();
+
+            let buyer_acc : Vec<u8> = [10,15,68].to_vec();
+            let buyer_acc2 : Vec<u8> = [55,41,12].to_vec();
+
+            let pair: OrderPair = OrderPair{ share:1 ,money:2};
+            assert_err!(Order::is_valid_pair(&pair) , "an invalid orderpair");
+            assert_ok!(OTC::new_pair(Some(1).into() , pair.clone()));
+            assert_ok!(Order::is_valid_pair(&pair));
+
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"price cann't be 0");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,seller_acc.clone(),seller_acc2.clone(),true) ,"price cann't be 0");
+
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error check_valid_order");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error check_valid_order");
+
+            Bank::modify_token(1,seller_acc.clone(),1,50,bank::TokenType::Free,true);
+            assert_eq!(Bank::deposit_free_token((1,seller_acc.clone(),1)),50);
+
+            assert_ok!(OTC::put_order(Some(1).into(),pair.clone(),10, 1000000 ,seller_acc.clone(),seller_acc2.clone(),true));
+            let aa = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
+            assert_eq!(Bank::deposit_free_token((1,seller_acc.clone(),1)),40);
+            assert_eq!(Bank::deposit_otc_token((1,seller_acc.clone(),1)),10);
+
+
+            //buy 4 coin-1 use coin-2
+            Bank::modify_token(2,buyer_acc.clone(),2,50,bank::TokenType::Free,true);
+            assert_eq!(Bank::deposit_free_token((2,buyer_acc.clone(),2)),50);
+
+            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1, 6,buyer_acc.clone(),buyer_acc2.clone(),true),"not_enough_money_error check_valid_buy");
+            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,11 ,buyer_acc.clone(),buyer_acc2.clone(),true),"cant buy too much!");
+
+
+            assert_ok!(OTC::buy(Some(2).into(), 1, pair.clone(), 1, 4, buyer_acc.clone(),buyer_acc2.clone(),true));
+
+            assert_eq!(Bank::deposit_free_token((2,buyer_acc2.clone(),1)),4);  // 0 + 5 =5
+            assert_eq!(Bank::deposit_otc_token((1,seller_acc.clone(),1)),6);  // 10 - 4 = 6
+            assert_eq!(Bank::deposit_free_token((2,buyer_acc.clone(),2)),10);  // 50 - 40 = 10
+            assert_eq!(Bank::deposit_free_token((1,seller_acc2.clone(),2)),40);  // 0 + 40 = 40
+
+            //check the data
+            assert_eq!(OTC::trading_volume_person((1,1)),4);
+            assert_eq!(OTC::trading_volume_person((2,2)),40);
+            assert_eq!(OTC::all_coin_type(),[1,2].to_vec());
+            assert_eq!(OTC::participant(),[(1,1),(2,2)].to_vec());
+            assert_eq!(OTC::transactions_quantity_person((1,1)),1);
+            assert_eq!(OTC::transactions_quantity_person((1,2)),0);
+            assert_eq!(OTC::transactions_quantity_person((2,2)),1);
+            assert_eq!(OTC::transactions_quantity_person((2,1)),0);
+            assert_eq!(OTC::transactions_quantity_total(2),1);
+
+            //clean the statistics
+            OTC::periodical_clean();
+            assert_eq!(OTC::trading_volume_person((1,1)),4);
+            assert_eq!(OTC::trading_volume_person((2,2)),40);
+            assert_eq!(OTC::all_coin_type(),[].to_vec());
+            assert_eq!(OTC::participant(),[].to_vec());
+
+            //buy again and check the data
+            Bank::modify_token(2,buyer_acc.clone(),2,50,bank::TokenType::Free,true);
+            assert_ok!(OTC::buy(Some(2).into(), 1, pair.clone(), 1, 2, buyer_acc.clone(),buyer_acc2.clone(),true));
+
+            assert_eq!(OTC::trading_volume_person((1,1)),2);
+            assert_eq!(OTC::trading_volume_person((2,2)),20);
+            assert_eq!(OTC::all_coin_type(),[1,2].to_vec());
+            assert_eq!(OTC::participant(),[(1,1),(2,2)].to_vec());
+
         });
     }
 }

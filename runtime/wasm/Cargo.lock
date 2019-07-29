@@ -897,7 +897,9 @@ name = "ladder-ladsession"
 version = "0.1.0"
 dependencies = [
  "ladder-bank 0.1.0",
+ "ladder-order 0.1.0",
  "ladder-otc 0.1.0",
+ "ladder-signcheck 0.1.0",
  "parity-codec 3.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.94 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -906,10 +908,13 @@ dependencies = [
  "sr-primitives 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
  "sr-std 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
  "sr-version 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
+ "srml-balances 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
+ "srml-consensus 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
  "srml-session 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
  "srml-sudo 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
  "srml-support 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
  "srml-system 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
+ "srml-timestamp 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
  "substrate-primitives 2.0.0 (git+https://github.com/paritytech/substrate?rev=6e67eff0653677d3d01980ca822c4b8a227914a3)",
 ]
 

@@ -66,7 +66,7 @@ decl_storage! {
         PeriodicHoldings get(periodic_holdings) : map (T::AccountId,u64) => u128;
 
         //
-        AllConinType get(all_coin_type) : Vec<u64>;
+        AllCoinType get(all_coin_type) : Vec<u64>;
         // support vec Vec<AccountId> record all buyer seller
         Participant get(participant) : Vec<(T::AccountId,u64)>;
 
@@ -180,7 +180,7 @@ impl<T: Trait> Module<T> {
         //bank---->pair.share  money enough?
         let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),pair.share));
         if free_token < amount {
-            return Err("not_enough_money_error ");
+            return Err("not_enough_money_error check_valid_order");
         }
         Ok(())
     }
@@ -188,7 +188,7 @@ impl<T: Trait> Module<T> {
     fn check_enough_token(who:&T::AccountId,acc:Vec<u8>,cointype:u64,amount:u64) -> Result{
         let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),cointype));
         if free_token < amount {
-            return Err("not_enough_money_error ");
+            return Err("not_enough_money_error check_enough_token");
         }
         Ok(())
     }
@@ -200,9 +200,10 @@ impl<T: Trait> Module<T> {
 
         let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),sellorder.pair.money));
         let token_needed = Self::price_restoration(amount,sell_order.price.clone());
-
+        println!("amount {} sell price {}",amount,sell_order.price.clone());
+        println!("free_token {} token_needed {}",free_token,token_needed);
         if (free_token as f64) < token_needed  {
-            return Err("not_enough_money_error ");
+            return Err("not_enough_money_error check_valid_buy");
         }
 
         Ok(())
@@ -293,7 +294,7 @@ impl<T: Trait> Module<T> {
 
     pub fn number_of_trading_total(coin_type:u64){
         let new_volume = 1u128 + Self::transactions_quantity_total(coin_type) as u128;
-        <TradingVolumeTotal<T>>::insert(coin_type,new_volume as u128);
+        <TransactionsQuantityTotal<T>>::insert(coin_type,new_volume as u64);
     }
 
     pub fn number_of_trading_person(who:&T::AccountId,coin_type:u64){
@@ -331,6 +332,15 @@ impl<T: Trait> Module<T> {
         if buyersellervec.contains(&(seller.clone(),money)) { }else { buyersellervec.push((seller.clone(),share)); <Participant<T>>::put(buyersellervec); }
         let mut buyersellervec = Self::participant();
         if buyersellervec.contains(&(buyer.clone(),money)) { }else { buyersellervec.push((buyer.clone(),money)); <Participant<T>>::put(buyersellervec); }
+
+        let mut coin_type = Self::all_coin_type();
+        if !Self::all_coin_type().contains(&share){
+            coin_type.push(share);
+        }
+        if !Self::all_coin_type().contains(&money){
+            coin_type.push(money);
+        }
+        <AllCoinType<T>>::put(coin_type);
     }
 
     pub fn periodical_clean() {
@@ -342,7 +352,7 @@ impl<T: Trait> Module<T> {
             <TradingVolumeTotal<T>>::insert(coin,0u128);
         });
         //clear cointype
-        <AllConinType<T>>::put([].to_vec() as Vec<u64>);
+        <AllCoinType<T>>::put([].to_vec() as Vec<u64>);
     }
 
     pub fn inilize_exchange_data(data:Vec<(u64,u64)>){
@@ -481,13 +491,13 @@ mod tests {
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"price cann't be 0");
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,seller_acc.clone(),seller_acc2.clone(),true) ,"price cann't be 0");
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error ");
-            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error ");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error check_valid_order");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error check_valid_order");
 
             Bank::modify_token(1,seller_acc.clone(),1,50,bank::TokenType::Free,true);
             assert_eq!(Bank::deposit_free_token((1,seller_acc.clone(),1)),50);
 
-            assert_ok!(OTC::put_order(Some(1).into(),pair.clone(),10, 10 ,seller_acc.clone(),seller_acc2.clone(),true));
+            assert_ok!(OTC::put_order(Some(1).into(),pair.clone(),10, 1000000 ,seller_acc.clone(),seller_acc2.clone(),true));
             let aa = Order::sell_order_of( (1, pair.clone(), 1) ).unwrap();
             assert_eq!(Bank::deposit_free_token((1,seller_acc.clone(),1)),40);
             assert_eq!(Bank::deposit_otc_token((1,seller_acc.clone(),1)),10);
@@ -497,14 +507,17 @@ mod tests {
             Bank::modify_token(2,buyer_acc.clone(),2,50,bank::TokenType::Free,true);
             assert_eq!(Bank::deposit_free_token((2,buyer_acc.clone(),2)),50);
 
-            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,6 ,buyer_acc.clone(),buyer_acc2.clone(),true),"not_enough_money_error ");
+            assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1, 6,buyer_acc.clone(),buyer_acc2.clone(),true),"not_enough_money_error check_valid_buy");
             assert_err!(OTC::buy(Some(2).into(),1, pair.clone(),1,11 ,buyer_acc.clone(),buyer_acc2.clone(),true),"cant buy too much!");
 
-            assert_ok!(OTC::buy(Some(2).into(), 1, pair.clone(), 1,4 ,buyer_acc.clone(),buyer_acc2.clone(),true));
+
+            assert_ok!(OTC::buy(Some(2).into(), 1, pair.clone(), 1, 4, buyer_acc.clone(),buyer_acc2.clone(),true));
+
             assert_eq!(Bank::deposit_free_token((2,buyer_acc2.clone(),1)),4);  // 0 + 5 =5
             assert_eq!(Bank::deposit_otc_token((1,seller_acc.clone(),1)),6);  // 10 - 4 = 6
             assert_eq!(Bank::deposit_free_token((2,buyer_acc.clone(),2)),10);  // 50 - 40 = 10
             assert_eq!(Bank::deposit_free_token((1,seller_acc2.clone(),2)),40);  // 0 + 40 = 40
+
         });
     }
 
