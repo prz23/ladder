@@ -486,7 +486,7 @@ impl<T: Trait> Module<T>
                 let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),balances);
                 let now_reward = <RewardRecord<T>>::get(v);
                 <RewardRecord<T>>::insert(v,reward+now_reward);
-                //Self::calculate_total_reward(cointype,balances,true);
+                Self::calculate_total_reward(cointype,balances,true);
             });
         });
     }
@@ -1022,6 +1022,7 @@ impl<T: Trait> Module<T>
             let reward = Self::reward_calcul(total_token_for_this_coin);
             Self::reward_token(&accountid,sender.clone(),coin_type,reward);
             <RewardRecord<T>>::mutate(accountid,|bal| *bal = *bal+ T::Balance::sa(reward) );
+            Self::calculate_total_reward(coin_type,T::Balance::sa(reward),true);
             Ok(())
         });
     }
@@ -1352,6 +1353,10 @@ mod tests {
             Bank::calculate_reward_and_reward();  //300000
             assert_eq!(Bank::reward_record(1),300000);
 
+            assert_eq!(Bank::coin_reward(1),100000);
+            assert_eq!(Bank::coin_reward(2),500000);
+            assert_eq!(Bank::coin_reward(3),100000);
+            assert_eq!(Bank::coin_reward(4),0);
             // draw reward
             assert_ok!(Bank::draw_reward(Some(1).into()));
             assert_eq!(Bank::deposit_reward_token((1,sender.clone(),3)),0);

@@ -154,7 +154,7 @@ impl timestamp::Trait for Runtime {
 
 impl session::Trait for Runtime {
 	type ConvertAccountIdToSessionKey = ();
-	type OnSessionChange = (Staking, grandpa::SyncedAuthorities<Runtime>, Erc);
+	type OnSessionChange = (Staking, grandpa::SyncedAuthorities<Runtime>, Erc,Ladsession);
 	type Event = Event;
 }
 
