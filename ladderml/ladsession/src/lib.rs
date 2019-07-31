@@ -286,7 +286,6 @@ mod tests {
             assert_eq!(OTC::trading_volume_person((2,2)),20);
             assert_eq!(OTC::all_coin_type(),[1,2].to_vec());
             assert_eq!(OTC::participant(),[(1,1),(2,2)].to_vec());
-
         });
     }
 }

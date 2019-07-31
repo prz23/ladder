@@ -200,8 +200,7 @@ impl<T: Trait> Module<T> {
 
         let free_token = <bank::Module<T>>::deposit_free_token((who.clone(),acc.clone(),sellorder.pair.money));
         let token_needed = Self::price_restoration(amount,sell_order.price.clone());
-        println!("amount {} sell price {}",amount,sell_order.price.clone());
-        println!("free_token {} token_needed {}",free_token,token_needed);
+
         if (free_token as f64) < token_needed  {
             return Err("not_enough_money_error check_valid_buy");
         }
@@ -538,8 +537,8 @@ mod tests {
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 0 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"price cann't be 0");
             assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 0 ,seller_acc.clone(),seller_acc2.clone(),true) ,"price cann't be 0");
 
-            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error ");
-            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error ");
+            assert_err!(OTC::put_order(Some(1).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error check_valid_order");
+            assert_err!(OTC::put_order(Some(2).into() , pair.clone(), 10 , 10 ,seller_acc.clone(),seller_acc2.clone(),true) ,"not_enough_money_error check_valid_order");
 
             Bank::modify_token(1,seller_acc.clone(),1,50,bank::TokenType::Free,true);
             Bank::modify_token(1,seller_acc.clone(),2,50,bank::TokenType::Free,true);
