@@ -15,7 +15,6 @@ runtime_primitives = { package = "sr-primitives", git = "https://github.com/pari
 offchain-primitives = { package = "substrate-offchain-primitives", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 version = { package = "sr-version", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 support = { package = "srml-support", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
-aura = { package = "srml-aura", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 balances = { package = "srml-balances", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 consensus = { package = "srml-consensus", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 contract = { package = "srml-contract", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
@@ -26,7 +25,6 @@ finality-tracker = { package = "srml-finality-tracker", git = "https://github.co
 grandpa = { package = "srml-grandpa", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 indices = { package = "srml-indices", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 session = { package = "srml-session", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
-staking = { package = "srml-staking", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 system = { package = "srml-system", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 timestamp = { package = "srml-timestamp", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 treasury = { package = "srml-treasury", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
@@ -39,6 +37,16 @@ substrate-keyring = { git = "https://github.com/paritytech/substrate", rev = "6e
 consensus_authorities = { package = "substrate-consensus-authorities", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 runtime-io = { package = "sr-io", git = "https://github.com/paritytech/substrate", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 brand = { path = "../ladderml/brand", default_features = false}
+
+[dependencies.staking]
+default_features = false
+path = "../ladderml/staking"
+package = 'srml-staking'
+
+[dependencies.aura]
+default_features = false
+path = "../ladderml/aura"
+package = 'srml-aura'
 
 [dependencies.signcheck]
 default_features = false

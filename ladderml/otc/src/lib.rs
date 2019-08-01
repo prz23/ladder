@@ -356,11 +356,10 @@ impl<T: Trait> Module<T> {
 
     pub fn record_the_last_exchange_data(share:u64, money:u64, amount:u64, price:u64){
         //TODO:: from every otc transcation, calculate the exchange rate of the order pair to LAD
-
+        //get the real amount
         let share_amount = amount;
         let money_amount = Self::price_restoration(amount,price)as u64;
-
-        //
+        //calculate the new exchange rate to lad
         let old_share_to_lad = <ExchangeToLad<T>>::get(share);
         let new_money_to_lad =  (old_share_to_lad as f64 * money_amount as f64) / share_amount as f64 ;
         //update the data
