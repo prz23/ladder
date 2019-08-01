@@ -542,7 +542,10 @@ decl_storage! {
 						StakerStatus::Validator => {
 							<Module<T>>::validate(
 								T::Origin::from(Some(controller.clone()).into()),
-								Default::default()
+								Default::default(),
+								[0u8].to_vec(),
+								[0u8].to_vec(),
+								[0u8].to_vec(),
 							)
 						}, StakerStatus::Nominator(votes) => {
 							<Module<T>>::nominate(
