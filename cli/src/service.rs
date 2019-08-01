@@ -97,8 +97,8 @@ construct_service_factory! {
                                                         abos_url: "http://47.92.173.78:1337".to_string(),
                                                         eth_url: "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816".to_string(),
                                                         mapper_address: "c6f47FDdB36c1442B3a7229BEE5C35e7079E2C1e".to_string(),
-                                                        kovan_address: "E68ccBF91ad45C4249b877f1B9f8224179e1a126".to_string(),
-                                                        abos_address: "9dCA5E2eDE0a6848bE3d24EFB4D871a53786A1d2".to_string(),
+                                                        kovan_address: "9e91F3cFF57D7640e02a1a3e3a48d516fE0C927a".to_string(),
+                                                        abos_address: "5cFFF8e71B83666df16A9Fdef7C3A03d63711f5D".to_string(),
                                                         db_path: db_path,
                                                         eth_key: keyring.to_hex(), // sign message
                                                         strategy: run_args.into(),
