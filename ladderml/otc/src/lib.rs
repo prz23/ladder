@@ -354,15 +354,18 @@ impl<T: Trait> Module<T> {
         });
     }
 
-    pub fn record_the_last_exchange_data(share:u64, money:u64, _amount:u64, _price:u64){
+    pub fn record_the_last_exchange_data(share:u64, money:u64, amount:u64, price:u64){
+        //TODO:: from every otc transcation, calculate the exchange rate of the order pair to LAD
 
-        //TODO:: some calculate ->
-        let exchange_rate_share = 10;
-        let exchange_rate_money = 10;
+        let share_amount = amount;
+        let money_amount = Self::price_restoration(amount,price)as u64;
 
+        //
+        let old_share_to_lad = <ExchangeToLad<T>>::get(share);
+        let new_money_to_lad =  (old_share_to_lad as f64 * money_amount as f64) / share_amount as f64 ;
         //update the data
-        <ExchangeToLad<T>>::insert(share,exchange_rate_share);
-        <ExchangeToLad<T>>::insert(money,exchange_rate_money);
+        <ExchangeToLad<T>>::insert(share,old_share_to_lad);
+        <ExchangeToLad<T>>::insert(money,new_money_to_lad as u64);
     }
 }
 
