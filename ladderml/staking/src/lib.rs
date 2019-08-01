@@ -649,6 +649,7 @@ decl_module! {
 			let controller = ensure_signed(origin)?;
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
+			ensure!(ledger.active >= <BalanceOf<T>>::sa(50000u64), "Insufficient Active");
 			ensure!(prefs.unstake_threshold <= MAX_UNSTAKE_THRESHOLD, "unstake threshold too large");
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
