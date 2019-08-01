@@ -390,6 +390,20 @@ pub struct Exposure<AccountId, Balance: HasCompact> {
 	pub others: Vec<IndividualExposure<AccountId, Balance>>,
 }
 
+/// NodeIntroduction
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Debug))]
+pub struct NodeIntroduction<AccountId> {
+	/// owner of the node
+    pub accountid: AccountId,
+	/// node name
+	pub name: Vec<u8>,
+	/// website
+	pub site: Vec<u8>,
+	/// node detail
+	pub detail: Vec<u8>,
+}
+
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 type PositiveImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::PositiveImbalance;
 type NegativeImbalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
@@ -507,6 +521,10 @@ decl_storage! {
 
 		/// Most recent `RECENT_OFFLINE_COUNT` instances. (Who it was, when it was reported, how many instances they were offline for).
 		pub RecentlyOffline get(recently_offline): Vec<(T::AccountId, T::BlockNumber, u32)>;
+
+		/// Introduction of Nodes
+		pub NodeInfomation get(node_infomation): map T::AccountId => Option<NodeIntroduction<T::AccountId>>;
+
 	}
 	add_extra_genesis {
 		config(stakers): Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
@@ -645,7 +663,7 @@ decl_module! {
 		/// Effects will be felt at the beginning of the next era.
 		///
 		/// The dispatch origin for this call must be _Signed_ by the controller, not the stash.
-		fn validate(origin, prefs: ValidatorPrefs<BalanceOf<T>>) {
+		fn validate(origin, prefs: ValidatorPrefs<BalanceOf<T>>,name:Vec<u8>,site:Vec<u8>,detail:Vec<u8>) {
 			let controller = ensure_signed(origin)?;
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
@@ -653,6 +671,7 @@ decl_module! {
 			ensure!(prefs.unstake_threshold <= MAX_UNSTAKE_THRESHOLD, "unstake threshold too large");
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
+			<NodeInfomation<T>>::insert(controller.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
 		}
 
 		/// Declare the desire to nominate `targets` for the origin controller.
@@ -683,6 +702,9 @@ decl_module! {
 			let controller = ensure_signed(origin)?;
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
+			if <Validators<T>>::exists(&controller){
+			    <NodeInfomation<T>>::remove(controller);
+			}
 			<Validators<T>>::remove(stash);
 			<Nominators<T>>::remove(stash);
 		}
