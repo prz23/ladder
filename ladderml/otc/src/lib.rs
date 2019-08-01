@@ -3,27 +3,20 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{As,CheckedAdd, CheckedSub, Hash, Verify, Zero};
+//use sr_primitives::traits::{As,CheckedAdd, CheckedSub, Hash, Verify, Zero};
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
-    StorageValue,StorageList,
+    decl_event, decl_module, decl_storage, dispatch::Result, StorageMap,
+    StorageValue,
 };
 
 use system::ensure_signed;
 
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
 pub use std::fmt;
 #[cfg(feature = "std")]
 use runtime_io::with_storage;
-
-// use Encode, Decode
-use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
-
-use runtime_io::*;
 
 use order::{OrderPair,OrderT,Symbol};
 
@@ -93,7 +86,7 @@ decl_module! {
         fn deposit_event<T>() = default;
 
         /// add an exchange pair
-        pub fn new_pair(origin,pair: OrderPair) -> Result {
+        pub fn new_pair(_origin,pair: OrderPair) -> Result {
             <order::Module<T>>::add_pair(pair)?;
             Ok(())
         }
@@ -115,7 +108,7 @@ decl_module! {
             let buyer = ensure_signed(origin)?;
 
             // find the sell order
-            if let Some(mut sellorder) = <order::Module<T>>::sell_order_of((seller,pair,index)){
+            if let Some(sellorder) = <order::Module<T>>::sell_order_of((seller,pair,index)){
                 // make sure the buy operate is valid
                 Self::check_valid_buy(buyer.clone(),amount,sellorder.clone(),acc.clone())?;
                 // do the buy operate and modify the order's status
@@ -130,7 +123,7 @@ decl_module! {
             let sender = ensure_signed(origin)?;
 
             // find  the order
-            if let Some(mut sellorder) = <order::Module<T>>::sell_order_of((sender.clone(),pair_type,index)){
+            if let Some(sellorder) = <order::Module<T>>::sell_order_of((sender.clone(),pair_type,index)){
                 // cancel the sell order and unlock the share not deal yet
                 Self::cancel_order_operate(&sender,sellorder)?;
             }else{
@@ -143,7 +136,7 @@ decl_module! {
             let sender = ensure_signed(origin)?;
 
             // find  the order
-            if let Some(mut sellorder) = <order::Module<T>>::all_sell_orders(index){
+            if let Some(sellorder) = <order::Module<T>>::all_sell_orders(index){
                 // cancel the sell order and unlock the share not deal yet
                 Self::cancel_order_operate(&sender,sellorder)?;
             }else{
@@ -156,7 +149,7 @@ decl_module! {
             //
             let sender = ensure_signed(origin)?;
             // find  the order
-            if let Some(mut sellorder) = <order::Module<T>>::all_sell_orders(index){
+            if let Some(sellorder) = <order::Module<T>>::all_sell_orders(index){
                 // cancel the sell order and unlock the share not deal yet
                 Self::alert_order_operate(sender.clone(),sellorder,amount)?;
             }else{
@@ -213,11 +206,11 @@ impl<T: Trait> Module<T> {
         <order::Module<T>>::generate_new_sell_order_and_put_into_list(who.clone(),pair_type.clone(),amount,per_price,
                                                                       reserved,acc.clone(),acc2.clone());
         // lock the specific kingd of money of amount in bank Module
-        <bank::Module<T>>::lock_token(&who,acc.clone(),pair_type.share,amount,bank::TokenType::OTC);
+        <bank::Module<T>>::lock_token(&who,acc.clone(),pair_type.share,amount,bank::TokenType::OTC).ok();
     }
 
     // buy operate , lock the money and change the status
-    fn buy_operate(buyer:T::AccountId,mut sellorder: OrderT<T>, amount:u64, reserved:bool,acc:Vec<u8>,acc2:Vec<u8>) -> Result {
+    fn buy_operate(buyer:T::AccountId,sellorder: OrderT<T>, amount:u64, reserved:bool,acc:Vec<u8>,acc2:Vec<u8>) -> Result {
 
         let mut sell_order = sellorder.clone();
         // Judge and process this buy operation and update the sell order
@@ -252,7 +245,7 @@ impl<T: Trait> Module<T> {
                 // unlock the left share of seller
                 let left_shares = sell_order.amount - sell_order.already_deal;
                 <bank::Module<T>>::unlock_token(&who,sell_order.acc,sell_order.pair.share,
-                                                left_shares,bank::TokenType::OTC);
+                                                left_shares,bank::TokenType::OTC)?;
             },
             _ => return Err("unknown err"),
         }
@@ -267,12 +260,12 @@ impl<T: Trait> Module<T> {
             //
             let increment_amount = amount - sell_order.amount;
             Self::check_enough_token(&seller,sell_order.acc.clone(),sell_order.pair.share,increment_amount)?;
-            <bank::Module<T>>::lock_token(&seller,sell_order.acc.clone(),sell_order.pair.share,increment_amount,bank::TokenType::OTC);
+            <bank::Module<T>>::lock_token(&seller,sell_order.acc.clone(),sell_order.pair.share,increment_amount,bank::TokenType::OTC)?;
         }else {
             if amount <= sell_order.already_deal {return Err("Cant smaller than already dealed amount.");}
             //
             let decrease_amount = sell_order.amount - amount;
-            <bank::Module<T>>::unlock_token(&seller,sell_order.acc.clone(),sell_order.pair.share,decrease_amount,bank::TokenType::OTC);
+            <bank::Module<T>>::unlock_token(&seller,sell_order.acc.clone(),sell_order.pair.share,decrease_amount,bank::TokenType::OTC)?;
         }
         <order::Module<T>>::alert_order_operate(sell_order,amount);
         Ok(())
@@ -346,7 +339,7 @@ impl<T: Trait> Module<T> {
         // put a new empty vector into the Participant storage
         <Participant<T>>::put([].to_vec() as Vec<(T::AccountId,u64)>);
         // clear the total data using cointype
-        Self::all_coin_type().iter().enumerate().for_each(|(i,coin)|{
+        Self::all_coin_type().iter().enumerate().for_each(|(_i,coin)|{
             <TransactionsQuantityTotal<T>>::insert(coin,0u64);
             <TradingVolumeTotal<T>>::insert(coin,0u128);
         });
@@ -356,12 +349,12 @@ impl<T: Trait> Module<T> {
 
     pub fn inilize_exchange_data(data:Vec<(u64,u64)>){
         //ExchangeToLad get(exchange_to_lad) : map u64 => u64;
-        data.iter().enumerate().for_each(|(i,(coin,exchange_rate))|{
+        data.iter().enumerate().for_each(|(_i,(coin,exchange_rate))|{
             <ExchangeToLad<T>>::insert(coin,exchange_rate);
         });
     }
 
-    pub fn record_the_last_exchange_data(share:u64, money:u64, amount:u64, price:u64){
+    pub fn record_the_last_exchange_data(share:u64, money:u64, _amount:u64, _price:u64){
 
         //TODO:: some calculate ->
         let exchange_rate_share = 10;
@@ -387,7 +380,6 @@ mod tests {
     use support::{StorageMap,StorageValue};
     #[cfg(feature = "std")]
     use rustc_hex::*;
-
 
     impl_outer_origin!{
 		pub enum Origin for Test {}

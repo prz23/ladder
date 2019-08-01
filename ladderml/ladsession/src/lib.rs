@@ -3,23 +3,17 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{As,CheckedAdd, CheckedSub, Hash, Verify, Zero};
+use sr_primitives::traits::As;
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
+    decl_event, decl_module, decl_storage, StorageMap,
     StorageValue,
 };
 
-use system::ensure_signed;
-
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
 pub use std::fmt;
 
-// use Encode, Decode
-use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
 use session::*;
 
 pub trait Trait: system::Trait + session::Trait + otc::Trait + bank::Trait{
@@ -55,7 +49,7 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
 
-    pub fn new_session_start(elapsed: T::Moment, should_reward: bool){
+    pub fn new_session_start(_elapsed: T::Moment, _should_reward: bool){
         Self::transaction_information_processing();
     }
 
@@ -69,7 +63,7 @@ impl<T: Trait> Module<T> {
 
         // trade reward
         let participant_vec = <otc::Module<T>>::participant();
-        participant_vec.iter().enumerate().for_each(|(i,(who,coin))|{
+        participant_vec.iter().enumerate().for_each(|(_i,(who,coin))|{
 
             //TODO::replace with real amount of reward
             let reward_amount_volume = (reward_amount_volume_real * <otc::Module<T>>::exchange_to_lad(coin) )as f64 / 10000f64 ;
@@ -88,7 +82,7 @@ impl<T: Trait> Module<T> {
             //TODO:: coin exchangerate
             let reward_amount_deposit = (reward_amount_deposit_real * <otc::Module<T>>::exchange_to_lad(coin_type) )as f64 / 10000f64 ;
 
-            let total_token_for_this_coin = <bank::Module<T>>::total_token_for_specific_coin(&accountid,&sender,coin_type);
+            //let total_token_for_this_coin = <bank::Module<T>>::total_token_for_specific_coin(&accountid,&sender,coin_type);
             let reward = ((<bank::Module<T>>::total_token_for_specific_coin(accountid,&sender,coin_type) as f64
                                / T::Balance::as_(<bank::Module<T>>::coin_deposit(coin_type)) as f64) * reward_amount_deposit ) as u64;
             <bank::Module<T>>::deposit_reward(accountid,reward);

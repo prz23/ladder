@@ -3,25 +3,23 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{CheckedAdd, CheckedSub, Hash, Verify, Zero};
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
+    decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap,
     StorageValue,
 };
 
 use system::ensure_signed;
 
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
 pub use std::fmt;
+#[cfg(feature = "std")]
+use runtime_io::with_storage;
 
 // use Encode, Decode
 use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
 
-use runtime_io::*;
 
 pub trait Trait: system::Trait + session::Trait{
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -154,7 +152,7 @@ impl<T: Trait> Module<T> {
             <AlreadySentTx<T>>::insert(&transcation,0);
         }
 
-        /// Preventing duplication of same signature
+        // Preventing duplication of same signature
         let mut repeat_vec = Self::repeat_prevent(transcation);
         ensure!(!repeat_vec.contains(&sign),"This signature is repeat!");
         // ensure!(!repeat_vec.iter().find(|&t| t == &sign).is_none(), "Cannot deposit if already in queue.");
@@ -196,7 +194,7 @@ impl<T: Trait> Module<T> {
 
 
     pub fn inilize_secp256( pubkey_vec :Vec<(T::AccountId,Vec<u8>)> ,ath:Vec<T::SessionKey>) {
-        pubkey_vec.iter().enumerate().for_each(|(i,(id,pubkey))|{
+        pubkey_vec.iter().enumerate().for_each(|(_i,(id,pubkey))|{
             <LadderPubkey<T>>::insert(id,pubkey);
         });
 
@@ -218,7 +216,9 @@ impl<T: Trait> Module<T> {
     }
 
     pub fn secp256_verification(message: Vec<u8>, signature:Vec<u8>, pubkey:Vec<u8>) -> Result{
+        //  \x19Ethereum Signed Message:\n
         let mut eth_header_vec:Vec<u8> = [25u8, 69, 116, 104, 101, 114, 101, 117, 109, 32, 83, 105, 103, 110, 101, 100, 32, 77, 101, 115, 115, 97, 103, 101, 58, 10].to_vec();
+
         let mut lenth_vec:Vec<u8> = Self::intu64_to_u8vec(message.len() as u64);
         let mut messageclone = message.clone();
 
@@ -237,18 +237,16 @@ impl<T: Trait> Module<T> {
                     return Err("Not Match!");
                 }
             },
-            Err(y) => return Err("Secp256k1 FAILED!"),
+            Err(_y) => return Err("Secp256k1 FAILED!"),
         }
     }
 
     /// convert intu64 into Vec<u8>
-    pub fn intu64_to_u8vec(number: u64) -> Vec<u8> {
-        let mut num = number.clone();
-        let mut leftover = 0;
+    pub fn intu64_to_u8vec(mut num: u64) -> Vec<u8> {
         let mut output :Vec<u8> = [].to_vec();
         loop{
             if num != 0 {
-                leftover = num%10 + 48;
+                let leftover = num%10 + 48;
                 num = num/10;
                 output.push(leftover as u8);
             }else {
@@ -291,6 +289,23 @@ mod tests {
         type Header = Header;
         type Event = ();
         type Log = DigestItem;
+    }
+
+    impl consensus::Trait for Test {
+        type Log = DigestItem;
+        type SessionKey = UintAuthorityId;
+        type InherentOfflineReport = ();
+    }
+
+    impl timestamp::Trait for Test {
+        type Moment = u64;
+        type OnTimestampSet = ();
+    }
+
+    impl session::Trait for Test {
+        type ConvertAccountIdToSessionKey = ConvertUintAuthorityId;
+        type OnSessionChange = ();
+        type Event = ();
     }
 
     impl Trait for Test {

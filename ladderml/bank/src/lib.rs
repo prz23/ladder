@@ -3,15 +3,14 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{As, CheckedAdd, CheckedSub, Hash, One, Verify, Zero};
+use sr_primitives::traits::{As, CheckedSub, Hash, One, Zero};
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
+    decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap,
     StorageValue,
 };
 
 use system::ensure_signed;
 
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
@@ -19,10 +18,8 @@ pub use std::fmt;
 #[cfg(feature = "std")]
 use runtime_io::with_storage;
 
-
 // use Encode, Decode
 use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
 
 use support::traits::Currency;
 
@@ -69,7 +66,7 @@ decl_module! {
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("Signature is Verified") ,
+                Ok(_y) =>  runtime_io::print("Signature is Verified") ,
                 Err(x) => return Err(x),
             }
 
@@ -109,7 +106,7 @@ decl_module! {
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("Signature is Verified") ,
+                Ok(_y) =>  runtime_io::print("Signature is Verified") ,
                 Err(x) => return Err(x),
             }
 
@@ -198,7 +195,7 @@ decl_module! {
 
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("Signature is Verified") ,
+                Ok(_y) =>  runtime_io::print("Signature is Verified") ,
                 Err(x) => return Err(x),
             }
             // ensure no repeat
@@ -337,14 +334,14 @@ impl<T: Trait> Module<T>
         let mut messagedrain = message.clone();
 
         // Coin 0-32
-        let mut coin_vec: Vec<_> = messagedrain.drain(0..8).collect();
-        let mut coin_type = Self::u8array_to_u64(coin_vec.as_slice());
+        let coin_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        let coin_type = Self::u8array_to_u64(coin_vec.as_slice());
         //sender
         let mut sender_vec: Vec<_> = messagedrain.drain(0..20).collect();
         let sender: Vec<u8> = sender_vec.drain(0..20).collect();
 
         // Who 33-64
-        let mut who_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        let who_vec: Vec<_> = messagedrain.drain(0..32).collect();
         let who: T::AccountId = Decode::decode(&mut &who_vec[..]).unwrap();
 
         //65-96
@@ -370,14 +367,14 @@ impl<T: Trait> Module<T>
         let mut messagedrain = message.clone();
 
         // Coin 0-32
-        let mut coin_vec: Vec<_> = messagedrain.drain(0..8).collect();
+        let coin_vec: Vec<_> = messagedrain.drain(0..8).collect();
         //coin_vec.drain(0..24);
-        let mut coin_type = Self::u8array_to_u64(coin_vec.as_slice());
+        let coin_type = Self::u8array_to_u64(coin_vec.as_slice());
 
         // Id 0-32
         let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
         id_vec.drain(0..16);
-        let mut id = Self::u8array_to_u128(id_vec.as_slice());
+        let id = Self::u8array_to_u128(id_vec.as_slice());
 
 
         //sender
@@ -385,7 +382,7 @@ impl<T: Trait> Module<T>
         let sender:Vec<u8> = sender_vec.drain(0..20).collect();
 
         // Who 33-64
-        let mut who_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        let who_vec: Vec<_> = messagedrain.drain(0..32).collect();
         let who: T::AccountId = Decode::decode(&mut &who_vec[..]).unwrap();
 
         //65-96
@@ -403,15 +400,6 @@ impl<T: Trait> Module<T>
         let signature_hash =  T::Hashing::hash( &signature[..]);
 
         return (tx_hash,who,amountu64,signature_hash,coin_type,id as u64,sender);
-    }
-
-    pub fn signature521(signature: Vec<u8>, hash: Vec<u8>){
-        //ensure the signature is valid
-        let mut tx_hash_to_check:[u8;65] = [0;65];
-        tx_hash_to_check.clone_from_slice(&hash);
-        let mut signature_hash_to_check:[u8;32] = [0;32];
-        signature_hash_to_check.clone_from_slice(&signature);
-        Self::check_secp512(&tx_hash_to_check,&signature_hash_to_check).is_ok();
     }
 
     /// Hook to be called after transaction processing.
@@ -473,16 +461,16 @@ impl<T: Trait> Module<T>
 
     /// Record the reward and click on it to get the money.
     fn count_draw_reward(accountid: T::AccountId) -> T::Balance {
-        let mut reward= <RewardRecord<T>>::get(accountid.clone());
+        let reward= <RewardRecord<T>>::get(accountid.clone());
         <RewardRecord<T>>::insert(accountid,T::Balance::sa(0));
         reward
     }
 
-    /// Record the reward and click on it to get the money.
+    /* Record the reward and click on it to get the money.
     fn reward_deposit_record() {
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
             let depositing_vec = <DespositingBalance<T>>::get(v);
-            depositing_vec.iter().enumerate().for_each(|(i,&(balances,cointype))| {
+            depositing_vec.iter().enumerate().for_each(|(_i,&(balances,cointype))| {
                 let reward = Self::reward_set(v.clone(),<DespositingTime<T>>::get(v),balances);
                 let now_reward = <RewardRecord<T>>::get(v);
                 <RewardRecord<T>>::insert(v,reward+now_reward);
@@ -490,15 +478,16 @@ impl<T: Trait> Module<T>
             });
         });
     }
+    */
 
     /// Money awarded directly to a specified deposit account in each session
     fn reward_deposit() {
-        Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
+        Self::despositing_account().iter().enumerate().for_each(|(_i,_v)|{
         });
     }
 
-
-    fn reward_set(who: T::AccountId, session: u32, money: T::Balance) -> T::Balance {
+/*
+    fn reward_set(_who: T::AccountId, session: u32, money: T::Balance) -> T::Balance {
 
         let session_value = Self::reward_session_value();
         let session_factor = Self::reward_session_factor();
@@ -506,17 +495,16 @@ impl<T: Trait> Module<T>
         let x1 = session_value[0];  let x2 = session_value[1];  let x3 = session_value[2];
         let y1 = session_factor[0];  let y2 = session_factor[1];  let y3 = session_factor[2]; let y4 = session_factor[3];
 
-        #[warn(unused_assignments)]
-            let mut final_se = 0;
+        let final_se =
         if session <= x1 {
-            final_se = y1;
+            y1
         } else if session <= x2 {
-            final_se = y2;
+            y2
         } else if session <= x3 {
-            final_se = y3;
+            y3
         } else {
-            final_se = y4;
-        }
+            y4
+        };
 
         let balance_value = Self::reward_balance_value();
         let balance_factor = Self::reward_balance_factor();
@@ -524,29 +512,26 @@ impl<T: Trait> Module<T>
         let xx1 = balance_value[0];  let xx2 = balance_value[1];  let xx3 = balance_value[2];
         let yy1 = balance_factor[0];  let yy2 = balance_factor[1];  let yy3 = balance_factor[2]; let yy4 = balance_factor[3];
 
-        let mut final_ba = 0;
+        let final_ba =
         if money <= xx1 {
-            final_ba = yy1;
+            yy1
         } else if money <= xx2 {
-            final_ba = yy2;
+            yy2
         } else if money <= xx3 {
-            final_ba = yy3;
+            yy3
         } else {
-            final_ba = yy4;
-        }
+            yy4
+        };
 
-        let rate =  (final_se * final_ba);
+        let rate =  final_se * final_ba;
         money*T::Balance::sa(rate as u64)/T::Balance::sa(100 as u64)
     }
-
+*/
     fn check_signature(who: T::AccountId, tx: T::Hash, signature: T::Hash,message_hash: Vec<u8>) -> Result {
         //ensure enough signature
         <signcheck::Module<T>>::check_signature(who,tx,signature ,message_hash)
     }
 
-    pub fn check_secp512(signature: &[u8; 65], tx: &[u8; 32]) -> Result {
-        Ok(())
-    }
 
     pub fn initlize(who: T::AccountId){
         let mut depositing_vec = <DespositingBalance<T>>::get(who.clone());
@@ -601,7 +586,7 @@ impl<T: Trait> Module<T>
             LockType::OTCLock => <DespositingBalanceReserved<T>>::get(who.clone()) ,
             LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::get(who.clone())
         };
-        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+        all_data_vec.iter().enumerate().for_each(|(_i,&(bal,_ctype))|{
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
             if bal != T::Balance::sa(0u64) {
                 deposit_total = deposit_total + 1;
@@ -648,7 +633,7 @@ impl<T: Trait> Module<T>
         //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
         let mut deposit_total = 0;
         let all_data_vec = <DespositingBalance<T>>::get(who.clone());
-        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+        all_data_vec.iter().enumerate().for_each(|(_i,&(bal,_ctype))|{
             if bal != T::Balance::sa(0u64) {
                 deposit_total = deposit_total + 1;
             }
@@ -737,20 +722,20 @@ impl<T: Trait> Module<T>
     }
 
     // Input coin type , Output the corresponding amount of ladder balance
-    pub fn deposit_exchange(coin_type:u64) -> u64 {
+    pub fn deposit_exchange(_coin_type:u64) -> u64 {
         5u64
     }
-
+/*
     pub fn balancetest(x1:T::Balance,x2:T::Balance){
-        let aa = T::Balance::sa(4);
-        <T as balances::Trait>::Balance::sa(5);
-        x1.checked_add(&x2);
+        //let aa = T::Balance::sa(4);
+        //<T as balances::Trait>::Balance::sa(5);
+        //x1.checked_add(&x2);
     }
-
+*/
     // make sure the lock record exist
     pub fn check_lock_exist(who:T::AccountId,lock_type:LockType) {
         //let mut is_none = false;
-        let mut depositing_vec_lock = match lock_type {
+        let depositing_vec_lock = match lock_type {
             LockType::OTCLock => <DespositingBalanceReserved<T>>::get(who.clone()) ,
             LockType::WithDrawLock => <DespositingBalanceWithdraw<T>>::get(who.clone())
         };
@@ -816,12 +801,11 @@ impl<T: Trait> Module<T>
 
     // return the amout of the token of  the cointype of who
     pub fn specific_token_free_amount(who:T::AccountId , cointype: u64) -> T::Balance{
-        let mut deposit_total = 0;
         let mut amount_on_sale = T::Balance::sa(0);
         let all_data_vec = <DespositingBalance<T>>::get(who.clone());
         if all_data_vec == [].to_vec() { return amount_on_sale;}
 
-        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+        all_data_vec.iter().enumerate().for_each(|(_i,&(bal,ctype))|{
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
             if ctype == cointype {
                 if bal == T::Balance::sa(0) {
@@ -834,11 +818,10 @@ impl<T: Trait> Module<T>
     }
 
     /// Find out if the person(who) has locked token(cointype) ,is true return the amount
-    pub fn is_specific_token_on_sale (who:T::AccountId , cointype: u64 ,lock_type:LockType) -> T::Balance{
-        let mut deposit_total = 0;
+    pub fn is_specific_token_on_sale (who:T::AccountId , cointype: u64 ,_lock_type:LockType) -> T::Balance{
         let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
         let mut amount_on_sale = T::Balance::sa(0);
-        all_data_vec.iter().enumerate().for_each(|(i,&(bal,ctype))|{
+        all_data_vec.iter().enumerate().for_each(|(_i,&(bal,ctype))|{
             // check each cointype s deposit balance , if not zero , DepositngAccountTotal plus 1 .
             if ctype == cointype {
                 if bal == T::Balance::sa(0) {
@@ -860,7 +843,7 @@ impl<T: Trait> Module<T>
             // free token is enough for the withdraw , do the lock/unlock operation
             match Self::lock_token(&who,sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
                 Ok(()) =>   return T::Balance::sa(withdraw_amount),
-                Err(x) => return  T::Balance::sa(0),
+                Err(_x) => return  T::Balance::sa(0),
             }
         }
         // if the free token is less than the requested amount
@@ -874,7 +857,7 @@ impl<T: Trait> Module<T>
             // so the free token is reachable.
             match Self::lock_token(&who,sender.clone(),cointype,free_token,TokenType::WithDraw){
                 Ok(()) =>  return T::Balance::sa(free_token),
-                Err(x) => return  T::Balance::sa(0),
+                Err(_x) => return  T::Balance::sa(0),
             }
         }else {
             //Cancel all sell orders  , TODO:: Processing only part of sell orders
@@ -882,7 +865,10 @@ impl<T: Trait> Module<T>
             // if success canceled , Then turn (amount_on_sale) from OTC_lock into free
             // in this case , if the free token is zero , the unlock will init the data
             // else , business as usual
-            Self::unlock_token(&who,sender.clone(),cointype,amount_on_sale,TokenType::OTC);
+            match Self::unlock_token(&who,sender.clone(),cointype,amount_on_sale,TokenType::OTC){
+                Ok(()) => runtime_io::print("ok"),
+                Err(_x) => return  T::Balance::sa(0),
+            };
             // retrieve the updated free token  notice that [ new_free_amount = amount_on_sale + free_token ]
             let new_free_amount = Self::free_token_for_specific_coin(who.clone(),sender.clone(),cointype);
             // lock the The Optimum Range of Lockable token
@@ -890,14 +876,14 @@ impl<T: Trait> Module<T>
                 // free token is sufficient,  Then turn (withdraw_amount) from free into Withdraw_lock
                 match  Self::lock_token(&who,sender.clone(),cointype,withdraw_amount,TokenType::WithDraw){
                     Ok(()) =>  return T::Balance::sa(withdraw_amount),
-                    Err(x) => return T::Balance::sa(0),
+                    Err(_x) => return T::Balance::sa(0),
                 }
             }else {
                 //TODO::this situation is supposed not to happen
                 // free token is not sufficient,  Then turn all(new_free_amount) from free into Withdraw_lock
                 match Self::lock_token(&who,sender.clone(),cointype,new_free_amount,TokenType::WithDraw){
                     Ok(()) => return T::Balance::sa(new_free_amount),
-                    Err(x) => return T::Balance::sa(0),
+                    Err(_x) => return T::Balance::sa(0),
                 }
             }
         }
@@ -969,33 +955,31 @@ impl<T: Trait> Module<T>
         Ok(())
     }
 
-    pub fn iterator_all_token_for_who<F>(who:T::AccountId,mut func: F) -> Result
+    pub fn iterator_all_token_for_who<F>(who:T::AccountId,mut func: F)
         where F: FnMut(u64,Vec<u8>) -> Result
     {
         let accountid_coin_vec = Self::deposit_account_coin_list(who.clone());
-        accountid_coin_vec.iter().enumerate().for_each(|(ib,&coin_type)|{
+        accountid_coin_vec.iter().enumerate().for_each(|(_ib,&coin_type)|{
             let sender_vec = Self::deposit_sender_list((who.clone(),coin_type));
-            sender_vec.iter().enumerate().for_each(|(ic,sender)|{
-                func(coin_type,sender.to_vec());
+            sender_vec.iter().enumerate().for_each(|(_ic,sender)|{
+                func(coin_type,sender.to_vec()).ok();;
             });
         });
-        Ok(())
     }
 
-    pub fn iterator_all_token<F>(mut func: F) -> Result
+    pub fn iterator_all_token<F>(mut func: F)
         where F: FnMut(&T::AccountId,u64,Vec<u8>) -> Result
     {
         let all_deposit_account = Self::deposit_ladder_account_list();
-        all_deposit_account.iter().enumerate().for_each(|(ia,accountid)|{
+        all_deposit_account.iter().enumerate().for_each(|(_ia,accountid)|{
             let accountid_coin_vec = Self::deposit_account_coin_list(accountid);
-            accountid_coin_vec.iter().enumerate().for_each(|(ib,&coin_type)|{
+            accountid_coin_vec.iter().enumerate().for_each(|(_ib,&coin_type)|{
                 let sender_vec = Self::deposit_sender_list((accountid.clone(),coin_type));
-                sender_vec.iter().enumerate().for_each(|(ic,sender)|{
-                    func(accountid,coin_type,sender.to_vec());
+                sender_vec.iter().enumerate().for_each(|(_ic,sender)|{
+                    func(accountid,coin_type,sender.to_vec()).ok();
                 });
             });
         });
-        Ok(())
     }
 
     pub fn free_token_for_specific_coin(who:T::AccountId,sender:Vec<u8>,coin_type:u64) -> u64{
@@ -1020,7 +1004,7 @@ impl<T: Trait> Module<T>
         Self::iterator_all_token(|accountid,coin_type,sender|{
             let total_token_for_this_coin = Self::total_token_for_specific_coin(&accountid,&sender,coin_type);
             let reward = Self::reward_calcul(total_token_for_this_coin);
-            Self::reward_token(&accountid,sender.clone(),coin_type,reward);
+            Self::reward_token(&accountid,sender.clone(),coin_type,reward)?;
             <RewardRecord<T>>::mutate(accountid,|bal| *bal = *bal+ T::Balance::sa(reward) );
             Self::calculate_total_reward(coin_type,T::Balance::sa(reward),true);
             Ok(())
@@ -1045,7 +1029,7 @@ impl<T: Trait> Module<T>
                 <DepositSenderList<T>>::insert((who.clone(),coin_type),sender_vec);
             }
             // then, check the same owner and  the same coin type  with different senders are zero
-            let mut sender_vec_2 = Self::deposit_sender_list((who.clone(),coin_type));
+            let sender_vec_2 = Self::deposit_sender_list((who.clone(),coin_type));
                  if sender_vec_2.is_empty(){
                 // delete the coin_type
                 let mut coin_type_vec = Self::deposit_account_coin_list(who.clone());
@@ -1131,6 +1115,7 @@ mod tests {
     use signcheck;
     #[cfg(feature = "std")]
     use rustc_hex::*;
+    use runtime_io::*;
 
     impl_outer_origin!{
 		pub enum Origin for Test {}

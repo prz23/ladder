@@ -5,7 +5,6 @@
 
 
 use session;
-use balances;
 use rstd::prelude::Vec;
 use runtime_primitives::traits::*;
 use { system::{self, ensure_signed}};
@@ -99,7 +98,7 @@ decl_module! {
         }
 
         pub fn contain_tx(origin) {
-            let sender:  T::AccountId = ensure_signed(origin)?;
+            let _sender:  T::AccountId = ensure_signed(origin)?;
         }
 
 		}

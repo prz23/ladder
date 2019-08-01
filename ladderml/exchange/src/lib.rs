@@ -3,23 +3,17 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{CheckedAdd, CheckedSub, Hash, Verify, Zero};
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
+    decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap,
     StorageValue,
 };
 
 use system::ensure_signed;
 
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
 pub use std::fmt;
-
-// use Encode, Decode
-use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
 
 pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -73,7 +67,7 @@ decl_module! {
             Ok(())
         }
 
-        pub  fn check_exchange(origin, message: Vec<u8>, signature: Vec<u8>) -> Result{
+        pub  fn check_exchange(origin, message: Vec<u8>, _signature: Vec<u8>) -> Result{
             let sender = ensure_signed(origin)?;
             let (exchangerate, time, extype) = Self::parse_tx_data(message);
 
@@ -86,14 +80,6 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-    fn _verify(_tx: T::Hash) -> Result {
-        //TODO:verify signature or others
-        Ok(())
-    }
-
-    pub fn check_validator(accountid: &T::AccountId) -> bool {
-        return false;
-    }
 
     /// Sign and determine if the current number of signatures is sufficient to send an event
     pub fn check_signature(who: T::AccountId, exchangerate: u64, time: u64, extype: u64) -> Result {
@@ -134,14 +120,14 @@ impl<T: Trait> Module<T> {
         Self::deposit_event(RawEvent::TranscationVerified(time, stored_vec));
         Ok(())
     }
-
+/*
     fn parse_data(message: Vec<u8>, signature: Vec<u8>) -> (T::AccountId, u64, u64, u64) {
         let mut messagedrain = message.clone();
         let hash: Vec<_> = messagedrain.drain(0..32).collect();
 
-        let tx_hash: T::Hash = Decode::decode(&mut &hash[..]).unwrap();
+        let _tx_hash: T::Hash = Decode::decode(&mut &hash[..]).unwrap();
 
-        let signature_hash: T::Hash = Decode::decode(&mut &signature[..]).unwrap();
+        let _signature_hash: T::Hash = Decode::decode(&mut &signature[..]).unwrap();
 
         let time: Vec<_> = messagedrain.drain(0..8).collect();
         let who: T::AccountId = Decode::decode(&mut &time[..]).unwrap();
@@ -181,7 +167,7 @@ impl<T: Trait> Module<T> {
 
         return (who, rate, time, extype);
     }
-
+*/
     /// parse_tx_data
     fn parse_tx_data(message: Vec<u8>) -> (u64, u64, u64) {
         let mut messagedrain = message.clone();
@@ -189,18 +175,18 @@ impl<T: Trait> Module<T> {
         // exchange rate
         let mut rate_vec: Vec<u8> = messagedrain.drain(0..8).collect();
         rate_vec.reverse();
-        let mut rate_u64 = Self::u8array_to_u64(rate_vec.as_slice());
+        let rate_u64 = Self::u8array_to_u64(rate_vec.as_slice());
 
 
         // time of the exchangerate
         let mut time_vec: Vec<_> = messagedrain.drain(0..8).collect();
         time_vec.reverse();
-        let mut time_u64 = Self::u8array_to_u64(time_vec.as_slice());
+        let time_u64 = Self::u8array_to_u64(time_vec.as_slice());
 
         // pair type of the rate
         let mut pair_vec: Vec<_> = messagedrain.drain(0..8).collect();
         pair_vec.reverse();
-        let mut pair_u64 = Self::u8array_to_u64(pair_vec.as_slice());
+        let pair_u64 = Self::u8array_to_u64(pair_vec.as_slice());
 
         return (rate_u64, time_u64, pair_u64);
     }

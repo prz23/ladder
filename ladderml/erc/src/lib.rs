@@ -3,15 +3,14 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{As, CheckedAdd, CheckedSub, Hash, One, Verify, Zero};
+use sr_primitives::traits::{As, Hash,};
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
+    decl_event, decl_module, decl_storage, dispatch::Result, ensure, StorageMap,
     StorageValue,
 };
 
 use system::ensure_signed;
 
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
@@ -23,7 +22,6 @@ use session::OnSessionChange;
 
 // use Encode, Decode
 use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
 
 use support::traits::Currency;
 
@@ -96,7 +94,7 @@ decl_module! {
             let tx_hash = T::Hashing::hash( &message[..]);
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("ok") ,
+                Ok(_y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
             // save the erc info
@@ -127,7 +125,7 @@ decl_module! {
             let tx_hash = T::Hashing::hash( &message[..]);
             //check the validity and number of signatures
             match  Self::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("ok") ,
+                Ok(_y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
             // ensure no repeat
@@ -141,7 +139,7 @@ decl_module! {
             match Self::is_valid_unlock(who.clone(),id){
                 Ok(()) => { Self::depositing_withdraw_record(who.clone(),r.value,1,false);
                            Self::calculate_total_deposit(r.value,false);
-                           Self::change_status(who.clone(),id);},
+                           Self::change_status(who.clone(),id)?;},
                 Err(x) => return Err(x),
             }
 
@@ -226,12 +224,12 @@ impl<T: Trait> Module<T>
         // Id 0-32
         let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
         id_vec.drain(0..16);
-        let mut id = Self::u8array_to_u128(id_vec.as_slice());
+        let id = Self::u8array_to_u128(id_vec.as_slice());
         //sender
         let mut sender_vec: Vec<_> = messagedrain.drain(0..20).collect();
         let sender = sender_vec.drain(0..20).collect();
         // Who 33-64  beneficiary
-        let mut who_vec: Vec<_> = messagedrain.drain(0..32).collect();
+        let who_vec: Vec<_> = messagedrain.drain(0..32).collect();
         let who: T::AccountId = Decode::decode(&mut &who_vec[..]).unwrap();
         //65-96  value
         let mut amount_vec:Vec<u8> = messagedrain.drain(0..32).collect();
@@ -244,7 +242,7 @@ impl<T: Trait> Module<T>
         //65-96  cycle
         let mut cycle_vec:Vec<u8> = messagedrain.drain(0..32).collect();
         cycle_vec.drain(0..16);
-        let mut cycle128 = Self::u8array_to_u128(cycle_vec.as_slice());
+        let cycle128 = Self::u8array_to_u128(cycle_vec.as_slice());
         let hash:Vec<u8> = messagedrain.drain(0..32).collect();
         //let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
         // Signature_Hash
@@ -259,7 +257,7 @@ impl<T: Trait> Module<T>
         // Coin 0-32
         let mut id_vec: Vec<_> = messagedrain.drain(0..32).collect();
         id_vec.drain(0..16);
-        let mut id = Self::u8array_to_u128(id_vec.as_slice());
+        let id = Self::u8array_to_u128(id_vec.as_slice());
         let hash: Vec<u8> = messagedrain.drain(0..32).collect();
         //let tx_hash = Decode::decode(&mut &hash[..]).unwrap();
         // Signature_Hash
@@ -276,7 +274,7 @@ impl<T: Trait> Module<T>
     fn adjust_deposit_list(){
         // update the session time of the depositing account
         Self::despositing_account().iter().enumerate().for_each(|(_i,v)|{
-            Self::account_lock_count(v).iter().enumerate().for_each(|(lock_index,&index)| {
+            Self::account_lock_count(v).iter().enumerate().for_each(|(_lock_index,&index)| {
                 if let Some(mut r) = <LockInfoList<T>>::get((v.clone(),index)){
                     let now = <timestamp::Module<T>>::get();
                     let u64now = T::Moment::as_(now);
@@ -309,7 +307,7 @@ impl<T: Trait> Module<T>
                         r.reward = r.reward + reward;
                         <LockInfoList<T>>::insert((v.clone(),index),r.clone());
                         // reward to user
-                        T::Currency::deposit_into_existing(&v, <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(reward)));
+                        T::Currency::deposit_creating(&v, <BalanceOf<T> as As<u64>>::sa(T::Balance::as_(reward)));
                     }
                 }
             });
@@ -333,14 +331,9 @@ impl<T: Trait> Module<T>
         <signcheck::Module<T>>::check_signature(who,tx, signature,message_hash)
     }
 
-    pub fn check_secp512(signature: &[u8; 65], tx: &[u8; 32]) -> Result {
-        Ok(())
-    }
 
     pub fn initlize(who: T::AccountId){
-        let mut depositing_erc = <AccountLockToken<T>>::get(who.clone());
-        depositing_erc = T::Balance::sa(0);
-        <AccountLockToken<T>>::insert(who.clone(),depositing_erc);
+        <AccountLockToken<T>>::insert(who.clone(),T::Balance::sa(0));
     }
 
     fn uninitlize(who: T::AccountId) {
@@ -348,19 +341,20 @@ impl<T: Trait> Module<T>
     }
 
     /// Adjust deposing_list            beneficiary         value              cycle           in out
-    pub fn depositing_withdraw_record(who: T::AccountId, balance:T::Balance, cycle:u64, d_w: bool){
+    pub fn depositing_withdraw_record(who: T::AccountId, balance:T::Balance, _cycle:u64, d_w: bool){
         if Self::despositing_account().iter().find(|&t| t == &who).is_none() {
             Self::initlize(who.clone());
         }
-        let mut depositing_erc = <AccountLockToken<T>>::get(who.clone());
-        let mut new_balance = T::Balance::sa(0);
+        let depositing_erc = <AccountLockToken<T>>::get(who.clone());
+
+        let new_balance=
          if d_w {
               //deposit
-             new_balance = depositing_erc + balance;
+             depositing_erc + balance
          }else {
              //withdraw
-             new_balance = depositing_erc - balance;
-         }
+             depositing_erc - balance
+         };
         // change the depositing data vector and put it back to map
         <AccountLockToken<T>>::insert(who.clone(),new_balance);
         Self::depositing_access_control(who);
@@ -369,7 +363,7 @@ impl<T: Trait> Module<T>
     /// use DepositngAccountTotal to control  DespoitingAccount
     pub fn depositing_access_control(who:T::AccountId){
         //let mut deposit_total = <DepositngAccountTotal<T>>::get(who.clone());
-        let mut deposit_total = 0;
+
         let all_data_vec = <AccountLockToken<T>>::get(who.clone());
 
         // if all type of coin is Zero ,  the accountid will be removed from the DepositingVec.
@@ -457,7 +451,7 @@ impl<T: Trait> Module<T>
 
     pub fn save_erc_info(beneficiary:T::AccountId,index:u64,sender:Vec<u8>,value:T::Balance,cycle:u64,txhash: Vec<u8>) -> Result{
         // find the infomation
-        if let Some(r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
+        if let Some(_r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
             //  already have
             return Err("duplicate erc lock info");
         }else {
@@ -486,7 +480,7 @@ impl<T: Trait> Module<T>
 
     ///make sure the account lock the Regulations times
     pub fn is_valid_unlock(beneficiary:T::AccountId,index:u64,) -> Result{
-        if let Some(mut r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
+        if let Some(r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
             if r.status == Status::Unlock{
                 return Ok(());
             }else {
@@ -509,15 +503,15 @@ impl<T: Trait> Module<T>
     }
 
     pub fn get_reward(beneficiary:T::AccountId,index:u64){
-        if let Some(mut r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
-            let old_reward = r.reward;
+        if let Some(r) = <LockInfoList<T>>::get((beneficiary.clone(),index)){
+            let _old_reward = r.reward;
         }
         //TODO::insert
     }
 }
 
 impl<T: Trait> OnSessionChange<T::Moment> for Module<T> {
-    fn on_session_change(elapsed: T::Moment, should_reward: bool) {
+    fn on_session_change(_elapsed: T::Moment, _should_reward: bool) {
         Self::erc_new_session();
     }
 }

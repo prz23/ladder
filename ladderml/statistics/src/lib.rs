@@ -3,23 +3,15 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{CheckedAdd, CheckedSub, Hash, Verify, Zero};
-use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
-    StorageValue,
-};
+#[warn(unused_imports)]
+use support::{decl_event, decl_module, decl_storage, StorageMap,};
 
-use system::ensure_signed;
+//use system::ensure_signed;
 
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
 pub use std::fmt;
-
-// use Encode, Decode
-use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
 
 pub trait Trait: system::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -63,21 +55,10 @@ decl_module! {
 
         fn deposit_event<T>() = default;
 
-        ///
-        pub  fn set_min_num(origin,new_num: u64) -> Result{
-
-            Ok(())
-        }
-
-
     }
 }
 
 impl<T: Trait> Module<T> {
-    fn verify(_tx: T::Hash) -> Result {
-
-        Ok(())
-    }
 
     //Basic storage operations
     ///increase amount of coin_type to the total volume record
@@ -127,7 +108,7 @@ impl<T: Trait> Module<T> {
 
     // in bank iterator_all_token() and calculate the amout
     pub fn calculate_reward_for_each(who:&T::AccountId,coin_type:u64){
-        let (a,b) = Self::calculate_a_b(who,coin_type);
+        let (_a,_b) = Self::calculate_a_b(who,coin_type);
     }
 
 }

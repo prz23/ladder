@@ -434,11 +434,6 @@ impl_runtime_apis! {
 			Consensus::authorities().contains(id)
 		}
 
-		/// check the accountid has the access to update the exchange rate data or not
-	    fn check_validator(account: &AccountId) -> bool {
-	       Exchange::check_validator(account)
-	    }
-
         fn price_of(tag: u64) -> u64 {
             Exchange::latest_exrate(tag)
         }
@@ -451,7 +446,7 @@ decl_runtime_apis! {
 	pub trait VendorApi {
 		fn account_nonce(account: &AccountId) -> Nonce;
 		fn is_authority(id: &SessionKey) -> bool;
-		fn check_validator(account: &AccountId) -> bool;
+		//fn check_validator(account: &AccountId) -> bool;
         fn price_of(tag: u64) -> u64;
 	}
 }

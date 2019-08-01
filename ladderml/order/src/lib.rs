@@ -3,15 +3,14 @@
 #[cfg(feature = "std")]
 use serde_derive::{Deserialize, Serialize};
 
-use sr_primitives::traits::{As,CheckedAdd, CheckedSub, Hash, Verify, Zero};
+use sr_primitives::traits::{Hash, Zero};
 use support::{
-    decl_event, decl_module, decl_storage, dispatch::Result, ensure, Parameter, StorageMap,
+    decl_event, decl_module, decl_storage, dispatch::Result, StorageMap,
     StorageValue,
 };
 
 use system::ensure_signed;
 
-use rstd::marker::PhantomData;
 use rstd::prelude::*;
 
 #[cfg(feature = "std")]
@@ -19,9 +18,6 @@ pub use std::fmt;
 
 // use Encode, Decode
 use parity_codec::{Decode, Encode};
-use rstd::ops::Div;
-
-use runtime_io::*;
 
 pub trait Trait: system::Trait + signcheck::Trait{
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
@@ -38,21 +34,21 @@ pub struct OrderPair {
 
 #[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
 #[cfg_attr(feature = "std", derive(Debug))]
-pub struct OrderContent<pair,AccountID,symbol,status> {
-    pub pair: pair,          // exchange pair
+pub struct OrderContent<Pair,AccountID,Symbol,Status> {
+    pub pair: Pair,          // exchange pair
     pub index: u64,          // sell order index assigned for a specific user
     pub who: AccountID,      //  seller
-    pub amount: symbol,      // share
-    pub price: symbol,       // price
-    pub already_deal:symbol, // already sold
-    pub status: status,      // sell order status
+    pub amount: Symbol,      // share
+    pub price: Symbol,       // price
+    pub already_deal:Symbol, // already sold
+    pub status: Status,      // sell order status
     pub longindex: u128,     // an unique index for each sell order
     pub reserved: bool,      // send the balance to bank or contract
     pub acc: Vec<u8>,        // seller's send account
     pub acc2: Vec<u8>,       // seller's recive account
 }
 
-impl<pair,AccountID,symbol,status> OrderContent<pair,AccountID,symbol,status>{
+impl<Pair,AccountID,Symbol,Status> OrderContent<Pair,AccountID,Symbol,Status>{
     pub fn reserved(&self) -> bool {
         self.reserved
     }
@@ -124,7 +120,7 @@ decl_module! {
             let signature_hash = T::Hashing::hash( &signature[..]);
             //check the validity and number of signatures
             match   <signcheck::Module<T>>::check_signature(sender.clone(), tx_hash, signature_hash, message.clone()){
-                Ok(y) =>  runtime_io::print("ok") ,
+                Ok(_y) =>  runtime_io::print("ok") ,
                 Err(x) => return Err(x),
             }
             //deposit_event
@@ -220,7 +216,7 @@ impl<T: Trait> Module<T> {
 
     /// Query the Bank Module，make sure the seller have enough money to sell
     /// and check the parmeters is not zero
-    pub fn check_valid_order(who: T::AccountId, pair: &OrderPair, amount:u64, price:u64) -> Result {
+    pub fn check_valid_order(_who: T::AccountId, pair: &OrderPair, amount:u64, price:u64) -> Result {
         Self::is_valid_pair(&pair)?;
         Self::is_price_zero(amount)?;
         Self::is_price_zero(price)?;
@@ -228,7 +224,7 @@ impl<T: Trait> Module<T> {
         Ok(())
     }
 
-    pub fn check_valid_buy(who:T::AccountId,amount:u64,sell_order:&mut OrderT<T>) -> Result {
+    pub fn check_valid_buy(_who:T::AccountId,amount:u64,sell_order:&mut OrderT<T>) -> Result {
 
         Self::is_price_zero(amount)?;
         // cant buy exceed the sell order
@@ -250,7 +246,7 @@ impl<T: Trait> Module<T> {
         <AllSellOrdersIndex<T>>::put(new_unique_index);
 
         // generate a new sell order
-        let mut new_sell_order :OrderT<T> = OrderContent{
+        let new_sell_order :OrderT<T> = OrderContent{
             pair:pair_type.clone(),
             index:new_last_index,
             who:who.clone(),
@@ -351,7 +347,7 @@ impl<T: Trait> Module<T> {
     pub fn cancel_order_for_bank_withdraw(accountid: T::AccountId,coin_type:u64,acc:Vec<u8>){
         // find the valid sell order for the account
         let all_pair_vec = Self::pair_list();
-        all_pair_vec.iter().enumerate().for_each(|(i,pair)|{
+        all_pair_vec.iter().enumerate().for_each(|(_i,pair)|{
             if pair.share == coin_type {
                 let new_last_index = Self::last_sell_order_index_of((accountid.clone(), pair.clone())).unwrap_or_default();
                 if new_last_index != 0{
