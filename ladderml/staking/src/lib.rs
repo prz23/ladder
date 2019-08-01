@@ -674,9 +674,19 @@ decl_module! {
 			ensure!(prefs.unstake_threshold <= MAX_UNSTAKE_THRESHOLD, "unstake threshold too large");
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
-			<NodeInfomation<T>>::insert(controller.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
+			<NodeInfomation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
 		}
 
+        fn change_nodeinfo(origin,name:Vec<u8>,site:Vec<u8>,detail:Vec<u8>) -> Result {
+            let controller = ensure_signed(origin)?;
+            let ledger = Self::ledger(&controller).ok_or("not a controller")?;
+            let stash = &ledger.stash;
+            if !<Validators<T>>::exists(stash){
+			    return Err("not validator");
+			}
+            <NodeInfomation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
+            Ok(())
+        }
 		/// Declare the desire to nominate `targets` for the origin controller.
 		///
 		/// Effects will be felt at the beginning of the next era.
@@ -705,8 +715,8 @@ decl_module! {
 			let controller = ensure_signed(origin)?;
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
-			if <Validators<T>>::exists(&controller){
-			    <NodeInfomation<T>>::remove(controller);
+			if <Validators<T>>::exists(stash){
+			    <NodeInfomation<T>>::remove(stash);
 			}
 			<Validators<T>>::remove(stash);
 			<Nominators<T>>::remove(stash);
