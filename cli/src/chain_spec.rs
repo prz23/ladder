@@ -50,6 +50,15 @@ pub fn get_session_key_from_seed(seed: &str) -> AuthorityId {
         .public()
 }
 
+fn str_to_vecu8(string:&str) -> Vec<u8>{
+	let vecu8 : Vec<u8> = string.into();
+	vecu8
+}
+
+pub fn get_nodeinfo(seed: &str) -> Vec<u8> {
+	str_to_vecu8(seed)
+}
+
 /// Helper function to generate stash, controller and session key from seed
 pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, AuthorityId) {
     (
@@ -72,6 +81,13 @@ pub fn get_brands(owned: AccountId) -> Vec<(Trademark, AccountId)> {
         (Trademark{ name: b"ETH-kovan".to_vec(), id: 1 }, owned.clone()),
         (Trademark{ name: b"ABOS-test".to_vec(), id: 2 }, owned.clone()),
     ]
+}
+
+/// Helper function to generate brands.
+pub fn get_nodeinformation() -> Vec<(Vec<u8>,Vec<u8>,Vec<u8>)> {
+	vec![
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+	]
 }
 
 /// Helper function to generate bond that linked authority and ethereum public key.
@@ -185,6 +201,7 @@ pub fn testnet_genesis(
 			offline_slash_grace: 0,
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+			nodeinformation: get_nodeinformation(),
 		}),
 		democracy: Some(DemocracyConfig {
 			launch_period: 9,
@@ -408,6 +425,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			minimum_validator_count: 4,
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
+			nodeinformation: get_nodeinformation(),
 		}),
 		democracy: Some(DemocracyConfig {
 			launch_period: 10 * MINUTES,    // 1 day per public referendum

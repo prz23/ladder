@@ -284,6 +284,8 @@ pub enum RewardDestination {
 	Stash,
 	/// Pay into the controller account.
 	Controller,
+	/// Self-help Receiving
+	Record,
 }
 
 impl Default for RewardDestination {
@@ -523,11 +525,16 @@ decl_storage! {
 		pub RecentlyOffline get(recently_offline): Vec<(T::AccountId, T::BlockNumber, u32)>;
 
 		/// Introduction of Nodes
-		pub NodeInfomation get(node_infomation): map T::AccountId => Option<NodeIntroduction<T::AccountId>>;
+		pub NodeInformation get(node_information): map T::AccountId => Option<NodeIntroduction<T::AccountId>>;
 
+		/// reward-record
+		pub RewardRecord get(reward_record): map T::AccountId => BalanceOf<T>;
+
+        pub RewardFee get(reward_fee): u64 = 95;
 	}
 	add_extra_genesis {
 		config(stakers): Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
+		config(nodeinformation) : Vec<(Vec<u8>,Vec<u8>,Vec<u8>)>;
 		build(|storage: &mut primitives::StorageOverlay, _: &mut primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
 			with_storage(storage, || {
 				for &(ref stash, ref controller, balance, ref status) in &config.stakers {
@@ -543,9 +550,9 @@ decl_storage! {
 							<Module<T>>::validate(
 								T::Origin::from(Some(controller.clone()).into()),
 								Default::default(),
-								[0u8].to_vec(),
-								[0u8].to_vec(),
-								[0u8].to_vec(),
+								[01u8].to_vec(),
+								[02u8].to_vec(),
+								[03u8].to_vec(),
 							)
 						}, StakerStatus::Nominator(votes) => {
 							<Module<T>>::nominate(
@@ -674,7 +681,7 @@ decl_module! {
 			ensure!(prefs.unstake_threshold <= MAX_UNSTAKE_THRESHOLD, "unstake threshold too large");
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
-			<NodeInfomation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
+			<NodeInformation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
 		}
 
         fn change_nodeinfo(origin,name:Vec<u8>,site:Vec<u8>,detail:Vec<u8>) -> Result {
@@ -684,7 +691,7 @@ decl_module! {
             if !<Validators<T>>::exists(stash){
 			    return Err("not validator");
 			}
-            <NodeInfomation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
+            <NodeInformation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
             Ok(())
         }
 		/// Declare the desire to nominate `targets` for the origin controller.
@@ -716,7 +723,7 @@ decl_module! {
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
 			if <Validators<T>>::exists(stash){
-			    <NodeInfomation<T>>::remove(stash);
+			    <NodeInformation<T>>::remove(stash);
 			}
 			<Validators<T>>::remove(stash);
 			<Nominators<T>>::remove(stash);
@@ -751,6 +758,20 @@ decl_module! {
 				if let Some(l) = <Ledger<T>>::take(&old_controller) { <Ledger<T>>::insert(&controller, l) };
 			}
 		}
+
+        ///
+        pub fn get_reward(origin) {
+            let controller = ensure_signed(origin)?;
+
+            let ratio = <BalanceOf<T> as As<u64>>::sa(95u64)/<BalanceOf<T> as As<u64>>::sa(100u64);
+            let amount = <RewardRecord<T>>::get(&controller) * ratio ;
+            <RewardRecord<T>>::insert(&controller,<BalanceOf<T> as As<u64>>::sa(0u64));
+
+            // handle the inbalance
+            let mut imbalance = <PositiveImbalanceOf<T>>::zero();
+            imbalance.maybe_subsume( T::Currency::deposit_into_existing(&controller,amount).ok() );
+            T::Reward::on_unbalanced(imbalance);
+        }
 
 		/// Set the number of sessions in an era.
 		fn set_sessions_per_era(#[compact] new: T::BlockNumber) {
@@ -872,6 +893,14 @@ impl<T: Trait> Module<T> {
 					Self::update_ledger(&controller, &l);
 					r
 				}),
+			RewardDestination::Record =>
+				Self::bonded(stash)
+					.and_then(|controller| {
+						let balance = <RewardRecord<T>>::get(&controller) + amount;
+						<RewardRecord<T>>::insert(controller, balance);
+						// only record some amount of balance, the inbalance will be handle later
+						None
+					}),
 		}
 	}
 
