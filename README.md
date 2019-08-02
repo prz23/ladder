@@ -183,6 +183,12 @@ cargo run -- --dev
     "status": "Status",
     "now_cycle": "u64",
     "reserved": "bool"
+  },
+  "NodeIntroduction": {
+    "accountid": "AccountId",
+    "name": "Vec<u8>",
+    "site": "Vec<u8>",
+    "detail": "Vec<u8>"
   }
 }
 ```
