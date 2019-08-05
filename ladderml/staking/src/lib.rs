@@ -245,6 +245,7 @@ use srml_support::traits::{
 	Currency, OnFreeBalanceZero, OnDilution, LockIdentifier, LockableCurrency, WithdrawReasons,
 	OnUnbalanced, Imbalance,
 };
+use timestamp;
 use session::OnSessionChange;
 use primitives::Perbill;
 use primitives::traits::{Convert, Zero, One, As, StaticLookup, CheckedSub, CheckedShl, Saturating, Bounded};
@@ -262,6 +263,7 @@ const RECENT_OFFLINE_COUNT: usize = 32;
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
 const MAX_NOMINATIONS: usize = 16;
 const MAX_UNSTAKE_THRESHOLD: u32 = 10;
+const YEAR_SECONDS: u64 = 365 * 24 * 3600;
 
 /// Indicates the initial status of the staker.
 #[cfg_attr(feature = "std", derive(Debug, Serialize, Deserialize))]
@@ -526,6 +528,9 @@ decl_storage! {
 
 		/// Introduction of Nodes
 		pub NodeInformation get(node_information): map T::AccountId => Option<NodeIntroduction<T::AccountId>>;
+
+		/// Total reward in one year
+		pub RewardPerYear get(reward_per_year) config(): Option<BalanceOf<T>>;
 
 		/// reward-record
 		pub RewardRecord get(reward_record): map T::AccountId => BalanceOf<T>;
@@ -988,7 +993,28 @@ impl<T: Trait> Module<T> {
 		let slot_stake = Self::select_validators();
 
 		// Update the balances for rewarding according to the stakes.
-		<CurrentSessionReward<T>>::put(Self::session_reward() * slot_stake);
+		// If has set the annual reward total, then session reward calculated by total amount.
+		let session_reward = if Self::reward_per_year().is_some() {
+			Self::session_reward_per_validator()
+		} else {
+			Self::session_reward() * slot_stake
+		};
+
+		<CurrentSessionReward<T>>::put(session_reward);
+	}
+
+	/// Get Mmximum reward, per validator, that is provided total reward per year.
+	///
+	/// formula: total / sessions_of_year / validators
+	fn session_reward_per_validator() -> BalanceOf<T> {
+		let session_of_year = YEAR_SECONDS / (<session::Module<T>>::length().as_() * <timestamp::Module<T>>::minimum_period().as_());
+		let elected_len = Self::current_elected().len().max(1) as u64;
+
+		if let Some(reward_per_year) = Self::reward_per_year() {
+			reward_per_year / BalanceOf::<T>::sa(session_of_year * elected_len)
+		} else {
+			BalanceOf::<T>::zero()
+		}
 	}
 
 	fn slashable_balance_of(stash: &T::AccountId) -> BalanceOf<T> {

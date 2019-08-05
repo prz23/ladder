@@ -26,7 +26,7 @@ use node_runtime::{
     Trademark, BrandConfig, SigncheckConfig,ErcConfig,OtcConfig
 };
 use primitives::{
-    crypto::{Ss58Codec, UncheckedInto, UncheckedFrom},
+    crypto::{UncheckedInto, UncheckedFrom},
     ed25519,
     ed25519::Public as AuthorityId,
     sr25519, Pair,
@@ -68,6 +68,7 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, Author
     )
 }
 
+/// Helper function to generate exchange
 pub fn get_exchangelad() -> Vec<(u64,u64)>{
    vec![
 	   (1,1000),
@@ -101,7 +102,7 @@ pub fn join_authorities_eth_bond(
 
     let author_bonds:Vec<(AccountId,Vec<u8>)> = initial_authorities.iter()
         .zip(bonds.iter())
-        .map(|((stash, controller, session), public_key)| {
+        .map(|((_stash, _controller, session), public_key)| {
             let mut r = [0u8; 32];
             r.copy_from_slice(session.as_ref());
             let mock_id: AccountId = UncheckedFrom::unchecked_from(r);
@@ -143,6 +144,7 @@ pub fn testnet_genesis(
 
 	const STASH: u128 = 1 << 20;
     const ENDOWMENT: u128 = 1 << 20;
+	const REWARDYEAR: u128 = 10_000_000_000 * 1_000_000_000;
 
     let mut contract_config = ContractConfig {
         signed_claim_handicap: 2,
@@ -202,6 +204,7 @@ pub fn testnet_genesis(
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			nodeinformation: get_nodeinformation(),
+			reward_per_year:REWARDYEAR,
 		}),
 		democracy: Some(DemocracyConfig {
 			launch_period: 9,
@@ -382,6 +385,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 
     const ENDOWMENT: u128 = 10_000_000 * DOLLARS;
     const STASH: u128 = 100 * DOLLARS;
+	const REWARDYEAR: u128 = 10_000_000_000 * 1_000_000_000;
 
     GenesisConfig {
 		consensus: Some(ConsensusConfig {
@@ -426,6 +430,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			nodeinformation: get_nodeinformation(),
+			reward_per_year: REWARDYEAR
 		}),
 		democracy: Some(DemocracyConfig {
 			launch_period: 10 * MINUTES,    // 1 day per public referendum
