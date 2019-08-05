@@ -26,7 +26,7 @@ use node_runtime::{
     Trademark, BrandConfig, SigncheckConfig,ErcConfig,OtcConfig
 };
 use primitives::{
-    crypto::{Ss58Codec, UncheckedInto, UncheckedFrom},
+    crypto::{UncheckedInto, UncheckedFrom},
     ed25519,
     ed25519::Public as AuthorityId,
     sr25519, Pair,
@@ -59,6 +59,7 @@ pub fn get_authority_keys_from_seed(seed: &str) -> (AccountId, AccountId, Author
     )
 }
 
+/// Helper function to generate exchange
 pub fn get_exchangelad() -> Vec<(u64,u64)>{
    vec![
 	   (1,1000),
@@ -85,7 +86,7 @@ pub fn join_authorities_eth_bond(
 
     let author_bonds:Vec<(AccountId,Vec<u8>)> = initial_authorities.iter()
         .zip(bonds.iter())
-        .map(|((stash, controller, session), public_key)| {
+        .map(|((_stash, _controller, session), public_key)| {
             let mut r = [0u8; 32];
             r.copy_from_slice(session.as_ref());
             let mock_id: AccountId = UncheckedFrom::unchecked_from(r);
