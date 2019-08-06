@@ -535,13 +535,14 @@ decl_storage! {
 		/// reward-record
 		pub RewardRecord get(reward_record): map T::AccountId => BalanceOf<T>;
 
-        pub RewardFee get(reward_fee): u64 = 95;
+        pub RewardFee get(reward_fee): u64 = 9995;
 	}
 	add_extra_genesis {
 		config(stakers): Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
 		config(nodeinformation) : Vec<(Vec<u8>,Vec<u8>,Vec<u8>)>;
 		build(|storage: &mut primitives::StorageOverlay, _: &mut primitives::ChildrenStorageOverlay, config: &GenesisConfig<T>| {
 			with_storage(storage, || {
+			    let mut i = 0;
 				for &(ref stash, ref controller, balance, ref status) in &config.stakers {
 					assert!(T::Currency::free_balance(&stash) >= balance);
 					let _ = <Module<T>>::bond(
@@ -555,9 +556,9 @@ decl_storage! {
 							<Module<T>>::validate(
 								T::Origin::from(Some(controller.clone()).into()),
 								Default::default(),
-								[01u8].to_vec(),
-								[02u8].to_vec(),
-								[03u8].to_vec(),
+								config.nodeinformation[i].0.clone(),
+								config.nodeinformation[i].1.clone(),
+								config.nodeinformation[i].2.clone(),
 							)
 						}, StakerStatus::Nominator(votes) => {
 							<Module<T>>::nominate(
@@ -566,6 +567,7 @@ decl_storage! {
 							)
 						}, _ => Ok(())
 					};
+					i = i + 1;
 				}
 
 				<Module<T>>::select_validators();
@@ -768,7 +770,7 @@ decl_module! {
         pub fn get_reward(origin) {
             let controller = ensure_signed(origin)?;
 
-            let ratio = <BalanceOf<T> as As<u64>>::sa(9995u64)/<BalanceOf<T> as As<u64>>::sa(1000u64);
+            let ratio = <BalanceOf<T> as As<u64>>::sa(Self::reward_fee())/<BalanceOf<T> as As<u64>>::sa(1000u64);
             let amount = <RewardRecord<T>>::get(&controller) * ratio ;
             <RewardRecord<T>>::insert(&controller,<BalanceOf<T> as As<u64>>::sa(0u64));
 

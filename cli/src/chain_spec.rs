@@ -88,6 +88,15 @@ pub fn get_brands(owned: AccountId) -> Vec<(Trademark, AccountId)> {
 pub fn get_nodeinformation() -> Vec<(Vec<u8>,Vec<u8>,Vec<u8>)> {
 	vec![
 		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
 	]
 }
 
