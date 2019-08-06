@@ -763,7 +763,7 @@ decl_module! {
         pub fn get_reward(origin) {
             let controller = ensure_signed(origin)?;
 
-            let ratio = <BalanceOf<T> as As<u64>>::sa(95u64)/<BalanceOf<T> as As<u64>>::sa(100u64);
+            let ratio = <BalanceOf<T> as As<u64>>::sa(9995u64)/<BalanceOf<T> as As<u64>>::sa(1000u64);
             let amount = <RewardRecord<T>>::get(&controller) * ratio ;
             <RewardRecord<T>>::insert(&controller,<BalanceOf<T> as As<u64>>::sa(0u64));
 
@@ -898,7 +898,7 @@ impl<T: Trait> Module<T> {
 					.and_then(|controller| {
 						let balance = <RewardRecord<T>>::get(&controller) + amount;
 						<RewardRecord<T>>::insert(controller, balance);
-						// only record some amount of balance, the inbalance will be handle later
+						// only record some amount of balance, the inbalance will be handled later
 						None
 					}),
 		}
