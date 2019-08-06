@@ -79,12 +79,6 @@ where
     }
 }
 
-fn get_tag(tag: &H256, index: usize) -> u64 {
-    let mut arr = [0u8; 8];
-    arr.copy_from_slice(&tag.0[index..(index + 8)]);
-    events::array_to_u64(arr)
-}
-
 impl<A, B, C, N> SuperviseClient for Supervisor<A, B, C, N>
 where
     A: txpool::ChainApi<Block = B>,
