@@ -817,7 +817,7 @@ impl<T: Trait> Module<T>
         amount_on_sale
     }
 
-    /// Find out if the person(who) has locked token(cointype) ,is true return the amount
+    /// Find out if the person(who) has locked token(cointype) , return the amount
     pub fn is_specific_token_on_sale (who:T::AccountId , cointype: u64 ,_lock_type:LockType) -> T::Balance{
         let all_data_vec = <DespositingBalanceReserved<T>>::get(who.clone());
         let mut amount_on_sale = T::Balance::sa(0);
@@ -1030,7 +1030,7 @@ impl<T: Trait> Module<T>
             }
             // then, check the same owner and  the same coin type  with different senders are zero
             let sender_vec_2 = Self::deposit_sender_list((who.clone(),coin_type));
-                 if sender_vec_2.is_empty(){
+            if sender_vec_2.is_empty(){
                 // delete the coin_type
                 let mut coin_type_vec = Self::deposit_account_coin_list(who.clone());
                 if coin_type_vec.iter().find(|&t| t == &coin_type).is_none(){ /* not happen */ }else{

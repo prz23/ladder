@@ -535,7 +535,7 @@ decl_storage! {
 		/// reward-record
 		pub RewardRecord get(reward_record): map T::AccountId => BalanceOf<T>;
 
-        pub RewardFee get(reward_fee): u64 = 9995;
+        pub RewardFee get(reward_fee): u64 = 995;
 	}
 	add_extra_genesis {
 		config(stakers): Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
@@ -770,8 +770,7 @@ decl_module! {
         pub fn get_reward(origin) {
             let controller = ensure_signed(origin)?;
 
-            let ratio = <BalanceOf<T> as As<u64>>::sa(Self::reward_fee())/<BalanceOf<T> as As<u64>>::sa(1000u64);
-            let amount = <RewardRecord<T>>::get(&controller) * ratio ;
+            let amount = Self::service_fee(<RewardRecord<T>>::get(&controller));
             <RewardRecord<T>>::insert(&controller,<BalanceOf<T> as As<u64>>::sa(0u64));
 
             // handle the inbalance
@@ -880,20 +879,26 @@ impl<T: Trait> Module<T> {
 		T::Slash::on_unbalanced(imbalance);
 	}
 
+	fn service_fee(mut fee:BalanceOf<T>) -> BalanceOf<T> {
+		let ratio = <BalanceOf<T> as As<u64>>::sa(Self::reward_fee()) * fee;
+		ratio/<BalanceOf<T> as As<u64>>::sa(1000u64)
+	}
+
 	/// Actually make a payment to a staker. This uses the currency's reward function
 	/// to pay the right payee for the given staker account.
-	fn make_payout(stash: &T::AccountId, amount: BalanceOf<T>) -> Option<PositiveImbalanceOf<T>> {
+	fn make_payout(stash: &T::AccountId, mut amount: BalanceOf<T>) -> Option<PositiveImbalanceOf<T>> {
 		let dest = Self::payee(stash);
 		match dest {
 			RewardDestination::Controller => Self::bonded(stash)
 				.and_then(|controller|
-					T::Currency::deposit_into_existing(&controller, amount).ok()
+					T::Currency::deposit_into_existing(&controller, Self::service_fee(amount)).ok()
 				),
 			RewardDestination::Stash =>
-				T::Currency::deposit_into_existing(stash, amount).ok(),
+				T::Currency::deposit_into_existing(stash, Self::service_fee(amount)).ok(),
 			RewardDestination::Staked => Self::bonded(stash)
 				.and_then(|c| Self::ledger(&c).map(|l| (c, l)))
 				.and_then(|(controller, mut l)| {
+					amount = Self::service_fee(amount);
 					l.active += amount;
 					l.total += amount;
 					let r = T::Currency::deposit_into_existing(stash, amount).ok();

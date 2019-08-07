@@ -48,7 +48,7 @@ fn bond_validator(acc: u64, val: u64) {
 	// a + 1 = stash
 	let _ = Balances::make_free_balance_be(&(acc+1), val);
 	assert_ok!(Staking::bond(Origin::signed(acc+1), acc, val, RewardDestination::Controller));
-	assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default()));
+	assert_ok!(Staking::validate(Origin::signed(acc), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 }
 
 #[inline]
@@ -152,10 +152,10 @@ fn change_controller_works() {
 		assert_eq!(Staking::current_era(), 1);
 
 		assert_noop!(
-			Staking::validate(Origin::signed(10), ValidatorPrefs::default()),
+			Staking::validate(Origin::signed(10), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()),
 			"not a controller"
 		);
-		assert_ok!(Staking::validate(Origin::signed(5), ValidatorPrefs::default()));
+		assert_ok!(Staking::validate(Origin::signed(5), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 	})
 }
 
@@ -282,11 +282,11 @@ fn max_unstake_threshold_works() {
 		assert_ok!(Staking::validate(Origin::signed(10), ValidatorPrefs {
 			unstake_threshold: MAX_UNSTAKE_THRESHOLD,
 			validator_payment: 0,
-		}));
+		},[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 		// Account 20 could not set their unstake_threshold past 10
 		assert_noop!(Staking::validate(Origin::signed(20), ValidatorPrefs {
 			unstake_threshold: MAX_UNSTAKE_THRESHOLD + 1,
-			validator_payment: 0}),
+			validator_payment: 0},[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()),
 			"unstake threshold too large"
 		);
 		// Give Account 20 unstake_threshold 11 anyway, should still be limited to 10
@@ -515,7 +515,7 @@ fn staking_should_work() {
 
 		// add a new candidate for being a validator. account 3 controlled by 4.
 		assert_ok!(Staking::bond(Origin::signed(3), 4, 1500, RewardDestination::Controller));
-		assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default()));
+		assert_ok!(Staking::validate(Origin::signed(4), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 
 		// No effects will be seen so far.
 		assert_eq_uvec!(Session::validators(), vec![20, 10]);
@@ -1521,7 +1521,7 @@ fn phragmen_poc_2_works() {
 
 		// Bond [30, 31] as the third validator
 		assert_ok!(Staking::bond_extra(Origin::signed(31), 999));
-		assert_ok!(Staking::validate(Origin::signed(30), ValidatorPrefs::default()));
+		assert_ok!(Staking::validate(Origin::signed(30), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 
 		// bond [2,1](A), [4,3](B), as 2 nominators
 		for i in &[1, 3] { let _ = Balances::deposit_creating(i, 2000); }
@@ -1577,7 +1577,7 @@ fn switching_roles() {
 
 		// add a new validator candidate
 		assert_ok!(Staking::bond(Origin::signed(5), 6, 1000, RewardDestination::Controller));
-		assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default()));
+		assert_ok!(Staking::validate(Origin::signed(6), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 
 		// new block
 		System::set_block_number(1);
@@ -1601,7 +1601,7 @@ fn switching_roles() {
 		assert_eq_uvec!(Session::validators(), vec![6, 10]);
 
 		// 2 decides to be a validator. Consequences:
-		assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
+		assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 		// new stakes:
 		// 10: 1000 self vote
 		// 20: 1000 self vote + 500 vote
@@ -1669,7 +1669,7 @@ fn bond_with_no_staked_value() {
 
 		// Stingy validator.
 		assert_ok!(Staking::bond(Origin::signed(1), 2, 1, RewardDestination::Controller));
-		assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
+		assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 
 		System::set_block_number(1);
 		Session::check_rotate_session(System::block_number());
@@ -1731,7 +1731,7 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
 
 		// Stingy validator.
 		assert_ok!(Staking::bond(Origin::signed(1), 2, 1, RewardDestination::Controller));
-		assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default()));
+		assert_ok!(Staking::validate(Origin::signed(2), ValidatorPrefs::default(),[0u8].to_vec(),[0u8].to_vec(),[0u8].to_vec()));
 
 		System::set_block_number(1);
 		Session::check_rotate_session(System::block_number());
@@ -2031,4 +2031,37 @@ fn phragmen_large_scale_test_2() {
 		assert_total_expo(3, nom_budget / 2 + c_budget);
 		assert_total_expo(5, nom_budget / 2 + c_budget);
 	})
+}
+
+
+#[test]
+fn fee_test() {
+	with_externalities(&mut ExtBuilder::default()
+		.nominate(false)
+		.minimum_validator_count(1)
+		.validator_count(2)
+		.build(),
+					   || {
+						   let _ = Staking::chill(Origin::signed(10));
+						   let _ = Staking::chill(Origin::signed(20));
+						   let nom_budget: u64 = 1_000_000_000_000_000_000;
+						   let c_budget: u64 = 4_000_000;
+
+						   bond_validator(2, c_budget as u64);
+						   bond_validator(4, c_budget as u64);
+
+						   bond_nominator(50, nom_budget, vec![3, 5]);
+
+						   System::set_block_number(1);
+						   Session::check_rotate_session(System::block_number());
+
+						   // Each exposure => total == own + sum(others)
+						   check_exposure_all();
+
+						   assert_total_expo(3, nom_budget / 2 + c_budget);
+						   assert_total_expo(5, nom_budget / 2 + c_budget);
+
+						   assert_eq!(Staking::service_fee(10),9);
+						   assert_eq!(Staking::service_fee(1000),995);
+					   })
 }
