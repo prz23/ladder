@@ -2063,5 +2063,6 @@ fn fee_test() {
 
 						   assert_eq!(Staking::service_fee(10),9);
 						   assert_eq!(Staking::service_fee(1000),995);
+						   assert_eq!(Staking::session_reward_per_validator(),792744799594);
 					   })
 }
