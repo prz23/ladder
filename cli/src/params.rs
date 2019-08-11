@@ -1,15 +1,15 @@
 use cli::{AugmentClap, GetLogFilter};
 use structopt::{clap::App, StructOpt};
-use vendor::RunStrategy;
+use std::path::PathBuf;
 
 #[derive(Debug, StructOpt, Clone, Default)]
 pub struct VendorCmd {
+    /// Config file
+    #[structopt(long = "config", parse(from_os_str))]
+    pub config: Option<PathBuf>,
     /// Enable listener mode
     #[structopt(long = "listener")]
     pub listener: bool,
-    /// Enable sender mode
-    #[structopt(long = "sender")]
-    pub sender: bool,
     /// Enable sender mode
     #[structopt(long = "enableexchange")]
     pub enableexchange: bool,
@@ -25,15 +25,5 @@ impl GetLogFilter for VendorCmd {
 impl AugmentClap for VendorCmd {
     fn augment_clap<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
         app
-    }
-}
-
-impl Into<RunStrategy> for VendorCmd {
-    fn into(self) -> RunStrategy {
-        RunStrategy {
-            listener: self.listener,
-            sender: self.sender,
-            enableexchange: self.enableexchange,
-        }
     }
 }

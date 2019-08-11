@@ -16,10 +16,11 @@ use web3::{
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
 
-pub enum ListenerStreamStyle {
-    Vendor,
-    Mapper,
-}
+//pub enum ListenerStreamStyle {
+//    Vendor,
+//    Mapper,
+//}
+use crate::config::ListenerStreamStyle;
 
 pub struct SideListener<V> {
     pub url: String,
@@ -48,6 +49,7 @@ impl<V> SideListener<V>
 where
     V: SuperviseClient + Send + Sync + 'static,
 {
+
     pub fn start(self) {
         // return directly.
         if !self.enable {

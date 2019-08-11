@@ -13,10 +13,14 @@ mod supervisor;
 mod utils;
 mod vendor;
 mod mapper;
+mod config;
+
+pub use crate::config::ServiceConfig;
 
 use crate::label::ChainAlias;
-use crate::listener::{SideListener, ListenerStreamStyle};
-use crate::sender::{AbosProxy, EthProxy, SideSender, SignContext};
+use crate::listener::{SideListener};
+use crate::config::{ServiceConfig as VendorServiceConfig, ListenerStreamStyle, EngineKind};
+use crate::sender::{AbosProxy, EthProxy, SideSender, SignContext, SenderProxy};
 use crate::supervisor::{PacketNonce, Supervisor, SuperviseClient};
 use crate::message::RelayMessage;
 use client::{blockchain::HeaderBackend, BlockchainEvents};
@@ -41,8 +45,10 @@ use signer::{KeyPair, PrivKey};
 use std::path::{Path};
 use std::str::FromStr;
 use std::sync::{
-    Arc, Mutex,
+    Arc, Mutex, mpsc::Sender,
 };
+use node_primitives::AccountId;
+use std::collections::HashMap;
 use transaction_pool::txpool::{self, Pool as TransactionPool};
 use web3::{
     types::{Address, H256, U256},
@@ -53,24 +59,14 @@ mod test;
 #[cfg(test)]
 pub use crate::test::{MockClient, MockTransport};
 
-#[derive(Clone)]
-pub struct RunStrategy {
-    pub listener: bool,
-    pub sender: bool,
-    pub enableexchange: bool,
-}
 
-#[derive(Clone)]
-pub struct VendorServiceConfig {
-    pub kovan_url: String,
-    pub abos_url: String,
-    pub kovan_address: String,
-    pub abos_address: String,
-    pub eth_url: String,
-    pub mapper_address: String,
-    pub db_path: String,
-    pub eth_key: String,
-    pub strategy: RunStrategy,
+impl From<EngineKind> for ChainAlias {
+    fn from(s: EngineKind) -> Self {
+        match s {
+            EngineKind::Eth => ChainAlias::ETH,
+            EngineKind::Abos => ChainAlias::ABOS,
+        }
+    }
 }
 
 /// Start the supply worker. The returned future should be run in a tokio runtime.
@@ -90,11 +86,8 @@ where
     C::Api: VendorApi<B>,
 {
     let key = keystore.load(&keystore.contents().unwrap()[0], "").unwrap();
-    let kovan_address = Address::from_str(&config.kovan_address).unwrap();
-    let abos_address = Address::from_str(&config.abos_address).unwrap();
-    let mapper_address = Address::from_str(&config.mapper_address).unwrap();
-    let eth_key = PrivKey::from_str(&config.eth_key).unwrap();
-    let eth_pair = KeyPair::from_privkey(eth_key);
+    let sign_key = PrivKey::from_str(&config.sign_key).unwrap();
+    let eth_pair = KeyPair::from_privkey(sign_key);
     info!(
         "ss58 account: {:?}, eth account: {}",
         key.public().to_ss58check(),
@@ -115,82 +108,114 @@ where
         pool: pool.clone(),
         network: network.clone(),
         key: key,
-        eth_key: eth_key.clone(),
+        eth_key: sign_key.clone(),
         packet_nonce: Arc::new(Mutex::new(packet_nonce)),
         phantom: std::marker::PhantomData,
     });
 
-    //new a thread to listen kovan network
-    SideListener {
-        url: config.kovan_url.clone(),
-        db_file: Path::new(&config.db_path).join("kovan_storage.json"),
-        contract_address: kovan_address,
-        spv: spv.clone(),
-        enable: config.strategy.listener,
-        chain: ChainAlias::ETH,
-        style: ListenerStreamStyle::Vendor,
-    }
-    .start();
+    // init listeners
+    let side_listeners = config.listeners.iter().map( |c|{
+        let contract_address = Address::from_str(&c.address).unwrap();
+        SideListener {
+            url: c.url.clone(),
+            contract_address: contract_address,
+            db_file: Path::new(&config.db_path).join(&c.name).into(),
+            spv: spv.clone(),
+            chain: c.kind.clone().into(),
+            style: c.stream_style.clone(),
+            enable: true,
+        }
+    });
 
-    //new a thread to listen abos network
-    SideListener {
-        url: config.abos_url.clone(),
-        db_file: Path::new(&config.db_path).join("abos_storage.json"),
-        contract_address: abos_address,
-        spv: spv.clone(),
-        enable: config.strategy.listener,
-        chain: ChainAlias::ABOS,
-        style: ListenerStreamStyle::Vendor,
-    }
-    .start();
+    // start listeners
+    side_listeners.for_each(|listener| {
+        listener.start();
+    });
 
-    // listen mapper information from eth
-    SideListener {
-        url: config.eth_url.clone(),
-        db_file: Path::new(&config.db_path).join("eth_mapper_storage.json"),
-        contract_address: mapper_address,
-        spv: spv.clone(),
-        enable: config.strategy.listener,
-        chain: ChainAlias::ETH,
-        style: ListenerStreamStyle::Mapper,
-    }
-    .start();
+    let mut dic: HashMap<String, Sender<RawEvent<AccountId>>> = HashMap::new();
+    config.senders.iter().for_each( |c| {
+        let contract_address = Address::from_str(&c.address).unwrap();
+        let pair = KeyPair::from_privkey(PrivKey::from_str(&c.key.clone().unwrap()).unwrap());
 
-    // A thread that send transaction to ETH
-    let kovan_sender = SideSender {
-        name: "ETH-kovan".to_string(),
-        url: config.kovan_url.clone(),
-        contract_address: kovan_address,
-        pair: eth_pair.clone(),
-        enable: config.strategy.sender,
-        proxy: EthProxy {
-            pair: eth_pair.clone(),
-            context: SignContext {
-                height: 0,
-                nonce: U256::from(0),
-                contract_address: kovan_address,
+        match c.kind {
+            EngineKind::Eth => {
+                let tx = SideSender {
+                    name: c.name.clone(),
+                    url: c.url.clone(),
+                    contract_address: contract_address,
+                    pair: pair.clone(),
+                    enable: true,
+                    proxy: EthProxy {
+                        pair: eth_pair.clone(),
+                        context: SignContext {
+                            height: 0,
+                            nonce: U256::from(0),
+                            contract_address: contract_address,
+                        },
+                    },
+                }.start();
+                dic.insert(c.name.clone(), tx);
             },
-        },
-    }
-    .start();
 
-    let abos_sender = SideSender {
-        name: "ABOS-test".to_string(),
-        url: config.abos_url.clone(),
-        contract_address: abos_address,
-        pair: eth_pair.clone(),
-        enable: config.strategy.sender,
-        proxy: AbosProxy {
-            pair: eth_pair.clone(),
-            chain_id: U256::from_str("00000000000000000000000000000000000000000000ca812def6446350c7e8d").unwrap(),
-            context: SignContext {
-                height: 0,
-                nonce: U256::from(0),
-                contract_address: abos_address,
-            },
-        },
-    }
-    .start();
+            EngineKind::Abos => {
+                let tx = SideSender {
+                    name: c.name.clone(),
+                    url: c.url.clone(),
+                    contract_address: contract_address,
+                    pair: pair.clone(),
+                    enable: true,
+                    proxy: AbosProxy {
+                        pair: pair.clone(),
+                        chain_id: U256::from_str("00000000000000000000000000000000000000000000ca812def6446350c7e8d").unwrap(),
+                        context: SignContext {
+                            height: 0,
+                            nonce: U256::from(0),
+                            contract_address: contract_address,
+                        },
+                    },
+                }.start();
+                dic.insert(c.name.clone(), tx);
+            }
+        }
+
+    });
+
+//
+//    // A thread that send transaction to ETH
+//    let kovan_sender = SideSender {
+//        name: "ETH-kovan".to_string(),
+//        url: config.kovan_url.clone(),
+//        contract_address: kovan_address,
+//        pair: eth_pair.clone(),
+//        enable: config.strategy.sender,
+//        proxy: EthProxy {
+//            pair: eth_pair.clone(),
+//            context: SignContext {
+//                height: 0,
+//                nonce: U256::from(0),
+//                contract_address: kovan_address,
+//            },
+//        },
+//    }
+//    .start();
+//
+//    let abos_sender = SideSender {
+//        name: "ABOS-test".to_string(),
+//        url: config.abos_url.clone(),
+//        contract_address: abos_address,
+//        pair: eth_pair.clone(),
+//        enable: config.strategy.sender,
+//        proxy: AbosProxy {
+//            pair: eth_pair.clone(),
+//            chain_id: U256::from_str("00000000000000000000000000000000000000000000ca812def6446350c7e8d").unwrap(),
+//            context: SignContext {
+//                height: 0,
+//                nonce: U256::from(0),
+//                contract_address: abos_address,
+//            },
+//        },
+//    }
+//    .start();
 
     // how to fetch real key?
     let events_key = StorageKey(primitives::twox_128(b"System Events").to_vec());
@@ -258,9 +283,17 @@ where
                             events::MatchEvent::from_bytes(message)
                                 .map(|ie| {
                                     if ie.tag == 1 {
-                                        kovan_sender.send(e.clone()).unwrap();
+                                        if let Some(kovan_sender) = dic.get("kovan") {
+                                            kovan_sender.send(e.clone()).unwrap();
+                                        } else {
+                                            warn!("Uninstantiated sender: {:?}", ie.tag);
+                                        }
                                     } else if ie.tag == 2 {
-                                        abos_sender.send(e.clone()).unwrap();
+                                        if let Some(abos_sender) = dic.get("abos") {
+                                            abos_sender.send(e.clone()).unwrap();
+                                        } else {
+                                            warn!("Uninstantiated sender: {:?}", ie.tag);
+                                        }
                                     } else {
                                         warn!("unknown event tag of ingress: {:?}", ie.tag);
                                     }

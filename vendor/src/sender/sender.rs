@@ -8,6 +8,7 @@ use node_runtime::{
 use signer::{KeyPair};
 use std::marker::{Send, Sync};
 use std::sync::{
+    Arc,
     mpsc::{channel, Sender},
 };
 use tokio_core::reactor::Core;
