@@ -1,0 +1,46 @@
+{
+  "listeners": [
+    {
+      "name": "kovan",
+      "url": "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816",
+      "address": "9e91F3cFF57D7640e02a1a3e3a48d516fE0C927a",
+      "kind": "Eth",
+      "streamStyle": "Vendor",
+      "key": null
+    },
+    {
+      "name": "abos",
+      "url": "http://47.92.173.78:1337",
+      "address": "5cFFF8e71B83666df16A9Fdef7C3A03d63711f5D",
+      "kind": "Abos",
+      "streamStyle": "Vendor",
+      "key": null
+    },
+    {
+      "name": "kovan_map",
+      "url": "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816",
+      "address": "c6f47FDdB36c1442B3a7229BEE5C35e7079E2C1e",
+      "kind": "Eth",
+      "streamStyle": "Mapper",
+      "key": null
+    }
+  ],
+  "senders": [
+    {
+      "name": "kovan",
+      "url": "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816",
+      "address": "9e91F3cFF57D7640e02a1a3e3a48d516fE0C927a",
+      "kind": "Eth",
+      "streamStyle": "Vendor",
+      "key": ""
+    },
+    {
+      "name": "abos",
+      "url": "http://47.92.173.78:1337",
+      "address": "5cFFF8e71B83666df16A9Fdef7C3A03d63711f5D",
+      "kind": "Abos",
+      "streamStyle": "Vendor",
+      "key": ""
+    }
+  ]
+}
