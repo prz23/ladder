@@ -587,13 +587,6 @@ mod tests {
         type Event = ();
     }
 
-    impl<T: Trait> OnSessionChange<T::Moment> for Test {
-        fn on_session_change(elapsed: T::Moment, should_reward: bool) {
-            runtime_io::print("LadderSessionTest");
-            println!("111111111111111111111111111111111111");
-        }
-    }
-
     fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
         let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
         runtime_io::TestExternalities::new(t)
