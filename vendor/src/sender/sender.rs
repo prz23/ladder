@@ -23,7 +23,6 @@ pub struct SideSender<P> {
     pub url: String,
     pub contract_address: Address,
     pub pair: KeyPair,
-    pub enable: bool,
     pub proxy: P,
 }
 
@@ -47,11 +46,6 @@ where
             self.proxy.initialize(&mut event_loop, &transport);
             loop {
                 let event = receiver.recv().unwrap();
-
-                if !self.enable {
-                    continue;
-                }
-
                 match event {
                     RawEvent::Settlement(message, signatures) => {
                         info!(

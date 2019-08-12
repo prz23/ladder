@@ -123,7 +123,6 @@ where
             spv: spv.clone(),
             chain: c.kind.clone().into(),
             style: c.stream_style.clone(),
-            enable: true,
         }
     });
 
@@ -144,7 +143,6 @@ where
                     url: c.url.clone(),
                     contract_address: contract_address,
                     pair: pair.clone(),
-                    enable: true,
                     proxy: EthProxy {
                         pair: eth_pair.clone(),
                         context: SignContext {
@@ -163,7 +161,6 @@ where
                     url: c.url.clone(),
                     contract_address: contract_address,
                     pair: pair.clone(),
-                    enable: true,
                     proxy: AbosProxy {
                         pair: pair.clone(),
                         chain_id: U256::from_str("00000000000000000000000000000000000000000000ca812def6446350c7e8d").unwrap(),
@@ -179,43 +176,6 @@ where
         }
 
     });
-
-//
-//    // A thread that send transaction to ETH
-//    let kovan_sender = SideSender {
-//        name: "ETH-kovan".to_string(),
-//        url: config.kovan_url.clone(),
-//        contract_address: kovan_address,
-//        pair: eth_pair.clone(),
-//        enable: config.strategy.sender,
-//        proxy: EthProxy {
-//            pair: eth_pair.clone(),
-//            context: SignContext {
-//                height: 0,
-//                nonce: U256::from(0),
-//                contract_address: kovan_address,
-//            },
-//        },
-//    }
-//    .start();
-//
-//    let abos_sender = SideSender {
-//        name: "ABOS-test".to_string(),
-//        url: config.abos_url.clone(),
-//        contract_address: abos_address,
-//        pair: eth_pair.clone(),
-//        enable: config.strategy.sender,
-//        proxy: AbosProxy {
-//            pair: eth_pair.clone(),
-//            chain_id: U256::from_str("00000000000000000000000000000000000000000000ca812def6446350c7e8d").unwrap(),
-//            context: SignContext {
-//                height: 0,
-//                nonce: U256::from(0),
-//                contract_address: abos_address,
-//            },
-//        },
-//    }
-//    .start();
 
     // how to fetch real key?
     let events_key = StorageKey(primitives::twox_128(b"System Events").to_vec());

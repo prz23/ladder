@@ -88,7 +88,7 @@ construct_service_factory! {
                     |config: FactoryFullConfiguration<Self>, executor: TaskExecutor| {
                         let keyring = config.keys.first().map_or(Keyring::default(), |key| Keyring::from(key.as_bytes()));
                         info!("eth signer key: {}", keyring.to_hex());
-                        let mut vendor_config = if let Some(path) = &config.custom.custom_args.config {
+                        let mut vendor_config = if let Some(path) = &config.custom.custom_args.vendor {
                             VendorServiceConfig::from_file(path.as_path()).unwrap()
                         } else {
                             VendorServiceConfig::default()
@@ -98,16 +98,6 @@ construct_service_factory! {
                         match FullComponents::<Factory>::new(config, executor.clone()) {
                             Ok(service) => {
                                 executor.spawn(start_vendor(
-//                                    VendorServiceConfig { kovan_url: "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816".to_string(),
-//                                                        abos_url: "http://47.92.173.78:1337".to_string(),
-//                                                        eth_url: "https://kovan.infura.io/v3/838099c0002948caa607f6cfb29a4816".to_string(),
-//                                                        mapper_address: "c6f47FDdB36c1442B3a7229BEE5C35e7079E2C1e".to_string(),
-//                                                        kovan_address: "9e91F3cFF57D7640e02a1a3e3a48d516fE0C927a".to_string(),
-//                                                        abos_address: "5cFFF8e71B83666df16A9Fdef7C3A03d63711f5D".to_string(),
-//                                                        db_path: db_path,
-//                                                        eth_key: keyring.to_hex(), // sign message
-//                                                        strategy: run_args.into(),
-//                                                        },
                                     vendor_config,
                                     service.network(),
                                     service.client(),

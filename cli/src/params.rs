@@ -5,8 +5,8 @@ use std::path::PathBuf;
 #[derive(Debug, StructOpt, Clone, Default)]
 pub struct VendorCmd {
     /// Config file
-    #[structopt(long = "config", parse(from_os_str))]
-    pub config: Option<PathBuf>,
+    #[structopt(long = "vendor", parse(from_os_str))]
+    pub vendor: Option<PathBuf>,
     /// Enable listener mode
     #[structopt(long = "listener")]
     pub listener: bool,

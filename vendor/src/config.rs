@@ -2,8 +2,8 @@ use crate::error::{Error, ErrorKind, ResultExt};
 use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::fs;
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::io::{self, Read};
+use std::path::{Path};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum EngineKind {
