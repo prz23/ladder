@@ -14,7 +14,7 @@ pub struct SignContext {
 }
 
 pub trait SenderProxy {
-    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport);
+    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport) -> Result<(), String>;
     fn send(&mut self, event_loop: &mut Core, transport: &impl Transport, payload: Vec<u8>);
 }
 
@@ -24,13 +24,20 @@ pub struct EthProxy {
 }
 
 impl SenderProxy for EthProxy {
-    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport) {
+    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport) -> Result<(), String>{
         let authority_address: Address = self.pair.address();
         let nonce = event_loop
-            .run(web3::api::Eth::new(&transport).transaction_count(authority_address, None))
-            .unwrap();
-        info!("eth nonce: {}", nonce);
-        self.context.nonce = nonce;
+            .run(web3::api::Eth::new(&transport).transaction_count(authority_address, None));
+        match nonce {
+            Ok(n) => {
+                info!("eth nonce: {}", n);
+                self.context.nonce = n;
+                Ok(())
+            }
+            Err(e) => {
+                Err(format!("{}", e))
+            }
+        }
     }
 
     fn send(&mut self, event_loop: &mut Core, transport: &impl Transport, payload: Vec<u8>) {
@@ -62,13 +69,20 @@ pub struct AbosProxy {
 }
 
 impl SenderProxy for AbosProxy {
-    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport) {
+    fn initialize(&mut self, event_loop: &mut Core, transport: &impl Transport) -> Result<(), String>{
         let authority_address: Address = self.pair.address();
         let nonce = event_loop
-            .run(web3::api::Abos::new(&transport).transaction_count(authority_address, None))
-            .unwrap();
-        info!("abos nonce: {}", nonce);
-        self.context.nonce = nonce;
+            .run(web3::api::Abos::new(&transport).transaction_count(authority_address, None));
+        match nonce {
+            Ok(n) => {
+                info!("eth nonce: {}", n);
+                self.context.nonce = n;
+                Ok(())
+            }
+            Err(e) => {
+                Err(format!("{}", e))
+            }
+        }
     }
 
     fn send(&mut self, event_loop: &mut Core, transport: &impl Transport, payload: Vec<u8>) {

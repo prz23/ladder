@@ -55,13 +55,21 @@ where
             let mut event_loop = Core::new().unwrap();
             loop {
                 info!("Intend to connect node.");
-                let transport = web3::transports::Http::with_event_loop(
+                let transport = match web3::transports::Http::with_event_loop(
                     &self.url,
                     &event_loop.handle(),
                     MAX_PARALLEL_REQUESTS,
                 )
-                .chain_err(|| format!("Cannot connect to node at {}", self.url))
-                .unwrap();
+                .chain_err(|| format!("Cannot connect to node at {}", self.url)) {
+                    Ok(t) => {
+                        t
+                    },
+                    Err(e) => {
+                        error!("{}",e);
+                        std::thread::sleep_ms(30000);
+                        continue;
+                    }
+                };
 
                 if !self.db_file.exists() {
                     std::fs::File::create(&self.db_file)
