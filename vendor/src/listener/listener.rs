@@ -16,17 +16,17 @@ use web3::{
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
 
-pub enum ListenerStreamStyle {
-    Vendor,
-    Mapper,
-}
+//pub enum ListenerStreamStyle {
+//    Vendor,
+//    Mapper,
+//}
+use crate::config::ListenerStreamStyle;
 
 pub struct SideListener<V> {
     pub url: String,
     pub contract_address: Address,
     pub db_file: PathBuf,
     pub spv: Arc<V>,
-    pub enable: bool,
     pub chain: ChainAlias,
     pub style: ListenerStreamStyle,
 }
@@ -48,11 +48,8 @@ impl<V> SideListener<V>
 where
     V: SuperviseClient + Send + Sync + 'static,
 {
+
     pub fn start(self) {
-        // return directly.
-        if !self.enable {
-            return;
-        }
         // TODO hook the event of http disconnect to keep run.
         std::thread::spawn(move || {
             let mut event_loop = Core::new().unwrap();
