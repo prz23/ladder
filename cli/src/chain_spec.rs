@@ -478,7 +478,7 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 /// ladder testnet config
 pub fn ladder_testnet_config() -> ChainSpec {
     ChainSpec::from_genesis(
-        "Ladder Testnet v0.5.0",
+        "Ladder Testnet v0.6.0",
         "Ladder Testnet",
         ladder_testnet_genesis,
         vec![],

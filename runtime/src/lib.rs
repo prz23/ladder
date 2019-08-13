@@ -74,9 +74,9 @@ pub mod matrix;
 pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node"),
 	impl_name: create_runtime_str!("ladder-node"),
-	authoring_version: 10,
-	spec_version: 74,
-	impl_version: 74,
+	authoring_version: 11,
+	spec_version: 75,
+	impl_version: 75,
 	apis: RUNTIME_API_VERSIONS,
 };
 
