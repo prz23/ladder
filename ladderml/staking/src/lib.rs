@@ -132,7 +132,7 @@
 //! ```
 //! use srml_support::{decl_module, dispatch::Result};
 //! use system::ensure_signed;
-//! use srml_staking::{self as staking};
+//! use ladder_staking::{self as staking};
 //!
 //! pub trait Trait: staking::Trait {}
 //!
@@ -530,12 +530,18 @@ decl_storage! {
 		pub NodeInformation get(node_information): map T::AccountId => Option<NodeIntroduction<T::AccountId>>;
 
 		/// Total reward in one year
-		pub RewardPerYear get(reward_per_year) config(): Option<BalanceOf<T>>;
+		pub RewardPerYear get(reward_per_year) config(): BalanceOf<T>;
 
 		/// reward-record
 		pub RewardRecord get(reward_record): map T::AccountId => BalanceOf<T>;
 
         pub RewardFee get(reward_fee): u64 = 995;
+
+        /// The minimum amount to become a validator
+        pub ValidateMinimumStake get(validate_minimum_stake) config(): BalanceOf<T>;
+
+		/// The minimum amount to become a nominator
+        pub NominateMinimumStake get(nominate_minimum_stake) config(): BalanceOf<T>;
 	}
 	add_extra_genesis {
 		config(stakers): Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
@@ -684,7 +690,7 @@ decl_module! {
 			let controller = ensure_signed(origin)?;
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
-			ensure!(ledger.active >= <BalanceOf<T>>::sa(50000u64), "Insufficient Active");
+			ensure!(ledger.active >= Self::validate_minimum_stake(), "insufficient Active");
 			ensure!(prefs.unstake_threshold <= MAX_UNSTAKE_THRESHOLD, "unstake threshold too large");
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
@@ -701,6 +707,7 @@ decl_module! {
             <NodeInformation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
             Ok(())
         }
+
 		/// Declare the desire to nominate `targets` for the origin controller.
 		///
 		/// Effects will be felt at the beginning of the next era.
@@ -711,6 +718,7 @@ decl_module! {
 			let ledger = Self::ledger(&controller).ok_or("not a controller")?;
 			let stash = &ledger.stash;
 			ensure!(!targets.is_empty(), "targets cannot be empty");
+			ensure!(ledger.active >= Self::nominate_minimum_stake(), "insufficient Active");
 			let targets = targets.into_iter()
 				.take(MAX_NOMINATIONS)
 				.map(T::Lookup::lookup)
@@ -879,7 +887,7 @@ impl<T: Trait> Module<T> {
 		T::Slash::on_unbalanced(imbalance);
 	}
 
-	fn service_fee(mut fee:BalanceOf<T>) -> BalanceOf<T> {
+	fn service_fee(fee: BalanceOf<T>) -> BalanceOf<T> {
 		let ratio = <BalanceOf<T> as As<u64>>::sa(Self::reward_fee()) * fee;
 		ratio/<BalanceOf<T> as As<u64>>::sa(1000u64)
 	}
@@ -1001,7 +1009,7 @@ impl<T: Trait> Module<T> {
 
 		// Update the balances for rewarding according to the stakes.
 		// If has set the annual reward total, then session reward calculated by total amount.
-		let session_reward = if Self::reward_per_year().is_some() {
+		let session_reward = if !Self::reward_per_year().is_zero() {
 			Self::session_reward_per_validator()
 		} else {
 			Self::session_reward() * slot_stake
@@ -1014,14 +1022,9 @@ impl<T: Trait> Module<T> {
 	///
 	/// formula: total / sessions_of_year / validators
 	fn session_reward_per_validator() -> BalanceOf<T> {
-		let session_of_year = YEAR_SECONDS / (<session::Module<T>>::length().as_() * <timestamp::Module<T>>::minimum_period().as_());
+		let session_of_year = YEAR_SECONDS / (<session::Module<T>>::length().as_() * <timestamp::Module<T>>::minimum_period().as_() * 2);
 		let elected_len = Self::current_elected().len().max(1) as u64;
-
-		if let Some(reward_per_year) = Self::reward_per_year() {
-			reward_per_year / BalanceOf::<T>::sa(session_of_year * elected_len)
-		} else {
-			BalanceOf::<T>::zero()
-		}
+		Self::reward_per_year() / BalanceOf::<T>::sa(session_of_year * elected_len)
 	}
 
 	fn slashable_balance_of(stash: &T::AccountId) -> BalanceOf<T> {

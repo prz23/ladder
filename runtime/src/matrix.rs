@@ -342,6 +342,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn ingress_test() {
         with_externalities(&mut new_test_ext(), || {
             assert_ok!(Matrix::ingress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()) );
@@ -360,6 +361,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn egress_test() {
         with_externalities(&mut new_test_ext(), || {
             assert_ok!(Matrix::egress(Origin::signed(1),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].to_vec(),[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17].to_vec()) );
@@ -371,6 +373,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn validators_contains_test() {
         with_externalities(&mut new_test_ext(), || {
             assert_eq_uvec!(Matrix::validators_list(), vec![1,2,3,4,5]);

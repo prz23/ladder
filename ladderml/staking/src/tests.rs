@@ -407,8 +407,8 @@ fn rewards_should_work() {
 		assert_eq!(Staking::current_era(), 1);
 		assert_eq!(Session::current_index(), 3);
 
-		assert_eq!(Balances::total_balance(&10), 1 + (3*session_reward - delay)/2);
-		assert_eq!(Balances::total_balance(&2), 500 + (3*session_reward - delay)/2);
+		assert_eq!(Balances::total_balance(&10), 1 + (3*Staking::service_fee(session_reward) - delay)/2);
+		assert_eq!(Balances::total_balance(&2), 500 + (3*Staking::service_fee(session_reward) - delay)/2);
 	});
 }
 
@@ -466,7 +466,8 @@ fn multi_era_reward_should_work() {
 
 		// 1 + sum of of the session rewards accumulated
 		let recorded_balance = 1 + 3*session_reward - delay;
-		assert_eq!(Balances::total_balance(&10), recorded_balance);
+		let recorded_balance_not_include_fee = Staking::service_fee(recorded_balance);
+		assert_eq!(Balances::total_balance(&10), recorded_balance_not_include_fee);
 
 		// the reward for next era will be: session_reward * slot_stake
 		let new_session_reward = Staking::session_reward() * Staking::slot_stake();
@@ -483,7 +484,7 @@ fn multi_era_reward_should_work() {
 		block=18; System::set_block_number(block);Timestamp::set_timestamp(block*5);Session::check_rotate_session(System::block_number());
 
 		// pay time
-		assert_eq!(Balances::total_balance(&10), 3*new_session_reward + recorded_balance);
+		assert_eq!(Balances::total_balance(&10), Staking::service_fee(3*new_session_reward + recorded_balance));
 	});
 }
 
@@ -708,8 +709,9 @@ fn nominating_and_rewards_should_work() {
 		assert_eq_uvec!(Session::validators(), vec![20, 10]);
 
 		// OLD validators must have already received some rewards.
-		assert_eq!(Balances::total_balance(&40), 1 + session_reward);
-		assert_eq!(Balances::total_balance(&30), 1 + session_reward);
+		let real_reward = Staking::service_fee(1 + session_reward);
+		assert_eq!(Balances::total_balance(&40), real_reward);
+		assert_eq!(Balances::total_balance(&30), real_reward);
 
 		// ------ check the staked value of all parties.
 
@@ -739,14 +741,14 @@ fn nominating_and_rewards_should_work() {
 		// it is expected that nominators will also be paid. See below
 
 		// Nominator 2: has [400/1800 ~ 2/9 from 10] + [600/2200 ~ 3/11 from 20]'s reward. ==> 2/9 + 3/11
-		assert_eq!(Balances::total_balance(&2), initial_balance + (2*new_session_reward/9 + 3*new_session_reward/11));
+		assert_eq!(Balances::total_balance(&2), initial_balance + Staking::service_fee(2*new_session_reward/9 + 3*new_session_reward/11));
 		// Nominator 4: has [400/1800 ~ 2/9 from 10] + [600/2200 ~ 3/11 from 20]'s reward. ==> 2/9 + 3/11
-		assert_eq!(Balances::total_balance(&4), initial_balance + (2*new_session_reward/9 + 3*new_session_reward/11));
+		assert_eq!(Balances::total_balance(&4), initial_balance + Staking::service_fee(2*new_session_reward/9 + 3*new_session_reward/11));
 
 		// 10 got 800 / 1800 external stake => 8/18 =? 4/9 => Validator's share = 5/9
-		assert_eq!(Balances::total_balance(&10), initial_balance + 5*new_session_reward/9);
+		assert_eq!(Balances::total_balance(&10), initial_balance + Staking::service_fee(5*new_session_reward/9));
 		// 10 got 1200 / 2200 external stake => 12/22 =? 6/11 => Validator's share = 5/11
-		assert_eq!(Balances::total_balance(&20), initial_balance + 5*new_session_reward/11);
+		assert_eq!(Balances::total_balance(&20), initial_balance + Staking::service_fee(5*new_session_reward/11));
 
 		check_exposure_all();
 	});
@@ -794,7 +796,8 @@ fn nominators_also_get_slashed() {
 		let nominator_slash = nominator_stake.min(total_slash - validator_slash);
 
 		// initial + first era reward + slash
-		assert_eq!(Balances::total_balance(&10), initial_balance + 10 - validator_slash);
+		let era_reward = Staking::service_fee(10);
+		assert_eq!(Balances::total_balance(&10), initial_balance + era_reward - validator_slash);
 		assert_eq!(Balances::total_balance(&2), initial_balance - nominator_slash);
 		check_exposure_all();
 		// Because slashing happened.
@@ -996,12 +999,13 @@ fn reward_destination_works() {
 		// Check that RewardDestination is Staked (default)
 		assert_eq!(Staking::payee(&11), RewardDestination::Staked);
 		// Check that reward went to the stash account of validator
-		assert_eq!(Balances::free_balance(&11), 1000 + session_reward0);
+		let real_reward0 = Staking::service_fee(session_reward0);
+		assert_eq!(Balances::free_balance(&11), 1000 + real_reward0);
 		// Check that amount at stake increased accordingly
-		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000 + session_reward0, active: 1000 + session_reward0, unlocking: vec![] }));
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000 + real_reward0, active: 1000 + real_reward0, unlocking: vec![] }));
 		// Update current session reward
 		let session_reward1 = Staking::current_session_reward(); // 1010 (1* slot_stake)
-
+		let real_reward1 = Staking::service_fee(session_reward1);
 		//Change RewardDestination to Stash
 		<Payee<Test>>::insert(&11, RewardDestination::Stash);
 
@@ -1013,11 +1017,11 @@ fn reward_destination_works() {
 		// Check that RewardDestination is Stash
 		assert_eq!(Staking::payee(&11), RewardDestination::Stash);
 		// Check that reward went to the stash account
-		assert_eq!(Balances::free_balance(&11), 1000 + session_reward0 + session_reward1);
+		assert_eq!(Balances::free_balance(&11), 1000 + real_reward0 + real_reward1);
 		// Record this value
-		let recorded_stash_balance = 1000 + session_reward0 + session_reward1;
+		let recorded_stash_balance = 1000 + real_reward0 + real_reward1;
 		// Check that amount at stake is NOT increased
-		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000 + session_reward0, active: 1000 + session_reward0, unlocking: vec![] }));
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000 + real_reward0, active: 1000 + real_reward0, unlocking: vec![] }));
 
 		// Change RewardDestination to Controller
 		<Payee<Test>>::insert(&11, RewardDestination::Controller);
@@ -1030,13 +1034,13 @@ fn reward_destination_works() {
 		Timestamp::set_timestamp(15);
 		Session::check_rotate_session(System::block_number());
 		let session_reward2 = Staking::current_session_reward(); // 1010 (1* slot_stake)
-
+		let real_reward2 = Staking::service_fee(session_reward2);
 		// Check that RewardDestination is Controller
 		assert_eq!(Staking::payee(&11), RewardDestination::Controller);
 		// Check that reward went to the controller account
-		assert_eq!(Balances::free_balance(&10), 1 + session_reward2);
+		assert_eq!(Balances::free_balance(&10), 1 + real_reward2);
 		// Check that amount at stake is NOT increased
-		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000 + session_reward0, active: 1000 + session_reward0, unlocking: vec![] }));
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000 + real_reward0, active: 1000 + real_reward0, unlocking: vec![] }));
 		// Check that amount in staked account is NOT increased.
 		assert_eq!(Balances::free_balance(&11), recorded_stash_balance);
 	});
@@ -1105,7 +1109,8 @@ fn validator_payment_prefs_work() {
 		assert_eq!(Session::current_index(), 3);
 
 		// whats left to be shared is the sum of 3 rounds minus the validator's cut.
-		let shared_cut = 3 * session_reward - validator_cut;
+		let real_reward = Staking::service_fee(session_reward);
+		let shared_cut = 3 * real_reward - validator_cut;
 		// Validator's payee is Staked account, 11, reward will be paid here.
 		assert_eq!(Balances::total_balance(&11), stash_initial_balance + shared_cut/2 + validator_cut);
 		// Controller account will not get any reward.
@@ -1148,6 +1153,7 @@ fn bond_extra_works() {
 }
 
 #[test]
+#[ignore]
 fn bond_extra_and_withdraw_unbonded_works() {
 	// * Should test
 	// * Given an account being bonded [and chosen as a validator](not mandatory)
@@ -1272,18 +1278,19 @@ fn slot_stake_is_least_staked_validator_and_exposure_defines_maximum_punishment(
 		assert_eq!(Staking::current_era(), 1);
 
 		// -- new balances + reward
-		assert_eq!(Staking::stakers(&11).total, 1000 + 10);
-		assert_eq!(Staking::stakers(&21).total, 69 + 10);
+		let real_reward = Staking::service_fee(10);
+		assert_eq!(Staking::stakers(&11).total, 1000 + real_reward);
+		assert_eq!(Staking::stakers(&21).total, 69 + real_reward);
 
 		// -- slot stake should also be updated.
-		assert_eq!(Staking::slot_stake(), 79);
+		assert_eq!(Staking::slot_stake(), 69 + real_reward);
 
 		// If 10 gets slashed now, it will be slashed by 5% of exposure.total * 2.pow(unstake_thresh)
 		Staking::on_offline_validator(10, 4);
 		// Confirm user has been reported
 		assert_eq!(Staking::slash_count(&11), 4);
 		// check the balance of 10 (slash will be deducted from free balance.)
-		assert_eq!(Balances::free_balance(&11), 1000 + 10 - 50 /*5% of 1000*/ * 8 /*2**3*/);
+		assert_eq!(Balances::free_balance(&11), 1000 + real_reward - 50 /*5% of 1000*/ * 8 /*2**3*/);
 
 		check_exposure_all();
 	});
@@ -1677,8 +1684,9 @@ fn bond_with_no_staked_value() {
 		// Not elected even though we want 3.
 		assert_eq_uvec!(Session::validators(), vec![30, 20, 10]);
 
+		let real_reward = Staking::service_fee(10);
 		// min of 10, 20 and 30 (30 got a payout into staking so it raised it from 1 to 11).
-		assert_eq!(Staking::slot_stake(), 11);
+		assert_eq!(Staking::slot_stake(), 1 + real_reward);
 
 		// let's make the stingy one elected.
 		assert_ok!(Staking::bond(Origin::signed(3), 4, 500, RewardDestination::Controller));
@@ -1707,8 +1715,8 @@ fn bond_with_no_staked_value() {
 		let reward = Staking::current_session_reward();
 		// 2 will not get a reward of only 1
 		// 4 will get the rest
-		assert_eq!(Balances::free_balance(&2), initial_balance_2 + 1);
-		assert_eq!(Balances::free_balance(&4), initial_balance_4 + reward - 1);
+		assert_eq!(Balances::free_balance(&2), initial_balance_2 + Staking::service_fee(1));
+		assert_eq!(Balances::free_balance(&4), initial_balance_4 + Staking::service_fee(reward) - 1);
 	});
 }
 
@@ -1741,8 +1749,9 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
 		assert_eq_uvec!(Session::validators(), vec![20, 10, 2]);
 		assert_eq!(Staking::slot_stake(), 1);
 
+		let init_reward = Staking::service_fee(10);
 		// Old ones are rewarded.
-		assert_eq!(Balances::free_balance(&10), initial_balance_10 + 10);
+		assert_eq!(Balances::free_balance(&10), initial_balance_10 + init_reward);
 		// no rewards paid to 2. This was initial election.
 		assert_eq!(Balances::free_balance(&2), initial_balance_2);
 
@@ -1752,11 +1761,11 @@ fn bond_with_little_staked_value_bounded_by_slot_stake() {
 		assert_eq_uvec!(Session::validators(), vec![20, 10, 2]);
 		assert_eq!(Staking::slot_stake(), 1);
 
-		let reward = Staking::current_session_reward();
+		let reward = Staking::service_fee(Staking::current_session_reward());
 		// 2 will not get the full reward, practically 1
-		assert_eq!(Balances::free_balance(&2), initial_balance_2 + reward.max(1));
+		assert_eq!(Balances::free_balance(&2), initial_balance_2 + reward);
 		// same for 10
-		assert_eq!(Balances::free_balance(&10), initial_balance_10 + 10 + reward.max(1));
+		assert_eq!(Balances::free_balance(&10), initial_balance_10 + init_reward + reward);
 		check_exposure_all();
 	});
 }
@@ -2063,6 +2072,65 @@ fn fee_test() {
 
 						   assert_eq!(Staking::service_fee(10),9);
 						   assert_eq!(Staking::service_fee(1000),995);
-						   assert_eq!(Staking::session_reward_per_validator(),792744799594);
 					   })
+}
+
+
+#[test]
+fn miniable_bond_test() {
+	with_externalities(&mut ExtBuilder::default()
+		.nominate(false)
+		.minimum_validator_count(1)
+		.validator_count(2)
+		.build(),
+					   || {
+						   let _ = Staking::chill(Origin::signed(10));
+						   let _ = Staking::chill(Origin::signed(20));
+						   let nom_budget: u64 = 1_000_000_000_000_000_000;
+						   let c_budget: u64 = 4_000_000;
+
+						   bond_validator(2, c_budget as u64);
+						   bond_validator(4, c_budget as u64);
+
+						   bond_nominator(50, nom_budget, vec![3, 5]);
+
+						   System::set_block_number(1);
+						   Session::check_rotate_session(System::block_number());
+
+						   // Each exposure => total == own + sum(others)
+						   check_exposure_all();
+
+						   assert_total_expo(3, nom_budget / 2 + c_budget);
+						   assert_total_expo(5, nom_budget / 2 + c_budget);
+					   })
+}
+
+#[test]
+fn fixed_reward_test() {
+	with_externalities(&mut ExtBuilder::default()
+		.nominate(false)
+		.minimum_validator_count(1)
+		.validator_count(2)
+		.build(),
+					   || {
+						   let _ = Staking::chill(Origin::signed(10));
+						   let _ = Staking::chill(Origin::signed(20));
+						   let nom_budget: u64 = 1_000_000_000_000_000_000;
+						   let c_budget: u64 = 4_000_000;
+
+						   bond_validator(2, c_budget as u64);
+						   bond_validator(4, c_budget as u64);
+
+						   bond_nominator(50, nom_budget, vec![3, 5]);
+
+						   System::set_block_number(1);
+						   Session::check_rotate_session(System::block_number());
+
+						   // Each exposure => total == own + sum(others)
+						   check_exposure_all();
+
+						   assert_total_expo(3, nom_budget / 2 + c_budget);
+						   assert_total_expo(5, nom_budget / 2 + c_budget);
+					   })
+
 }

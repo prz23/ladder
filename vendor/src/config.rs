@@ -83,6 +83,7 @@ mod tests {
     use self::tempdir::TempDir;
     use super::*;
     use std::fs::File;
+    use std::io::Write;
 
     fn mock_config() -> ServiceConfig{
         let items = vec![BasicItem {

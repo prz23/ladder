@@ -102,6 +102,7 @@ pub struct ExtBuilder {
 	validator_count: u32,
 	minimum_validator_count: u32,
 	fair: bool,
+	reward_year: u64,
 }
 
 impl Default for ExtBuilder {
@@ -116,7 +117,8 @@ impl Default for ExtBuilder {
 			nominate: true,
 			validator_count: 2,
 			minimum_validator_count: 0,
-			fair: true
+			fair: true,
+			reward_year: 0,
 		}
 	}
 }
@@ -156,6 +158,10 @@ impl ExtBuilder {
 	}
 	pub fn fair(mut self, is_fair: bool) -> Self {
 		self.fair = is_fair;
+		self
+	}
+	pub fn reward_year(mut self, reward: u64) -> Self {
+		self.reward_year = reward;
 		self
 	}
 	pub fn build(self) -> runtime_io::TestExternalities<Blake2Hasher> {
@@ -229,7 +235,9 @@ impl ExtBuilder {
 			offline_slash_grace: 0,
 			invulnerables: vec![],
 			nodeinformation:get_nodeinformation(),
-			reward_per_year:REWARDYEAR as u64,
+			reward_per_year: self.reward_year,
+			validate_minimum_stake: 0,
+			nominate_minimum_stake: 0,
 		}.assimilate_storage(&mut t, &mut c);
 		let _ = timestamp::GenesisConfig::<Test>{
 			minimum_period: 5,
@@ -238,7 +246,6 @@ impl ExtBuilder {
 	}
 }
 
-const REWARDYEAR: u128 = 10_000_000_000 * 1_000_000_000;
 /// Helper function to generate brands.
 pub fn get_nodeinformation() -> Vec<(Vec<u8>,Vec<u8>,Vec<u8>)> {
 	vec![

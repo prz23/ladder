@@ -1179,8 +1179,14 @@ mod tests {
     }
 
     fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
-        let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
-        runtime_io::TestExternalities::new(t)
+        let authorities = vec![1u64, 2u64, 3u64, 4u64, 5u64];
+        let (mut t, mut c) = system::GenesisConfig::<Test>::default().build_storage().unwrap();
+
+        let _ = signcheck::GenesisConfig::<Test> {
+            pubkey: vec![(1, vec![1, 2]) ],
+            athorities: authorities.into_iter().map(|a| UintAuthorityId(a)).collect()
+        }.assimilate_storage(&mut t, &mut c);
+        t.into()
     }
 
     type Bank = Module<Test>;

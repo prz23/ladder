@@ -91,6 +91,10 @@ rev = "6e67eff0653677d3d01980ca822c4b8a227914a3"
 optional = true
 version = "1.0"
 
+[dependencies.hex-literal]
+optional = true
+version = "0.2"
+
 [features]
 default = ["std"]
 std = [
@@ -110,4 +114,5 @@ std = [
     'sr_primitives/std',
     "session/std",
     "rustc-hex",
+    "hex-literal",
 ]

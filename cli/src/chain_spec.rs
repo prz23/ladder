@@ -214,6 +214,8 @@ pub fn testnet_genesis(
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			nodeinformation: get_nodeinformation(),
 			reward_per_year:REWARDYEAR,
+			validate_minimum_stake: 5_000_000,
+			nominate_minimum_stake: 1_000,
 		}),
 		democracy: Some(DemocracyConfig {
 			launch_period: 9,
@@ -439,7 +441,9 @@ fn ladder_testnet_genesis() -> GenesisConfig {
 			stakers: initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), STASH, StakerStatus::Validator)).collect(),
 			invulnerables: initial_authorities.iter().map(|x| x.1.clone()).collect(),
 			nodeinformation: get_nodeinformation(),
-			reward_per_year: REWARDYEAR
+			reward_per_year: REWARDYEAR,
+			validate_minimum_stake: 50_000 * DOLLARS,
+			nominate_minimum_stake: 10 * DOLLARS,
 		}),
 		democracy: Some(DemocracyConfig {
 			launch_period: 10 * MINUTES,    // 1 day per public referendum
@@ -569,6 +573,7 @@ mod tests {
     }
 
     #[test]
+	#[ignore]
     fn test_connectivity() {
         service_test::connectivity::<Factory>(integration_test_config());
     }

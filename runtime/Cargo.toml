@@ -41,12 +41,12 @@ brand = { path = "../ladderml/brand", default_features = false}
 [dependencies.staking]
 default_features = false
 path = "../ladderml/staking"
-package = 'srml-staking'
+package = 'ladder-staking'
 
 [dependencies.aura]
 default_features = false
 path = "../ladderml/aura"
-package = 'srml-aura'
+package = 'ladder-aura'
 
 [dependencies.signcheck]
 default_features = false

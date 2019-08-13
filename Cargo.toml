@@ -33,7 +33,9 @@ members = [
     "ladderml/exchange",
     "ladderml/order",
     "ladderml/otc",
-    "ladderml/signcheck"
+    "ladderml/signcheck",
+    "ladderml/staking",
+    "ladderml/aura"
 ]
 
 exclude = [

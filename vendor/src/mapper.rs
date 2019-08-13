@@ -136,6 +136,7 @@ mod tests {
     use crate::vendor::Vendor;
 
     #[test]
+    #[ignore]
     fn test_vendor_stream() {
         let lock_topic = contracts::mapper::events::lock_token::filter().topic0;
         let unlock_topic = contracts::mapper::events::unlock_token::filter().topic0;

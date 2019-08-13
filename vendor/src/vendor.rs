@@ -205,6 +205,7 @@ mod tests {
     use tokio_core::reactor::Core;
 
     #[test]
+    #[ignore]
     fn test_vendor_stream() {
         let request_topic = contracts::bridge::events::request::filter().topic0;
         let deposit_topic = contracts::bridge::events::deposit::filter().topic0;

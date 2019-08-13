@@ -1,5 +1,5 @@
 [package]
-name = "srml-aura"
+name = "ladder-aura"
 version = "2.0.0"
 authors = ["Parity Technologies <admin@parity.io>"]
 edition = "2018"
@@ -13,7 +13,7 @@ primitives = { package = "sr-primitives", git = "https://github.com/paritytech/s
 srml-support = {  git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 system = { package = "srml-system", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 timestamp = { package = "srml-timestamp", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
-staking = { package = "srml-staking", path = "../staking", default-features = false }
+staking = { package = "ladder-staking", path = "../staking", default-features = false }
 session = { package = "srml-session",  git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 
 

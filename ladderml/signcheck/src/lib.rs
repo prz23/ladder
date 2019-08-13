@@ -269,6 +269,7 @@ mod tests {
     use sr_primitives::traits::{BlakeTwo256, IdentityLookup};
     use sr_primitives::testing::{Digest, DigestItem, Header, UintAuthorityId, ConvertUintAuthorityId};
     use rustc_hex::*;
+    use hex_literal::hex;
 
     impl_outer_origin!{
 		pub enum Origin for Test {}
@@ -313,8 +314,13 @@ mod tests {
     }
 
     fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
+        let authorities = vec![1u64, 2u64, 3u64, 4u64, 5u64];
         let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
-        runtime_io::TestExternalities::new(t)
+        t.extend(GenesisConfig::<Test>{
+            pubkey: vec![(1, hex!("4707a1eb3028f30b0d8646ca22bf8791210de0e8b80bcd1bbd7176c96fbaa2a223d365c7bf10f69dc8f45de2f182cf1f7217d93b69993c0b32445892b0d768b7").to_vec()) ],
+            athorities: authorities.into_iter().map(|a| UintAuthorityId(a)).collect()
+        }.build_storage().unwrap().0);
+        t.into()
     }
 
     type Signcheck = Module<Test>;
