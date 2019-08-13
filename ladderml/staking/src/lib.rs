@@ -261,7 +261,7 @@ use phragmen::{elect, ACCURACY, ExtendedBalance};
 
 const RECENT_OFFLINE_COUNT: usize = 32;
 const DEFAULT_MINIMUM_VALIDATOR_COUNT: u32 = 4;
-const MAX_NOMINATIONS: usize = 16;
+const MAX_NOMINATIONS: usize = 10;
 const MAX_UNSTAKE_THRESHOLD: u32 = 10;
 const YEAR_SECONDS: u64 = 365 * 24 * 3600;
 
