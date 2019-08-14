@@ -91,7 +91,7 @@ impl Default for GenesisConfigBuilder {
 			validate_minimum_stake: 50_000 * LADS,
 			nominate_minimum_stake: 10 * LADS,
 			reward_per_year: REWARDYEAR,
-			bonding_duration: 120,
+			bonding_duration: 240,
 			print: false,
 		}
 	}
@@ -361,6 +361,9 @@ pub fn testnet_genesis(
 	builder.endowed_accounts = endowed_accounts;
 	builder.ethereum_public_keys = ethereum_public_keys;
 	builder.print = enable_println;
+	builder.sec_per_block = 4;
+	builder.sec_per_session = MINUTES;
+	builder.sec_per_era = MINUTES * 3;
 	builder.build()
 }
 
