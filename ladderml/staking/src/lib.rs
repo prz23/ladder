@@ -965,6 +965,7 @@ impl<T: Trait> Module<T> {
 			reward_vec.for_each(|(i,x)|{
 				<RewardChance<T>>::insert(i,1u64);
 			});
+			<WeekCount<T>>::put(0u64);
 		}
 	}
 
