@@ -542,6 +542,9 @@ decl_storage! {
 
 		/// The minimum amount to become a nominator
         pub NominateMinimumStake get(nominate_minimum_stake) config(): BalanceOf<T>;
+
+        pub WeekCount get(week_count) : u64;
+        pub RewardChance get(reward_chance) : linked_map T::AccountId => u64;
 	}
 	add_extra_genesis {
 		config(stakers): Vec<(T::AccountId, T::AccountId, BalanceOf<T>, StakerStatus<T::AccountId>)>;
@@ -694,7 +697,8 @@ decl_module! {
 			ensure!(prefs.unstake_threshold <= MAX_UNSTAKE_THRESHOLD, "unstake threshold too large");
 			<Nominators<T>>::remove(stash);
 			<Validators<T>>::insert(stash, prefs);
-			<NodeInformation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller,name:name,site: site,detail: detail });
+			<NodeInformation<T>>::insert(stash.clone(), &NodeIntroduction{ accountid:controller.clone(),name:name,site: site,detail: detail });
+		    <RewardChance<T>>::insert(controller,1u64);
 		}
 
         fn change_nodeinfo(origin,name:Vec<u8>,site:Vec<u8>,detail:Vec<u8>) -> Result {
@@ -726,6 +730,7 @@ decl_module! {
 
 			<Validators<T>>::remove(stash);
 			<Nominators<T>>::insert(stash, targets);
+			<RewardChance<T>>::insert(controller,1u64);
 		}
 
 		/// Declare no desire to either validate or nominate.
@@ -775,8 +780,13 @@ decl_module! {
 		}
 
         ///
-        pub fn get_reward(origin) {
+        pub fn get_reward(origin) -> Result {
             let controller = ensure_signed(origin)?;
+
+            if <RewardChance<T>>::get(&controller) == 0 {
+                return Err("wait for one week");
+            }
+            <RewardChance<T>>::insert(&controller,0u64);
 
             let amount = Self::service_fee(<RewardRecord<T>>::get(&controller));
             <RewardRecord<T>>::insert(&controller,<BalanceOf<T> as As<u64>>::sa(0u64));
@@ -785,6 +795,7 @@ decl_module! {
             let mut imbalance = <PositiveImbalanceOf<T>>::zero();
             imbalance.maybe_subsume( T::Currency::deposit_into_existing(&controller,amount).ok() );
             T::Reward::on_unbalanced(imbalance);
+            Ok(())
         }
 
 		/// Set the number of sessions in an era.
@@ -946,6 +957,17 @@ impl<T: Trait> Module<T> {
 		T::Reward::on_unbalanced(imbalance);
 	}
 
+	fn update_reward_chance(){
+		if <WeekCount<T>>::get() <= 168u64{
+			<WeekCount<T>>::mutate(|i| *i = *i + 1);
+		}else {
+			let reward_vec = <RewardChance<T>>::enumerate();
+			reward_vec.for_each(|(i,x)|{
+				<RewardChance<T>>::insert(i,1u64);
+			});
+		}
+	}
+
 	/// Get the reward for the session, assuming it ends with this block.
 	fn this_session_reward(actual_elapsed: T::Moment) -> BalanceOf<T> {
 		let ideal_elapsed = <session::Module<T>>::ideal_session_duration();
@@ -1016,6 +1038,8 @@ impl<T: Trait> Module<T> {
 		};
 
 		<CurrentSessionReward<T>>::put(session_reward);
+
+		Self::update_reward_chance();
 	}
 
 	/// Get Mmximum reward, per validator, that is provided total reward per year.
