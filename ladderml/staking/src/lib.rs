@@ -544,6 +544,7 @@ decl_storage! {
         pub NominateMinimumStake get(nominate_minimum_stake) config(): BalanceOf<T>;
 
         pub WeekCount get(week_count) : u64;
+
         pub RewardChance get(reward_chance) : linked_map T::AccountId => u64;
 	}
 	add_extra_genesis {
@@ -653,6 +654,16 @@ decl_module! {
 			let mut ledger = Self::ledger(&controller).ok_or("not a controller")?;
 
 			let mut value = value.min(ledger.active);
+
+            let stash = &ledger.stash;
+
+            if <Validators<T>>::exists(stash) ||  <session::Module<T>>::validators().contains(stash) {
+			    ensure!(ledger.active - value >= Self::validate_minimum_stake(), "insufficient validate Money");
+			}else if  <Nominators<T>>::exists(stash) || Self::is_nominating(stash) {
+			    ensure!(ledger.active - value >= Self::nominate_minimum_stake(), "insufficient nominate Money");
+			}else{
+
+			}
 
 			if !value.is_zero() {
 				ledger.active -= value;
@@ -935,6 +946,18 @@ impl<T: Trait> Module<T> {
 		}
 	}
 
+	/// if the stash is nominating , return true
+	fn is_nominating(stash: &T::AccountId) -> bool {
+		let mut is_nominatoring = false;
+		<session::Module<T>>::validators().iter().enumerate().for_each(|(_i,validator)|{
+		        let stakers = Self::stakers(validator);
+				stakers.others.iter().enumerate().for_each(|(_i,x)| {
+					if x.who == *stash { is_nominatoring = true; }
+				});
+			});
+		is_nominatoring
+	}
+
 	/// Reward a given validator by a specific amount. Add the reward to the validator's, and its nominators'
 	/// balance, pro-rata based on their exposure, after having removed the validator's pre-payout cut.
 	fn reward_validator(stash: &T::AccountId, reward: BalanceOf<T>) {
@@ -962,7 +985,7 @@ impl<T: Trait> Module<T> {
 			<WeekCount<T>>::mutate(|i| *i = *i + 1);
 		}else {
 			let reward_vec = <RewardChance<T>>::enumerate();
-			reward_vec.for_each(|(i,x)|{
+			reward_vec.for_each(|(i,_x)|{
 				<RewardChance<T>>::insert(i,1u64);
 			});
 			<WeekCount<T>>::put(0u64);
