@@ -874,6 +874,21 @@ impl<T: Trait> Module<T> {
 		Self::stakers(who).total
 	}
 
+	/// Reduce the balance in ledger when slash the stash account.
+	fn reduce_ledger(stash: &T::AccountId, value: BalanceOf<T>) {
+		if let Some(controller) = Self::bonded(stash) {
+			if let Some(mut ledger) = Self::ledger(&controller) {
+				let value = value.min(ledger.active);
+
+				if !value.is_zero() {
+					ledger.total -= value;
+					ledger.active -= value;
+					Self::update_ledger(&controller, &ledger);
+				}
+			}
+		}
+	}
+
 	// MUTABLES (DANGEROUS)
 
 	/// Update the ledger for a controller. This will also update the stash lock.
@@ -892,6 +907,7 @@ impl<T: Trait> Module<T> {
 		// The amount we'll slash from the validator's stash directly.
 		let own_slash = exposure.own.min(slash);
 		let (mut imbalance, missing) = T::Currency::slash(stash, own_slash);
+		Self::reduce_ledger(stash, imbalance.peek());
 		let own_slash = own_slash - missing;
 		// The amount remaining that we can't slash from the validator, that must be taken from the nominators.
 		let rest_slash = slash - own_slash;
@@ -902,7 +918,9 @@ impl<T: Trait> Module<T> {
 				let safe_mul_rational = |b| b * rest_slash / total;// FIXME #1572 avoid overflow
 				for i in exposure.others.iter() {
 					// best effort - not much that can be done on fail.
-					imbalance.subsume(T::Currency::slash(&i.who, safe_mul_rational(i.value)).0)
+					let rest_imbalance= T::Currency::slash(&i.who, safe_mul_rational(i.value)).0;
+					Self::reduce_ledger(&i.who, rest_imbalance.peek());
+					imbalance.subsume(rest_imbalance)
 				}
 			}
 		}
