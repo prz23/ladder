@@ -222,6 +222,39 @@ fn offline_should_slash_and_kick() {
 }
 
 #[test]
+fn offline_should_slash_with_ledger() {
+	// Test that an offline validator gets slashed and update ledger.
+	with_externalities(&mut ExtBuilder::default()
+		.build(), || {
+		assert_eq!(Staking::bonded(&11), Some(10)); // Account 11 is stashed and locked, and account 10 is the controller
+		// Account 10 controls the stash from account 11, which is 100 * balance_factor units
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: 1000, active: 1000, unlocking: vec![] }));
+		// Confirm account 10 is a validator
+		assert!(<Validators<Test>>::exists(&11));
+		// Unstake threshold is 3
+		assert_eq!(Staking::validators(&11).unstake_threshold, 3);
+		// Account 10 has not been slashed before
+		assert_eq!(Staking::slash_count(&11), 0);
+		// Account 10 has the funds we just gave it
+		assert_eq!(Balances::free_balance(&11), 1000);
+		// Report account 10 as offline, one greater than unstake threshold
+		Staking::on_offline_validator(10, 4);
+		// Confirm user has been reported
+		assert_eq!(Staking::slash_count(&11), 4);
+		// Confirm balance has been reduced by 2^unstake_threshold * offline_slash() * amount_at_stake.
+		let slash_base = Staking::offline_slash() * Staking::stakers(11).total;
+		let balance = 1000 - 2_u64.pow(3) * slash_base;
+		assert_eq!(Balances::free_balance(&11), balance);
+		assert_eq!(Staking::ledger(&10), Some(StakingLedger { stash: 11, total: balance, active: balance, unlocking: vec![] }));
+		// Confirm account 10 has been removed as a validator
+		assert!(!<Validators<Test>>::exists(&11));
+		// A new era is forced due to slashing
+		assert!(Staking::forcing_new_era().is_some());
+	});
+}
+
+
+#[test]
 fn offline_grace_should_delay_slashing() {
 	// Tests that with grace, slashing is delayed
 	with_externalities(&mut ExtBuilder::default().build(), || {
