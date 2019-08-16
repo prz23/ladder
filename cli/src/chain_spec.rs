@@ -131,7 +131,7 @@ impl GenesisConfigBuilder {
 			}),
 			staking: Some(StakingConfig {
 				current_era: 0,
-				offline_slash: Perbill::from_billionths(1_000_000),
+				offline_slash: Perbill::from_billionths(1),
 				session_reward: Perbill::from_billionths(2_065),
 				current_session_reward: 0,
 				validator_count: self.validator_count,
@@ -291,16 +291,13 @@ pub fn get_brands(owned: AccountId) -> Vec<(Trademark, AccountId)> {
 /// Helper function to generate brands.
 pub fn get_nodeinformation() -> Vec<(Vec<u8>,Vec<u8>,Vec<u8>)> {
 	vec![
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
-		([00u8].to_vec(), [01u8].to_vec(),[02u8].to_vec()),
+		(b"Ali".to_vec(), b"laddernetwork.io".to_vec(),b"ladder".to_vec()),
+		(b"Bob".to_vec(), b"laddernetwork.io".to_vec(),b"ladder".to_vec()),
+		(b"Dav".to_vec(), b"laddernetwork.io".to_vec(),b"ladder".to_vec()),
+		(b"Eva".to_vec(), b"laddernetwork.io".to_vec(),b"ladder".to_vec()),
+		(b"Tra".to_vec(), b"laddernetwork.io".to_vec(),b"ladder".to_vec()),
+		(b"Glo".to_vec(), b"laddernetwork.io".to_vec(),b"ladder".to_vec()),
+		([].to_vec(), [].to_vec(),[].to_vec()),
 	]
 }
 

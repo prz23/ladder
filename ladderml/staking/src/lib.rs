@@ -839,6 +839,11 @@ decl_module! {
 		fn set_invulnerables(validators: Vec<T::AccountId>) {
 			<Invulnerables<T>>::put(validators);
 		}
+
+		/// Set the offline slash.
+		fn set_offline_slash(#[compact] new: u32) {
+		    <OfflineSlash<T>>::put(Perbill::from_billionths(new));
+		}
 	}
 }
 

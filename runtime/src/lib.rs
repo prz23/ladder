@@ -75,8 +75,8 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node"),
 	impl_name: create_runtime_str!("ladder-node"),
 	authoring_version: 11,
-	spec_version: 75,
-	impl_version: 75,
+	spec_version: 76,
+	impl_version: 76,
 	apis: RUNTIME_API_VERSIONS,
 };
 
