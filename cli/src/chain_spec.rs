@@ -140,7 +140,7 @@ impl GenesisConfigBuilder {
 				offline_slash_grace: 4,
 				minimum_validator_count: self.minimum_validator_count,
 				stakers: self.initial_authorities.iter().map(|x| (x.0.clone(), x.1.clone(), self.stash, StakerStatus::Validator)).collect(),
-				invulnerables: self.initial_authorities.iter().map(|x| x.1.clone()).collect(),
+				invulnerables: self.initial_authorities.iter().map(|x| x.0.clone()).collect(),
 				nodeinformation: get_nodeinformation(),
 				reward_per_year: self.reward_per_year,
 				validate_minimum_stake: self.validate_minimum_stake,
