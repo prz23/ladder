@@ -5,7 +5,6 @@ use srml_support::{StorageValue, dispatch::Result, decl_module, decl_storage, de
 use system::ensure_signed;
 use parity_codec::{Decode, Encode};
 use srml_support::traits::{Currency, WithdrawReason, ExistenceRequirement};
-//use system::Module;
 
 #[cfg(feature = "std")]
 use runtime_io::with_storage;

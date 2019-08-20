@@ -234,10 +234,6 @@ impl bank::Trait for Runtime {
 	type Currency =  Balances;
 }
 
-impl exchange::Trait for Runtime {
-	type Event = Event;
-}
-
 impl finality_tracker::Trait for Runtime {
 	type OnFinalizationStalled = grandpa::SyncedAuthorities<Runtime>;
 }
@@ -266,6 +262,12 @@ impl erc::Trait for Runtime {
 	type Event = Event;
 	type Currency =  Balances;
 }
+
+impl gateway::Trait for Runtime {
+	type Event = Event;
+	type Currency =  Balances;
+}
+
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, AuthorityId, AuthoritySignature>) where
 		Block = Block,
@@ -294,13 +296,13 @@ construct_runtime!(
 		Matrix: matrix::{Module, Call, Storage, Event<T>},
 		Signcheck: signcheck::{Module, Call, Storage, Config<T>, Event<T>},
 		Bank: bank::{Module,Call,Storage,Config<T>,Event<T>},
-		Exchange: exchange::{Module,Call,Storage,Event<T>},
 		Brand: brand::{Module, Call, Storage, Config<T>, Event<T>},
 		Otc: otc::{Module,Call,Storage,Config<T>,Event<T>},
 		Erc: erc::{Module,Call,Storage,Config<T>,Event<T>},
 		Order: order::{Module,Call,Storage,Event<T>},
 		Statistics: statistics::{Module,Call,Storage,Event<T>},
 		Ladsession: ladsession::{Module,Call,Storage,Event<T>},
+		Gateway: gateway::{Module, Call, Storage, Config<T>, Event<T>},
 	}
 );
 
@@ -436,7 +438,7 @@ impl_runtime_apis! {
 		}
 
         fn price_of(tag: u64) -> u64 {
-            Exchange::latest_exrate(tag)
+            1//Exchange::latest_exrate(tag)
         }
 	}
 }

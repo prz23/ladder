@@ -113,7 +113,7 @@ where
                 RelayType::Deposit => Call::Bank(BankCall::deposit(message.raw, signature)),
                 RelayType::Withdraw => Call::Bank(BankCall::withdraw(message.raw, signature)),
                 RelayType::SetAuthorities => Call::Matrix(MatrixCall::reset_authorities(message.raw, signature)),
-                RelayType::ExchangeRate => Call::Exchange(ExchangeCall::check_exchange(message.raw, signature)),
+//                RelayType::ExchangeRate => Call::Exchange(ExchangeCall::check_exchange(message.raw, signature)),
                 RelayType::LockToken => Call::Erc(ErcCall::lock_erc(message.raw, signature)),
                 RelayType::UnlockToken => Call::Erc(ErcCall::unlock_erc(message.raw, signature)),
             };

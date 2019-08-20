@@ -23,7 +23,7 @@ use node_runtime::{
     BalancesConfig, BankConfig, ConsensusConfig, ContractConfig, CouncilSeatsConfig,
     CouncilVotingConfig, DemocracyConfig, GrandpaConfig, IndicesConfig, Perbill, Permill,
     SessionConfig, StakerStatus, StakingConfig, SudoConfig, TimestampConfig, TreasuryConfig,
-    Trademark, BrandConfig, SigncheckConfig,ErcConfig,OtcConfig
+    Trademark, BrandConfig, SigncheckConfig,ErcConfig,OtcConfig, GatewayConfig,
 };
 use primitives::{
     crypto::{UncheckedInto, UncheckedFrom},
@@ -230,6 +230,9 @@ impl GenesisConfigBuilder {
 				athorities: self.initial_authorities.iter().map(|x| (x.2.clone()) ).collect(),
 				exchangelad : get_exchangelad(),
 			}),
+			gateway: Some(GatewayConfig {
+				author: self.root_key.clone(),
+			})
 		};
 		if self.print {
 			match config.contract.as_mut() {
