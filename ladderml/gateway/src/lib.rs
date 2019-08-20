@@ -1,9 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use srml_support::{StorageValue, dispatch::Result, decl_module, decl_storage, decl_event, StorageMap, dispatch::Vec, ensure};
+use srml_support::{StorageValue, dispatch::Result, decl_module, decl_storage, decl_event,
+                   StorageMap, dispatch::Vec, ensure};
 use system::ensure_signed;
 use parity_codec::{Decode, Encode};
-use srml_support::traits::Currency;
+use srml_support::traits::{Currency, WithdrawReason, ExistenceRequirement};
 //use system::Module;
 
 #[cfg(feature = "std")]
@@ -28,13 +29,13 @@ pub trait Trait: system::Trait + balances::Trait {
 decl_storage! {
     trait Store for Module<T: Trait> as Gateway {
         ///
-         Author get(author) config(): T::AccountId;
+        pub Author get(author) config(): T::AccountId;
         ///
-         TotalIncrease get(total_increase): BalanceOf<T>;
+        pub TotalIncrease get(total_increase): BalanceOf<T>;
         ///
-         TotalDecrease get(total_decrease): BalanceOf<T>;
+        pub TotalDecrease get(total_decrease): BalanceOf<T>;
         ///
-         HashOf get(hash_of): map T::Hash => EnterInfo<T::AccountId, BalanceOf<T>>;
+        pub HashOf get(hash_of): map T::Hash => EnterInfo<T::AccountId, BalanceOf<T>>;
     }
 }
 
@@ -52,61 +53,55 @@ decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
         fn deposit_event<T>() = default;
 
+        ///
         pub fn enter(origin, hash: T::Hash, receiver: T::AccountId, value: BalanceOf<T>) -> Result {
             let sender = ensure_signed(origin)?;
-            ensure!(sender == Self::author(), "Only author can call it");
+            ensure!(sender == Self::author(), "only author can call it");
 
-            if (<HashOf<T>>::exists(hash)) {
-                return Err("Repeat entry information");
+            if <HashOf<T>>::exists(hash) {
+                return Err("repeat entry");
             }
+            <HashOf<T>>::insert(hash, EnterInfo { receiver: receiver.clone(), value: value.clone() });
 
             // modify balance
             T::Currency::deposit_creating(&receiver, value);
 
-            <TotalIncrease<T>>::mutate(|total| {*total = *total + value;});
+            <TotalIncrease<T>>::mutate(|total| {*total = *total + value; });
 
             Self::deposit_event(RawEvent::Increase(hash, receiver, value));
             Ok(())
         }
 
+        ///
         pub fn out(origin, receiver: Vec<u8>, value: BalanceOf<T>) -> Result {
             let sender = ensure_signed(origin)?;
 
-            // modify balance
+            T::Currency::withdraw(&sender, value, WithdrawReason::Transfer, ExistenceRequirement::KeepAlive)?;
 
-
-            ensure!(T::Currency::can_slash(&sender, value), "balance to low");
-
-            T::Currency::slash(&sender, value);
-
-            <TotalDecrease<T>>::mutate(|total| {
-                *total = *total + value;
-                *total
-            });
+            <TotalDecrease<T>>::mutate(|total| { *total = *total + value; });
 
             // dispach event
             Self::deposit_event(RawEvent::Decrease(sender, receiver, value));
             Ok(())
         }
 
-//        /// update author
-//        pub fn update_author(new: T:AccountId) {
-//			<Author<T>>::put(new);
-//		}
+        /// update author
+        pub fn update_author(new: T::AccountId) {
+			<Author<T>>::put(new);
+		}
     }
 }
-
-impl<T: Trait> Module<T> {}
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use srml_support::{impl_outer_origin, assert_ok, assert_err};
+    use srml_support::{impl_outer_origin, assert_ok, assert_err,
+                    traits::{LockableCurrency, LockIdentifier, WithdrawReason, WithdrawReasons}};
     use runtime_io::{Blake2Hasher, with_externalities};
     use primitives::{
-        BuildStorage, traits::{BlakeTwo256, IdentityLookup},
+        BuildStorage, traits::{BlakeTwo256, IdentityLookup, Hash},
         testing::{H256, Digest, DigestItem, Header}
     };
 
@@ -147,6 +142,7 @@ mod tests {
     }
 
     type Gateway = Module<Test>;
+    type Balances = balances::Module<Test>;
 
     fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
         let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
@@ -156,10 +152,23 @@ mod tests {
         t.into()
     }
 
+    const ID_1: LockIdentifier = *b"1       ";
+
     #[test]
     fn initialize_test() {
         with_externalities(&mut new_test_ext(), || {
             assert_eq!(Gateway::author(), 1);
+
+            // author enter
+            assert_ok!(Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[1]), 2, 1000));
+            assert_eq!(Balances::free_balance(&2), 1000);
+
+            // 2 withdraw
+            assert_ok!(Gateway::out(Origin::signed(2),[1u8, 2u8].to_vec(), 1000));
+            assert_eq!(Balances::free_balance(&2), 0);
+
+            assert_eq!(Gateway::total_increase(), 1000);
+            assert_eq!(Gateway::total_decrease(), 1000);
         });
     }
 
@@ -167,6 +176,20 @@ mod tests {
     fn only_author_can_enter() {
         with_externalities(&mut new_test_ext(), || {
             assert_eq!(Gateway::author(), 1);
+
+            // author enter
+            Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[1]), 2, 1000);
+            assert_eq!(Balances::free_balance(&2), 1000);
+
+            // author enter
+            assert_ok!(Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[2]), 3, 1000));
+            assert_eq!(Balances::free_balance(&3), 1000);
+
+            // not author enter
+            assert_err!(Gateway::enter(Origin::signed(2), BlakeTwo256::hash(&[3]), 2, 1000), "only author can call it");
+            assert_eq!(Balances::free_balance(&2), 1000);
+
+            assert_eq!(Gateway::total_increase(), 2000);
         });
     }
 
@@ -174,6 +197,16 @@ mod tests {
     fn repeat_enter_should_failed() {
         with_externalities(&mut new_test_ext(), || {
             assert_eq!(Gateway::author(), 1);
+
+            // author enter
+            assert_ok!(Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[1]), 2, 1000));
+            assert_eq!(Balances::free_balance(&2), 1000);
+
+            // repeat hash
+            assert_err!(Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[1]), 2, 1000), "repeat entry");
+            assert_eq!(Balances::free_balance(&2), 1000);
+
+            assert_eq!(Gateway::total_increase(), 1000);
         });
     }
 
@@ -181,6 +214,30 @@ mod tests {
     fn only_avaliable_balance_can_go_out() {
         with_externalities(&mut new_test_ext(), || {
             assert_eq!(Gateway::author(), 1);
+
+            // author enter
+            assert_ok!(Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[1]), 2, 1000));
+            assert_eq!(Balances::free_balance(&2), 1000);
+
+            // lock balance
+            Balances::set_lock(ID_1, &2, 500, u64::max_value(), WithdrawReasons::all());
+
+            // 2 withdraw failed
+            assert_err!(Gateway::out(Origin::signed(2),[1u8, 2u8].to_vec(), 1000), "account liquidity restrictions prevent withdrawal");
+            assert_eq!(Balances::free_balance(&2), 1000);
+
+            // 2 withdraw
+            assert_ok!(Gateway::out(Origin::signed(2),[1u8, 2u8].to_vec(), 400));
+            assert_eq!(Balances::free_balance(&2), 600);
+
+
+            // unlock balance
+            Balances::remove_lock(ID_1, &2);
+            assert_ok!(Gateway::out(Origin::signed(2),[1u8, 2u8].to_vec(), 600));
+
+            assert_eq!(Gateway::total_increase(), 1000);
+            assert_eq!(Gateway::total_decrease(), 1000);
+
         });
     }
 
