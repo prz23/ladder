@@ -58,6 +58,7 @@ pub use otc::Call as OtcCall;
 pub use order::Call as OrderCall;
 pub use statistics::Call as StaCall;
 pub use ladsession::Call as SessCall;
+pub use gateway::Call as GatewayCall;
 pub use runtime_primitives::{Permill, Perbill};
 pub use support::StorageValue;
 pub use staking::StakerStatus;

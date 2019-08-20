@@ -35,7 +35,8 @@ members = [
     "ladderml/otc",
     "ladderml/signcheck",
     "ladderml/staking",
-    "ladderml/aura"
+    "ladderml/aura",
+    "ladderml/gateway"
 ]
 
 exclude = [
