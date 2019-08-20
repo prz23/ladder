@@ -12,7 +12,7 @@ srml-support = { git = "https://github.com/paritytech/substrate.git", rev = "6e6
 system = { package = "srml-system", git = "https://github.com/paritytech/substrate.git",rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 primitives = { package = "sr-primitives", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 runtime_io = { package = "sr-io", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
-balances = { package = "srml-balances", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3" }
+balances = { package = "srml-balances", git = "https://github.com/paritytech/substrate.git", rev = "6e67eff0653677d3d01980ca822c4b8a227914a3", default-features = false }
 
 [features]
 default = ["std"]

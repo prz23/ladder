@@ -2495,6 +2495,7 @@ name = "node-runtime"
 version = "1.0.0"
 dependencies = [
  "brand 0.1.0",
+ "gateway 0.1.0",
  "integer-sqrt 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ladder-aura 2.0.0",
  "ladder-bank 0.1.0",
