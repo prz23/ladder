@@ -20,6 +20,13 @@ pub struct EnterInfo<Account, Balance> {
     pub value: Balance,
 }
 
+#[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize, Debug))]
+pub struct OutInfo<Balance> {
+    pub receiver: Vec<u8>,
+    pub value: Balance,
+}
+
 pub trait Trait: system::Trait + balances::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
     type Currency: Currency<Self::AccountId>;
@@ -34,7 +41,9 @@ decl_storage! {
         ///
         pub TotalDecrease get(total_decrease): BalanceOf<T>;
         ///
-        pub HashOf get(hash_of): map T::Hash => EnterInfo<T::AccountId, BalanceOf<T>>;
+        pub HashOf get(hash_of): map T::Hash => Option<EnterInfo<T::AccountId, BalanceOf<T>>>;
+        ///
+        pub AccountOf get(account_of): map T::AccountId => Vec<OutInfo<BalanceOf<T>>>;
     }
 }
 
@@ -78,6 +87,7 @@ decl_module! {
             T::Currency::withdraw(&sender, value, WithdrawReason::Transfer, ExistenceRequirement::KeepAlive)?;
 
             <TotalDecrease<T>>::mutate(|total| { *total = *total + value; });
+            <AccountOf<T>>::mutate(&sender, |q| q.push(OutInfo { receiver: receiver.clone(), value: value.clone() }));
 
             // dispach event
             Self::deposit_event(RawEvent::Decrease(sender, receiver, value));
