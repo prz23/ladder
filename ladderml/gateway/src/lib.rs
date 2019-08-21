@@ -13,20 +13,6 @@ use serde_derive::{Deserialize, Serialize};
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
-#[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize, Debug))]
-pub struct EnterInfo<Account, Balance> {
-    pub receiver: Account,
-    pub value: Balance,
-}
-
-#[derive(PartialEq, Eq, Clone, Encode, Decode, Default)]
-#[cfg_attr(feature = "std", derive(Serialize, Deserialize, Debug))]
-pub struct OutInfo<Balance> {
-    pub receiver: Vec<u8>,
-    pub value: Balance,
-}
-
 pub trait Trait: system::Trait + balances::Trait {
     type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
     type Currency: Currency<Self::AccountId>;
@@ -34,16 +20,16 @@ pub trait Trait: system::Trait + balances::Trait {
 
 decl_storage! {
     trait Store for Module<T: Trait> as Gateway {
-        ///
+        /// The gateway controller
         pub Author get(author) config(): T::AccountId;
-        ///
+        /// The total increase in gateway
         pub TotalIncrease get(total_increase): BalanceOf<T>;
-        ///
+        /// The total decrease in gateway
         pub TotalDecrease get(total_decrease): BalanceOf<T>;
-        ///
-        pub HashOf get(hash_of): map T::Hash => Option<EnterInfo<T::AccountId, BalanceOf<T>>>;
-        ///
-        pub AccountOf get(account_of): map T::AccountId => Vec<OutInfo<BalanceOf<T>>>;
+        /// Record entry hash for deduplication
+        pub HashOf get(hash_of): map T::Hash => Option<(T::AccountId, BalanceOf<T>)>;
+        /// Record all outgoing from the gateway
+        pub AccountOf get(account_of): map T::AccountId => Vec<(Vec<u8>, BalanceOf<T>)>;
     }
 }
 
@@ -61,7 +47,9 @@ decl_module! {
     pub struct Module<T: Trait> for enum Call where origin: T::Origin {
         fn deposit_event<T>() = default;
 
-        ///
+        /// Map Ethereum funds to current system
+		///
+		/// Only the authority can successfully call.
         pub fn enter(origin, hash: T::Hash, receiver: T::AccountId, value: BalanceOf<T>) -> Result {
             let sender = ensure_signed(origin)?;
             ensure!(sender == Self::author(), "only author can call it");
@@ -69,7 +57,7 @@ decl_module! {
             if <HashOf<T>>::exists(hash) {
                 return Err("repeat entry");
             }
-            <HashOf<T>>::insert(hash, EnterInfo { receiver: receiver.clone(), value: value.clone() });
+            <HashOf<T>>::insert(hash, (receiver.clone(), value.clone()));
 
             // modify balance
             T::Currency::deposit_creating(&receiver, value);
@@ -80,14 +68,16 @@ decl_module! {
             Ok(())
         }
 
-        ///
+        /// Map current system funds to Ethereum
+		///
+		/// If the funds in the account are locked, the call will fail, for example in a mortgage.
         pub fn out(origin, receiver: Vec<u8>, value: BalanceOf<T>) -> Result {
             let sender = ensure_signed(origin)?;
 
             T::Currency::withdraw(&sender, value, WithdrawReason::Transfer, ExistenceRequirement::KeepAlive)?;
 
             <TotalDecrease<T>>::mutate(|total| { *total = *total + value; });
-            <AccountOf<T>>::mutate(&sender, |q| q.push(OutInfo { receiver: receiver.clone(), value: value.clone() }));
+            <AccountOf<T>>::mutate(&sender, |q| q.push((receiver.clone(), value.clone())));
 
             // dispach event
             Self::deposit_event(RawEvent::Decrease(sender, receiver, value));
