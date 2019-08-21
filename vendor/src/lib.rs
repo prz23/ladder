@@ -2,7 +2,7 @@
 mod macros;
 pub mod error;
 pub mod events;
-mod exchange;
+//mod exchange;
 pub mod label;
 mod listener;
 pub mod message;
@@ -24,7 +24,7 @@ use crate::sender::{AbosProxy, EthProxy, SideSender, SignContext, SenderProxy};
 use crate::supervisor::{PacketNonce, Supervisor, SuperviseClient};
 use crate::message::RelayMessage;
 use client::{blockchain::HeaderBackend, BlockchainEvents};
-use exchange::Exchange;
+//use exchange::Exchange;
 use futures::{Future, Stream};
 use keystore::Store as Keystore;
 use log::{error, info, warn};

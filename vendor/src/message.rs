@@ -8,7 +8,7 @@ pub enum RelayType {
     Deposit,
     Withdraw,
     SetAuthorities,
-    ExchangeRate,
+//    ExchangeRate,
     LockToken,
     UnlockToken,
 }
@@ -73,15 +73,15 @@ impl From<AuthorityEvent> for RelayMessage {
     }
 }
 
-impl From<ExchangeRateEvent> for RelayMessage {
-    fn from(event: ExchangeRateEvent) -> Self {
-        RelayMessage {
-            hash: event.tx_hash,
-            raw: event.to_bytes(),
-            ty: RelayType::ExchangeRate,
-        }
-    }
-}
+//impl From<ExchangeRateEvent> for RelayMessage {
+//    fn from(event: ExchangeRateEvent) -> Self {
+//        RelayMessage {
+//            hash: event.tx_hash,
+//            raw: event.to_bytes(),
+//            ty: RelayType::ExchangeRate,
+//        }
+//    }
+//}
 
 impl From<LockTokenEvent> for RelayMessage {
     fn from(event: LockTokenEvent) -> Self {
