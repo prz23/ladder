@@ -358,6 +358,7 @@ mod tests {
 					(2,50000),
 				],
 			}),
+			gateway: Some(Default::default())
 		}.build_storage().unwrap().0)
 	}
 
