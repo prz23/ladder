@@ -3,13 +3,8 @@
 use srml_support::{StorageValue, dispatch::Result, decl_module, decl_storage, decl_event,
                    StorageMap, dispatch::Vec, ensure};
 use system::ensure_signed;
-use parity_codec::{Decode, Encode};
 use srml_support::traits::{Currency, WithdrawReason, ExistenceRequirement};
 
-#[cfg(feature = "std")]
-use runtime_io::with_storage;
-#[cfg(feature = "std")]
-use serde_derive::{Deserialize, Serialize};
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 
@@ -30,6 +25,8 @@ decl_storage! {
         pub HashOf get(hash_of): map T::Hash => Option<(T::AccountId, BalanceOf<T>)>;
         /// Record all outgoing from the gateway
         pub AccountOf get(account_of): map T::AccountId => Vec<(Vec<u8>, BalanceOf<T>)>;
+        /// The value of maximum exit in single action.
+        pub MaximumExit get(maximum_exit) config(): BalanceOf<T>;
     }
 }
 
@@ -74,6 +71,8 @@ decl_module! {
         pub fn out(origin, receiver: Vec<u8>, value: BalanceOf<T>) -> Result {
             let sender = ensure_signed(origin)?;
 
+            ensure!(value <= Self::maximum_exit(), "exceeding the maximum output");
+
             T::Currency::withdraw(&sender, value, WithdrawReason::Transfer, ExistenceRequirement::KeepAlive)?;
 
             <TotalDecrease<T>>::mutate(|total| { *total = *total + value; });
@@ -87,6 +86,11 @@ decl_module! {
         /// update author
         pub fn update_author(new: T::AccountId) {
 			<Author<T>>::put(new);
+		}
+
+        /// update the value of maximum exit.
+		pub fn update_maximum_exit(new: BalanceOf<T>) {
+		    <MaximumExit<T>>::put(new);
 		}
     }
 }
@@ -147,6 +151,7 @@ mod tests {
         let mut t = system::GenesisConfig::<Test>::default().build_storage().unwrap().0;
         t.extend(GenesisConfig::<Test>{
             author: 1,
+            maximum_exit: 1000,
         }.build_storage().unwrap().0);
         t.into()
     }
@@ -168,6 +173,14 @@ mod tests {
 
             assert_eq!(Gateway::total_increase(), 1000);
             assert_eq!(Gateway::total_decrease(), 1000);
+
+            // author enter
+            assert_ok!(Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[2]), 2, 1001));
+            assert_eq!(Balances::free_balance(&2), 1001);
+
+            // withdraw fail, exceeding maximum
+            assert_err!(Gateway::out(Origin::signed(2),[1u8, 2u8].to_vec(), 1001), "exceeding the maximum output");
+            assert_eq!(Balances::free_balance(&2), 1001);
         });
     }
 
@@ -239,5 +252,4 @@ mod tests {
 
         });
     }
-
 }
