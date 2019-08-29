@@ -52,6 +52,7 @@ struct GenesisConfigBuilder {
 	pub stash: u128,
 	pub endowment: u128,
 	pub root_key: AccountId,
+    pub gateway_key: AccountId,
 	pub ethereum_public_keys: Vec<Vec<u8>>,
 	pub endowed_accounts: Vec<AccountId>,
 	pub initial_authorities: Vec<(AccountId, AccountId, AuthorityId)>,
@@ -73,7 +74,7 @@ impl Default for GenesisConfigBuilder {
 //		const ERA_TIME: u64 = HOURS;
 //		const ERA_PER_SESSIONS: u64 = ERA_TIME / SESSION_TIME;
 
-		const ENDOWMENT: u128 = 20_000_000 * LADS;
+		const ENDOWMENT: u128 = 100_000 * LADS;
 		const STASH: u128 = 50_000 * LADS;
 		const REWARDYEAR: u128 = 10_000_000 * LADS;  // 1000w
 
@@ -84,6 +85,7 @@ impl Default for GenesisConfigBuilder {
 			stash: STASH,
 			endowment: ENDOWMENT,
 			root_key: AccountId::default(),
+            gateway_key: AccountId::default(),
 			ethereum_public_keys: vec![],
 			endowed_accounts: vec![],
 			initial_authorities: vec![],
@@ -233,7 +235,7 @@ impl GenesisConfigBuilder {
 				exchangelad : get_exchangelad(),
 			}),
 			gateway: Some(GatewayConfig {
-				author: self.root_key.clone(),
+				author: self.gateway_key.clone(),
 				maximum_exit: self.maximum_exit,
 			})
 		};
@@ -350,6 +352,7 @@ pub fn testnet_genesis(
             get_account_id_from_seed("Ferdie//stash"),
             hex!("0bdb300d3f861c5f9dad27b4f2d37b613ab59c689f469cbb19b5844b75e02985")
                 .unchecked_into(),
+            hex!("6670330b1f8131ad370553b5e718c144ab87e9e4ccc967933f9e9f2854dea065").unchecked_into()
         ]
     });
 
@@ -361,12 +364,10 @@ pub fn testnet_genesis(
 	let mut builder = GenesisConfigBuilder::default();
 	builder.initial_authorities = initial_authorities;
 	builder.root_key = root_key;
+    builder.gateway_key = hex!("6670330b1f8131ad370553b5e718c144ab87e9e4ccc967933f9e9f2854dea065").unchecked_into();
 	builder.endowed_accounts = endowed_accounts;
 	builder.ethereum_public_keys = ethereum_public_keys;
 	builder.print = enable_println;
-	builder.sec_per_block = 4;
-	builder.sec_per_session = MINUTES;
-	builder.sec_per_era = MINUTES * 3;
 	builder.build()
 }
 
@@ -464,16 +465,16 @@ fn ladder_testnet_genesis() -> GenesisConfig {
         hex!("84f934cd44c0a044cc808dc11ce42623560b92961c2d4fc58d160006a7893bf47cf66a726388749a5b2cc46f85a21e41affca5156094003ced2669c605d6d251").to_vec(),
     ];
 
-    // root account.
+    // endowed account.
     let endowed_accounts: Vec<AccountId> = vec![
         hex!["58149eabec2e986b0dec740f243bbb836f6f6dc48a656e7c036471f1f6e06f6d"].unchecked_into(), //5E4CCLsJ3P1UBXgRdzFEQivMMJEqfg3VBj1tpvx8dsJa2FxQ
+        hex!("6670330b1f8131ad370553b5e718c144ab87e9e4ccc967933f9e9f2854dea065").unchecked_into(), //5EP2573tCEEmpxUsorY9CS5fr15kVRSPXRkG76YxtD8UzaiG
     ];
-
-	let root_key = hex!["58149eabec2e986b0dec740f243bbb836f6f6dc48a656e7c036471f1f6e06f6d"].unchecked_into(); //5E4CCLsJ3P1UBXgRdzFEQivMMJEqfg3VBj1tpvx8dsJa2FxQ
 
 	let mut builder = GenesisConfigBuilder::default();
 	builder.initial_authorities = initial_authorities;
-	builder.root_key = root_key;
+	builder.root_key = hex!["58149eabec2e986b0dec740f243bbb836f6f6dc48a656e7c036471f1f6e06f6d"].unchecked_into(); //5E4CCLsJ3P1UBXgRdzFEQivMMJEqfg3VBj1tpvx8dsJa2FxQ
+    builder.gateway_key = hex!("6670330b1f8131ad370553b5e718c144ab87e9e4ccc967933f9e9f2854dea065").unchecked_into(); //5EP2573tCEEmpxUsorY9CS5fr15kVRSPXRkG76YxtD8UzaiG
 	builder.endowed_accounts = endowed_accounts;
 	builder.ethereum_public_keys = ethereum_public_keys;
 	builder.validator_count = 30;
