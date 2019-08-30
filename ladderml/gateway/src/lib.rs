@@ -27,6 +27,8 @@ decl_storage! {
         pub AccountOf get(account_of): map T::AccountId => Vec<(Vec<u8>, BalanceOf<T>)>;
         /// The value of maximum exit in single action.
         pub MaximumExit get(maximum_exit) config(): BalanceOf<T>;
+        /// The value of minimum exit in single action.
+        pub MinimumExit get(minimum_exit) config(): BalanceOf<T>;
     }
 }
 
@@ -71,7 +73,10 @@ decl_module! {
         pub fn out(origin, receiver: Vec<u8>, value: BalanceOf<T>) -> Result {
             let sender = ensure_signed(origin)?;
 
+            // Another meaning, the maximum value is used to control whether to open the channel.
             ensure!(value <= Self::maximum_exit(), "exceeding the maximum output");
+
+            ensure!(value >= Self::minimum_exit(), "below the minimum output");
 
             T::Currency::withdraw(&sender, value, WithdrawReason::Transfer, ExistenceRequirement::KeepAlive)?;
 
@@ -91,6 +96,11 @@ decl_module! {
         /// update the value of maximum exit.
 		pub fn update_maximum_exit(new: BalanceOf<T>) {
 		    <MaximumExit<T>>::put(new);
+		}
+
+        /// update the value of minimum exit.
+		pub fn update_minimum_exit(new: BalanceOf<T>) {
+		    <MinimumExit<T>>::put(new);
 		}
     }
 }
@@ -152,6 +162,7 @@ mod tests {
         t.extend(GenesisConfig::<Test>{
             author: 1,
             maximum_exit: 1000,
+            minimum_exit: 10,
         }.build_storage().unwrap().0);
         t.into()
     }
@@ -181,6 +192,10 @@ mod tests {
             // withdraw fail, exceeding maximum
             assert_err!(Gateway::out(Origin::signed(2),[1u8, 2u8].to_vec(), 1001), "exceeding the maximum output");
             assert_eq!(Balances::free_balance(&2), 1001);
+
+            // withdraw fail, below minimum
+            assert_err!(Gateway::out(Origin::signed(2),[1u8, 2u8].to_vec(), 1), "below the minimum output");
+            assert_eq!(Balances::free_balance(&2), 1001);
         });
     }
 
@@ -190,7 +205,7 @@ mod tests {
             assert_eq!(Gateway::author(), 1);
 
             // author enter
-            Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[1]), 2, 1000);
+            assert_ok!(Gateway::enter(Origin::signed(1), BlakeTwo256::hash(&[1]), 2, 1000));
             assert_eq!(Balances::free_balance(&2), 1000);
 
             // author enter

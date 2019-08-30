@@ -62,6 +62,7 @@ struct GenesisConfigBuilder {
 	pub validate_minimum_stake: u128,
 	pub nominate_minimum_stake: u128,
 	pub maximum_exit: u128,
+	pub minimum_exit: u128,
 	pub bonding_duration: u64,
 	pub print: bool,
 }
@@ -94,6 +95,7 @@ impl Default for GenesisConfigBuilder {
 			validate_minimum_stake: 50_000 * LADS,
 			nominate_minimum_stake: 10 * LADS,
 			maximum_exit: 100_000 * LADS,
+			minimum_exit: 10 * LADS,
 			reward_per_year: REWARDYEAR,
 			bonding_duration: 240,
 			print: false,
@@ -237,6 +239,7 @@ impl GenesisConfigBuilder {
 			gateway: Some(GatewayConfig {
 				author: self.gateway_key.clone(),
 				maximum_exit: self.maximum_exit,
+				minimum_exit: self.minimum_exit,
 			})
 		};
 		if self.print {
