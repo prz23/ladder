@@ -72,13 +72,10 @@ EOF
 start() {
     # find local?
     if [ -e $EXE_PATH ]; then
-        local LOG_FILE="$LOGS_PATH/$NODE_NAME.log"
-        local NODE_PATH="$BASE_PATH/$NODE_NAME"
-
         # Start node
         # TODO to check env, if support to run with native, then run in native, else 
         if [ $NODE_NAME = "dev" ]; then
-            RUST_LOG='info' $EXE_PATH --chain=dev --base-path=$NODE_PATH >> $LOG_FILE 2>&1 & 
+            RUST_LOG='info' $EXE_PATH --dev --base-path=$NODE_PATH >> $LOG_FILE 2>&1 & 
         else
             RUST_LOG='info' $EXE_PATH --chain=ladder --base-path=$NODE_PATH --name=$NODE_NAME --bootnodes /ip4/47.56.107.144/tcp/30333/p2p/QmXS53cQyDRT7RaXiKYLjfkX8xSc9pBDPohDh1F3HxzjAz --validator --telemetry-url ws://telemetry.polkadot.io:1024 >> $LOG_FILE 2>&1 & 
         fi
@@ -90,12 +87,13 @@ start() {
     echo "not exist"
     # use docker only
     # test docker
+    # nohup docker run -p 30335:30333 -p 9966:9933 -p 9977:9944 -v $PWD/data:/data --name kusama parity/polkadot:v0.5.0 --validator --name "laddernetwork" --base-path="/data" --ws-external --rpc-cors=all > $PWD/kusama.log 2>&1 &
+    
 }
 
 # stop node
 stop() {
-    local SP="nodes/$NODE_NAME"
-    local pid=$(ps -ef | grep $EXE_NAME | grep $SP | grep -v grep | awk '{print $2}')
+    local pid=$(ps -ef | grep $EXE_NAME | grep $NODE_PATH | grep -v grep | awk '{print $2}')
     if [ $pid ]; then
         kill -9 $pid
         echo "killed $pid"
@@ -106,8 +104,6 @@ stop() {
 
 # clean database
 clean() {
-    local NODE_PATH="$BASE_PATH/$NODE_NAME"
-    local LOG_FILE="$LOGS_PATH/$NODE_NAME.log"
     if [ ! -d $NODE_PATH ]; then
         echo "No such node directory: ${NODE_NAME}"
         exit 1
@@ -119,7 +115,6 @@ clean() {
 }
 
 logs() {
-    local LOG_FILE="$LOGS_PATH/$NODE_NAME.log"
     tail -f $LOG_FILE
 }
 
@@ -129,7 +124,10 @@ update() {
 }
 
 top() {
-    ps -ef | grep $EXE_NAME | grep "base-path" | awk '{print $1 "\t" $2 "\t" $5 "\t" $10}' | sed "s/--base.*nodes\///"
+    ps -ef | \
+    grep $EXE_NAME | \
+    awk 'BEGIN {print "user \tpid \ttime \tname"} /--base-path/{print $1 "\t" $2 "\t" $5 "\t" $10}' | \
+    sed "s/--base.*nodes\///g"
 }
 
 sudo() {
@@ -208,6 +206,8 @@ main() {
     fi
 
     NODE_NAME=$2
+    NODE_PATH="$BASE_PATH/$NODE_NAME"
+    LOG_FILE="$LOGS_PATH/$NODE_NAME.log"
 
     dealwith "$@"
 
