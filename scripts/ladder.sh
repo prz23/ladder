@@ -131,7 +131,7 @@ start() {
     if [ $NODE_NAME = "dev" ]; then
         RUST_LOG='info' $EXE_PATH --dev --base-path=$NODE_PATH --name=$NOED_NAME >> $LOG_FILE 2>&1 & 
     else
-        RUST_LOG='info' $EXE_PATH --chain=ladder --base-path=$NODE_PATH --name=$NODE_NAME --bootnodes /ip4/47.56.107.144/tcp/30333/p2p/QmXS53cQyDRT7RaXiKYLjfkX8xSc9pBDPohDh1F3HxzjAz --validator --telemetry-url ws://telemetry.polkadot.io:1024 >> $LOG_FILE 2>&1 & 
+        RUST_LOG='info' $EXE_PATH --chain=ladder.json --base-path=$NODE_PATH --name=$NODE_NAME "${@:3}" >> $LOG_FILE 2>&1 & 
     fi
 
     # TODO check pid.

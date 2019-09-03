@@ -8,4 +8,4 @@ RUN apt-get update \
     && apt-get install -y libssl-dev \
     ca-certificates
 
-COPY ladder ladder.sh /chain/
+COPY ladder ladder.sh ladder.json /chain/
