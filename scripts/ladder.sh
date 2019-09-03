@@ -12,7 +12,7 @@
 #         |--test.log
 #         |--test2.log
 
-set -e
+#set -e
 
 DOCKER_IMAGE=kazee/ladder-node
 EXE_NAME=ladder
@@ -100,7 +100,7 @@ env() {
 
         if ! docker ps | grep "${CONTAINER_NAME}" > '/dev/null' 2>&1; then
             # remove dead container
-            docker rm ${CONTAINER_NAME} > /dev/null 2>&1
+            docker rm "${CONTAINER_NAME}" > '/dev/null' 2>&1
 
             # run new container
             docker run -d \
@@ -196,13 +196,8 @@ sudo() {
 }
 
 ensureDir() {
-    if [ ! -d $BASE_PATH ]; then
-        mkdir nodes
-    fi
-
-    if [ ! -d $LOGS_PATH ]; then 
-        mkdir nodes/logs
-    fi
+    mkdir -p nodes
+    mkdir -p nodes/logs
 }
 
 dealwith() {
@@ -269,11 +264,3 @@ main() {
 }
 
 main "$@"
-
-# run() {
-#     echo $@
-#     ./lad-env.sh $@
-#     echo "123"
-# }
-
-# run "$@"
