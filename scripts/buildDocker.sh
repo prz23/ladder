@@ -2,10 +2,7 @@
 
 ## TODO build.
 
-# check file exist?
-
 PROJECT_ROOT=`git rev-parse --show-toplevel`
-
 
 # Save current directory.
 pushd . >/dev/null
@@ -16,10 +13,13 @@ cp -f $PROJECT_ROOT/target/release/ladder .
 # Show version
 ./ladder --version
 
-# build it docker
+# Build it docker
 docker build . -f ./docker/Dockerfile -t kazee/ladder
 
-# build node docker 
+# Build node docker 
 docker build . -f ./docker/node.Dockerfile -t kazee/ladder-node
+
+# Remove file
+rm -f ./ladder
 
 popd >/dev/null
