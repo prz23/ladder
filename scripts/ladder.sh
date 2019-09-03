@@ -14,13 +14,12 @@
 
 #set -e
 
-DOCKER_IMAGE=kazee/ladder-node
+DOCKER_IMAGE=kazee/ladder
 EXE_NAME=ladder
 PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 BASE_PATH="$PROJECT_ROOT/nodes"
 EXE_PATH="$PROJECT_ROOT/$EXE_NAME"
 LOGS_PATH="$BASE_PATH/logs"
-DOCKER_IMAGE="ladder-node"
 CONTAINER_NAME="ladder"
 
 usage() {
@@ -88,7 +87,7 @@ env() {
     fi
 
     if [ $isDockerEnv == true ]; then
-        #echo "Use docker only"
+        echo "Use docker"
         # Test docker
         if ! test -x docker ; then
             echo "Please install docker firstly, use 'apt install docker.io' command"
@@ -128,10 +127,11 @@ env() {
 
 
 start() {
+    echo "$@"
     if [ $NODE_NAME = "dev" ]; then
         RUST_LOG='info' $EXE_PATH --dev --base-path=$NODE_PATH --name=$NOED_NAME >> $LOG_FILE 2>&1 & 
     else
-        RUST_LOG='info' $EXE_PATH --chain=ladder.json --base-path=$NODE_PATH --name=$NODE_NAME "${@:3}" >> $LOG_FILE 2>&1 & 
+        RUST_LOG='info' $EXE_PATH --chain=ladder.json --base-path=$NODE_PATH --name=$NODE_NAME "$@" >> $LOG_FILE 2>&1 & 
     fi
 
     # TODO check pid.
@@ -142,7 +142,7 @@ start() {
 
 restart() {
     stop
-    start
+    start "$@"
 }
 
 # stop node
@@ -207,13 +207,13 @@ dealwith() {
             help
             ;;
         start)
-            start
+            start "${@:3}"
             ;;
         stop)
             stop
             ;;
         restart)
-            restart
+            restart "${@:3}"
             ;;
         clean)
             clean

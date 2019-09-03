@@ -1,5 +1,5 @@
 DOCKER_IMAGE="kazee/ladder-node"
-CONTAINER_NAME="ladder"
+CONTAINER_NAME="ladder-node"
 
 docker ps | grep ${CONTAINER_NAME} > /dev/null 2>&1
 
