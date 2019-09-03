@@ -8,4 +8,6 @@ RUN apt-get update \
     && apt-get install -y libssl-dev \
     ca-certificates
 
+COPY ladder entrypoint.sh ./
+
 EXPOSE 30333 9933 9944
