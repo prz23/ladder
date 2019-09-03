@@ -17,6 +17,6 @@ PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 EXE_PATH="$PWD/ladder"
 BASE_PATH="$PWD/$NODE_NAME"
 
-RUST_LOG='info' $EXE_PATH --chain=ladder --base-path=$BASE_PATH --key=$KEY --name=$NODE_NAME --bootnodes /ip4/47.56.107.144/tcp/30333/p2p/QmXS53cQyDRT7RaXiKYLjfkX8xSc9pBDPohDh1F3HxzjAz --port $PORT --validator --telemetry-url ws://telemetry.polkadot.io:1024 > $LOG_FILE 2>&1 & 
+RUST_LOG='info' $EXE_PATH --chain=ladder.json --base-path=$BASE_PATH --key=$KEY --name=$NODE_NAME --port $PORT --validator > $LOG_FILE 2>&1 & 
 
 echo "Node run with $NODE_NAME, Log in $LOG_FILE file"

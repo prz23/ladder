@@ -33,6 +33,10 @@ use primitives::{
 };
 use substrate_service;
 
+use substrate_telemetry::TelemetryEndpoints;
+
+const STAGING_TELEMETRY_URL: &str = "wss://telemetry.polkadot.io/submit/";
+
 /// Specialized `ChainSpec`.
 pub type ChainSpec = substrate_service::ChainSpec<GenesisConfig>;
 
@@ -492,7 +496,7 @@ pub fn ladder_testnet_config() -> ChainSpec {
         "Ladder Testnet",
         ladder_testnet_genesis,
         vec![],
-        None,
+        Some(TelemetryEndpoints::new(vec![(STAGING_TELEMETRY_URL.to_string(), 0)])),
         None,
         None,
         None,

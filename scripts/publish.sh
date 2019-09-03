@@ -20,6 +20,7 @@ cargo build --release
 FILES=(
     "target/release/ladder"
     "scripts/ladder.sh"
+    "cli/res/ladder.json"
 )
 
 mkdir -p ./$PUBLISH
@@ -31,7 +32,7 @@ done
 # Make package
 cd $PROJECT_ROOT/$PUBLISH
 version=$(./ladder --version | sed  's/^ladder //')
-tar -cf $version.tar ./ladder ./ladder.sh
+tar -cf $version.tar ./ladder ./ladder.sh ./ladder.json
 
 echo "Package '$version.tar' is ready."
 # Restore initial directory.
