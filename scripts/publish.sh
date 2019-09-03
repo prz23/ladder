@@ -6,7 +6,7 @@ PROJECT_ROOT=`git rev-parse --show-toplevel`
 PUBLISH=publish
 
 # Build wasm
-#./build.sh
+$PROJECT_ROOT/scripts/build.sh
 
 # Save current directory.
 pushd . >/dev/null
@@ -14,7 +14,7 @@ pushd . >/dev/null
 # Build target
 cd $PROJECT_ROOT
 echo "Build ladder"
-#cargo build --release
+cargo build --release
 
 # Copy files 
 FILES=(
