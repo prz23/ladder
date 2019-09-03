@@ -2,8 +2,8 @@
 
 # directory structure
 # |--ladder.sh
-# |--nodes   # for storage
-#     |--ladder  # for native start if exist
+# |--ladder  # for native start if exist
+# |--nodes   # for storage (native and docker)
 #     |--test
 #         |--chains
 #     |--test2
@@ -18,8 +18,10 @@ DOCKER_IMAGE=kazee/ladder-node
 EXE_NAME=ladder
 PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 BASE_PATH="$PROJECT_ROOT/nodes"
-EXE_PATH="$BASE_PATH/$EXE_NAME"
+EXE_PATH="$PROJECT_ROOT/$EXE_NAME"
 LOGS_PATH="$BASE_PATH/logs"
+DOCKER_IMAGE="ladder-node"
+CONTAINER_NAME="ladder"
 
 usage() {
     cat <<EOF
@@ -69,26 +71,78 @@ EOF
 
 }
 
-start() {
-    # find local?
-    if [ -e $EXE_PATH ]; then
-        # Start node
-        # TODO to check env, if support to run with native, then run in native, else 
-        if [ $NODE_NAME = "dev" ]; then
-            RUST_LOG='info' $EXE_PATH --dev --base-path=$NODE_PATH >> $LOG_FILE 2>&1 & 
-        else
-            RUST_LOG='info' $EXE_PATH --chain=ladder --base-path=$NODE_PATH --name=$NODE_NAME --bootnodes /ip4/47.56.107.144/tcp/30333/p2p/QmXS53cQyDRT7RaXiKYLjfkX8xSc9pBDPohDh1F3HxzjAz --validator --telemetry-url ws://telemetry.polkadot.io:1024 >> $LOG_FILE 2>&1 & 
-        fi
+INIT_CMD='sleep infinity'
 
-        echo "Start node: $NODE_NAME"
-        exit 0
+env() {
+    # Check if need to run in docker?
+    isDockerEnv=false
+
+    if [ ! -e $EXE_PATH ]; then
+        isDockerEnv=true
+    else
+        # Get the version 
+        canRunNative=$($EXE_PATH --version | grep "^ladder.*")
+        if test -z "$canRunNative" ; then
+            isDockerEnv=true
+        fi
     fi
 
-    echo "not exist"
-    # use docker only
-    # test docker
-    # nohup docker run -p 30335:30333 -p 9966:9933 -p 9977:9944 -v $PWD/data:/data --name kusama parity/polkadot:v0.5.0 --validator --name "laddernetwork" --base-path="/data" --ws-external --rpc-cors=all > $PWD/kusama.log 2>&1 &
-    
+    if [ $isDockerEnv == true ]; then
+        #echo "Use docker only"
+        # Test docker
+        if ! test -x docker ; then
+            echo "Please install docker firstly, use 'apt install docker.io' command"
+            exit 1
+        fi
+
+        # run instance in one docker or multi docker? impl single
+        # nohup docker run -p 30335:30333 -p 9966:9933 -p 9977:9944 -v $PWD/data:/data --name kusama parity/polkadot:v0.5.0 --validator --name "laddernetwork" --base-path="/data" --ws-external --rpc-cors=all > $PWD/kusama.log 2>&1 &
+
+        if ! docker ps | grep "${CONTAINER_NAME}" > '/dev/null' 2>&1; then
+            # remove dead container
+            docker rm ${CONTAINER_NAME} > /dev/null 2>&1
+
+            # run new container
+            docker run -d \
+                --net=host \
+                --volume `pwd`/nodes:/chain/nodes  \
+                --name ${CONTAINER_NAME} \
+                ${DOCKER_IMAGE} \
+                /bin/bash -c "${INIT_CMD}"
+            sleep 3
+        fi
+
+        local background=false
+        if [[ $1 == "start" ]] || [[ $1 == "restart" ]]; then
+            background=true
+        fi
+
+        if [ $background = true ]; then
+            docker exec -id ${CONTAINER_NAME} ./ladder.sh "$@"
+        else
+            docker exec -it ${CONTAINER_NAME} ./ladder.sh "$@"
+        fi
+        exit 0
+    fi
+}
+
+
+start() {
+    if [ $NODE_NAME = "dev" ]; then
+        RUST_LOG='info' $EXE_PATH --dev --base-path=$NODE_PATH --name=$NOED_NAME >> $LOG_FILE 2>&1 & 
+    else
+        RUST_LOG='info' $EXE_PATH --chain=ladder --base-path=$NODE_PATH --name=$NODE_NAME --bootnodes /ip4/47.56.107.144/tcp/30333/p2p/QmXS53cQyDRT7RaXiKYLjfkX8xSc9pBDPohDh1F3HxzjAz --validator --telemetry-url ws://telemetry.polkadot.io:1024 >> $LOG_FILE 2>&1 & 
+    fi
+
+    # TODO check pid.
+    echo "Start node: $NODE_NAME"
+    exit 0
+}
+
+
+restart() {
+    stop
+    start
 }
 
 # stop node
@@ -96,7 +150,7 @@ stop() {
     local pid=$(ps -ef | grep $EXE_NAME | grep $NODE_PATH | grep -v grep | awk '{print $2}')
     if [ $pid ]; then
         kill -9 $pid
-        echo "killed $pid"
+        echo "Killed $pid, name: $NODE_NAME"
     else
         echo "No such process"
     fi 
@@ -185,11 +239,11 @@ dealwith() {
 }
 
 main() {
-    # echo $PROJECT_ROOT
-    # echo $EXE_PATH
-    # echo $BASE_PATH
-
+    # Mock directory
     ensureDir
+
+    # Check runing environment
+    env "$@"
 
     # Commands not depend on node name
     local indie=( help usage update top )
@@ -215,3 +269,11 @@ main() {
 }
 
 main "$@"
+
+# run() {
+#     echo $@
+#     ./lad-env.sh $@
+#     echo "123"
+# }
+
+# run "$@"
